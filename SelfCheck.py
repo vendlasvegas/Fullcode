@@ -3473,12 +3473,21 @@ def _thank_you_complete(self):
         logging.info(f"Touch in Cart mode at ({x}, {y})")
         self._on_activity()
 
+    def _on_touch(self, event):
+        """Handle touch events in Cart mode."""
+        x, y = event.x, event.y
+        logging.info(f"Touch in Cart mode at ({x}, {y})")
+        self._on_activity()
+
+
+
     def _on_activity(self, event=None):
+        """Reset inactivity timer."""
         # Reset inactivity timer
         self.last_activity_ts = time.time()
-        
+    
         # Cancel any existing timeout popup
-        if self.timeout_popup:
+        if hasattr(self, 'timeout_popup') and self.timeout_popup:
             self._cancel_timeout_popup()
 
     def start(self):
