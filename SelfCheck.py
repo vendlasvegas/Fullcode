@@ -193,10 +193,10 @@ class IdleMode:
         self._load_button_images()
         
         # Add touch support to all elements
-        self.label.bind("<Button-1>", self._on_touch)
-        self.bottom_text.bind("<Button-1>", self._on_touch)
-        self.time_label.bind("<Button-1>", self._on_touch)
-        self.weather_label.bind("<Button-1>", self._on_touch)
+        self.label.bind("<Button-1>", self.on_touch)
+        self.bottom_text.bind("<Button-1>", self.on_touch)
+        self.time_label.bind("<Button-1>", self.on_touch)
+        self.weather_label.bind("<Button-1>", self.on_touch)
         self.admin_button.bind("<Button-1>", self._on_admin_button_click)
         
         # Selection screen bindings
@@ -245,7 +245,7 @@ class IdleMode:
         except Exception as e:
             logging.error(f"Error loading button images: {e}")
 
-    def _on_touch(self, event):
+    def on_touch(self, event):
         # Touch handler for idle mode
         if not self.is_active:
             return
@@ -852,9 +852,9 @@ class PriceCheckMode:
         self.scan_var.trace_add("write", self._on_scan_var_change)
 
         # Add touch support
-        self.label.bind("<Button-1>", self._on_touch)
+        self.label.bind("<Button-1>", self.on_touch)
 
-    def _on_touch(self, event):
+    def on_touch(self, event):
         # Touch handler for PriceCheck mode
         x, y = event.x, event.y
         logging.info(f"Touch in PriceCheck mode at ({x}, {y})")
@@ -1387,10 +1387,10 @@ class AdminMode:
         self.login_screen = None  # Will be created in start()
         
         # Add touch support
-        self.label.bind("<Button-1>", self._on_touch)
+        self.label.bind("<Button-1>", self.on_touch)
         self.label.bind("<Motion>", self._on_activity)
 
-    def _on_touch(self, event):
+    def on_touch(self, event):
         # Touch handler for Admin mode
         x, y = event.x, event.y
         logging.info(f"Touch in Admin mode at ({x}, {y})")
@@ -2002,7 +2002,7 @@ class CartMode:
         self.countdown_value = 30
         
         # Add touch support
-        self.label.bind("<Button-1>", self._on_touch)
+        self.label.bind("<Button-1>", self.on_touch)
         self.label.bind("<Motion>", self._on_activity)
         
         # Barcode input handling
@@ -3467,7 +3467,7 @@ def _thank_you_complete(self):
             target_label.config(image="", text=f"Error loading image")
             return False
 
-    def _on_touch(self, event):
+    def on_touch(self, event):
         # Touch handler for cart mode
         x, y = event.x, event.y
         logging.info(f"Touch in Cart mode at ({x}, {y})")
