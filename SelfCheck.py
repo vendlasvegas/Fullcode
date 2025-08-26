@@ -3091,6 +3091,519 @@ class CartMode:
         if method == "Venmo":
             # Show QR code for Venmo payment
             self._show_venmo_qr_code(total)
+        elif method == "Stripe":
+            # Show QR code for Stripe payment
+            self._show_stripe_qr_code(total)
+        else:
+            # For other payment methods (temporary)
+            self._close_payment_popup()
+            
+            # Log the transaction
+            self._log_successful_transaction(method, total)
+            
+            # Show thank you popup
+            self._show_thank_you_popup()
+
+    def _show_stripe_qr_code(self, total):
+        """Show QR code for Stripe credit card payment."""
+        # Close the current payment popup
+        if hasattr(self, 'payment_popup') and self.payment_popup:
+            self.payment_popup.destroy()
+        
+        # Create a new popup for the QR code
+        self.payment_popup = tk.Frame(self.root, bg="white", bd=3, relief=tk.RAISED)
+        self.payment_popup.place(relx=0.5, rely=0.5, width=600, height=700, anchor=tk.CENTER)
+        
+        # Title
+        title_label = tk.Label(self.payment_popup, 
+                             text="Pay with Credit Card", 
+                             font=("Arial", 24, "bold"), 
+                             bg="white")
+        title_label.pack(pady=(20, 10))
+        
+        try:
+            # Generate QR code and get session ID
+            qr_img, session_id = self._generate_stripe_qr_code(total)
+            
+            # Store session ID for reference
+            self.current_stripe_session_id = session_id
+            
+            # Amount
+            details_frame = tk.Frame(self.payment_popup, bg="white")
+            details_frame.pack(pady=(0, 10))
+            
+            amount_label = tk.Label(details_frame, 
+                                  text=f"Amount: ${total:.2f}", 
+                                  font=("Arial", 18), 
+                                  bg="white")
+            amount_label.pack(pady=5)
+            
+            # Resize QR for display
+            qr_img = qr_img.resize((300, 300), Image.LANCZOS)
+            
+            # Convert to PhotoImage
+            qr_photo = ImageTk.PhotoImage(qr_img)
+            
+            # Display QR code
+            qr_label = tk.Label(self.payment_popup, image=qr_photo, bg="white")
+            qr_label.image = qr_photo  # Keep a reference
+            qr_label.pack(pady=10)
+            
+            # Instructions
+            instructions = (
+                "1. Open your phone's camera app\n"
+                "2. Scan this QR code\n"
+                "3. Follow the link to the payment page\n"
+                "4. Complete payment on your phone\n"
+                "5. Wait for confirmation (automatic)"
+            )
+            
+            instructions_label = tk.Label(self.payment_popup, 
+                                        text=instructions, 
+                                        font=("Arial", 14), 
+                                        bg="white",
+                                        justify=tk.LEFT)
+            instructions_label.pack(pady=10)
+            
+            # Status message (initially empty)
+            self.stripe_status_label = tk.Label(self.payment_popup,
+                                              text="Waiting for payment...",
+                                              font=("Arial", 14, "italic"),
+                                              bg="white",
+                                              fg="#888888")
+            self.stripe_status_label.pack(pady=5)
+            
+        except Exception as e:
+            logging.error(f"Error generating Stripe QR code: {e}")
+            import traceback
+            logging.error(traceback.format_exc())
+            
+            # Show error message instead of QR code
+            error_label = tk.Label(self.payment_popup, 
+                                 text=f"Error generating QR code:\n{str(e)}", 
+                                 font=("Arial", 16), 
+                                 bg="white",
+                                 fg="#e74c3c")  # Red color
+            error_label.pack(pady=20)
+        
+        # Button frame
+        button_frame = tk.Frame(self.payment_popup, bg="white")
+        button_frame.pack(pady=(20, 20), fill=tk.X, padx=20)
+        
+        # Return to Cart button
+        return_btn = tk.Button(button_frame, 
+                             text="Return to Cart", 
+                             font=("Arial", 16), 
+                             command=self._close_payment_popup,
+                             bg="#3498db", fg="white",
+                             height=1)
+        return_btn.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
+        
+        # Cancel Order button
+        cancel_btn = tk.Button(button_frame, 
+                             text="Cancel Order", 
+                             font=("Arial", 16), 
+                             command=self._cancel_from_payment,
+                             bg="#e74c3c", fg="white",
+                             height=1)
+        cancel_btn.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
+        
+        # Start webhook listener
+        self._start_stripe_webhook_listener()
+        
+        # Start timeout for payment popup - 60 seconds
+        self._start_stripe_payment_timeout()
+
+    def _generate_stripe_qr_code(self, total):
+        """Generate a Stripe payment QR code."""
+        import qrcode
+        import stripe
+        import json
+        import uuid
+        
+        # Load Stripe credentials
+        try:
+            stripe_secret_key_path = Path.home() / "SelfCheck" / "Cred" / "Stripe_Secret_Key.txt"
+            stripe_dest_id_path = Path.home() / "SelfCheck" / "Cred" / "Stripe_Dest_ID.txt"
+            stripe_url_path = Path.home() / "SelfCheck" / "Cred" / "Stripe_URL.txt"
+            
+            if not stripe_secret_key_path.exists():
+                raise FileNotFoundError(f"Stripe secret key file not found: {stripe_secret_key_path}")
+            
+            if not stripe_dest_id_path.exists():
+                raise FileNotFoundError(f"Stripe destination ID file not found: {stripe_dest_id_path}")
+                
+            if not stripe_url_path.exists():
+                raise FileNotFoundError(f"Stripe URL file not found: {stripe_url_path}")
+            
+            # Read credentials
+            with open(stripe_secret_key_path, 'r') as f:
+                stripe_secret_key = f.read().strip()
+            
+            with open(stripe_dest_id_path, 'r') as f:
+                stripe_dest_id = f.read().strip()
+                
+            with open(stripe_url_path, 'r') as f:
+                stripe_url = f.read().strip()
+            
+            # Initialize Stripe
+            stripe.api_key = stripe_secret_key
+            
+            # Format the amount with 2 decimal places
+            formatted_total = "{:.2f}".format(total)
+            
+            # Generate a unique reference ID
+            reference_id = str(uuid.uuid4())
+            
+            # Store the reference ID for verification
+            self.stripe_reference_id = reference_id
+            
+            # Create a Stripe Checkout Session
+            checkout_session = stripe.checkout.Session.create(
+                payment_method_types=['card'],
+                line_items=[{
+                    'price_data': {
+                        'currency': 'usd',
+                        'product_data': {
+                            'name': f'Purchase from {self.machine_id}',
+                            'description': f'Transaction ID: {self.transaction_id}',
+                        },
+                        'unit_amount': int(float(formatted_total) * 100),  # Convert to cents
+                    },
+                    'quantity': 1,
+                }],
+                mode='payment',
+                success_url=f'{stripe_url}/success?session_id={{CHECKOUT_SESSION_ID}}&machine_id={self.machine_id}&reference={reference_id}',
+                cancel_url=f'{stripe_url}/cancel?machine_id={self.machine_id}&reference={reference_id}',
+                metadata={
+                    'machine_id': self.machine_id,
+                    'transaction_id': self.transaction_id,
+                    'reference_id': reference_id,
+                },
+                payment_intent_data={
+                    'metadata': {
+                        'machine_id': self.machine_id,
+                        'transaction_id': self.transaction_id,
+                        'reference_id': reference_id,
+                    },
+                    'transfer_data': {
+                        'destination': stripe_dest_id,
+                    },
+                },
+            )
+            
+            # Get the session ID
+            session_id = checkout_session.id
+            
+            # Create the URL for the QR code
+            checkout_url = checkout_session.url
+            
+            logging.info(f"Generated Stripe checkout URL: {checkout_url}")
+            logging.info(f"Stripe session ID: {session_id}")
+            logging.info(f"Reference ID: {reference_id}")
+            
+            # Create QR code for the checkout URL
+            qr = qrcode.QRCode(
+                version=1,
+                error_correction=qrcode.constants.ERROR_CORRECT_L,
+                box_size=10,
+                border=4,
+            )
+            qr.add_data(checkout_url)
+            qr.make(fit=True)
+            
+            # Create an image from the QR Code
+            img = qr.make_image(fill_color="black", back_color="white")
+            
+            # Return the PIL Image and session ID
+            return img, session_id
+            
+        except Exception as e:
+            logging.error(f"Error generating Stripe QR code: {e}")
+            import traceback
+            logging.error(traceback.format_exc())
+            raise
+
+    def _start_stripe_webhook_listener(self):
+        """Start listening for Stripe webhook events."""
+        import threading
+        import http.server
+        import socketserver
+        import json
+        import stripe
+        import time
+        from datetime import datetime, timedelta
+        
+        # Load webhook secret
+        try:
+            webhook_secret_path = Path.home() / "SelfCheck" / "Cred" / "Stripe_Webhook_Secret.txt"
+            
+            if not webhook_secret_path.exists():
+                raise FileNotFoundError(f"Stripe webhook secret file not found: {webhook_secret_path}")
+            
+            with open(webhook_secret_path, 'r') as f:
+                webhook_secret = f.read().strip()
+            
+            # Store the start time for timeout checking
+            self.stripe_webhook_start_time = time.time()
+            
+            # Flag to track if payment was received
+            self.stripe_payment_received = False
+            
+            # Define webhook handler
+            class StripeWebhookHandler(http.server.BaseHTTPRequestHandler):
+                def do_POST(self):
+                    content_length = int(self.headers['Content-Length'])
+                    post_data = self.rfile.read(content_length)
+                    
+                    try:
+                        # Verify webhook signature
+                        event = stripe.Webhook.construct_event(
+                            post_data, self.headers['Stripe-Signature'], webhook_secret
+                        )
+                        
+                        # Log the event
+                        logging.info(f"Received Stripe webhook event: {event['type']}")
+                        
+                        # Check if it's a payment success event
+                        if event['type'] == 'checkout.session.completed':
+                            session = event['data']['object']
+                            
+                            # Get metadata
+                            metadata = session.get('metadata', {})
+                            machine_id = metadata.get('machine_id')
+                            reference_id = metadata.get('reference_id')
+                            
+                            # Check if this webhook is for this machine
+                            if machine_id == self.server.machine_id:
+                                # Check if the webhook is recent (within 5 minutes)
+                                event_time = datetime.fromtimestamp(event['created'])
+                                now = datetime.now()
+                                
+                                if now - event_time <= timedelta(minutes=5):
+                                    # Check if reference ID matches
+                                    if reference_id == self.server.reference_id:
+                                        logging.info(f"Valid payment confirmation received for machine {machine_id}")
+                                        
+                                        # Set payment received flag
+                                        self.server.payment_received = True
+                                        
+                                        # Schedule UI update in main thread
+                                        self.server.root.after(0, self.server.payment_callback)
+                                    else:
+                                        logging.warning(f"Reference ID mismatch: {reference_id} vs {self.server.reference_id}")
+                                else:
+                                    logging.warning(f"Webhook event too old: {event_time}")
+                            else:
+                                logging.info(f"Webhook for different machine: {machine_id}")
+                        
+                        # Send response
+                        self.send_response(200)
+                        self.end_headers()
+                        self.wfile.write(b'Event received')
+                        
+                    except Exception as e:
+                        logging.error(f"Error processing webhook: {e}")
+                        self.send_response(400)
+                        self.end_headers()
+                        self.wfile.write(b'Webhook error')
+            
+            # Create server
+            class StripeWebhookServer(socketserver.TCPServer):
+                def __init__(self, server_address, RequestHandlerClass, machine_id, reference_id, root, payment_callback):
+                    self.machine_id = machine_id
+                    self.reference_id = reference_id
+                    self.root = root
+                    self.payment_callback = payment_callback
+                    self.payment_received = False
+                    socketserver.TCPServer.__init__(self, server_address, RequestHandlerClass)
+            
+            # Start server in a separate thread
+            def run_server():
+                try:
+                    # Use a random available port
+                    with StripeWebhookServer(('localhost', 0), StripeWebhookHandler, 
+                                            self.machine_id, self.stripe_reference_id, 
+                                            self.root, self._on_stripe_payment_received) as httpd:
+                        
+                        # Store the server port
+                        self.stripe_webhook_port = httpd.server_address[1]
+                        logging.info(f"Stripe webhook server started on port {self.stripe_webhook_port}")
+                        
+                        # Serve until shutdown
+                        httpd.serve_forever()
+                except Exception as e:
+                    logging.error(f"Error in webhook server: {e}")
+            
+            # Start server thread
+            self.stripe_webhook_thread = threading.Thread(target=run_server)
+            self.stripe_webhook_thread.daemon = True
+            self.stripe_webhook_thread.start()
+            
+        except Exception as e:
+            logging.error(f"Error starting Stripe webhook listener: {e}")
+            import traceback
+            logging.error(traceback.format_exc())
+
+    def _on_stripe_payment_received(self):
+        """Handle successful Stripe payment."""
+        logging.info("Stripe payment received and verified")
+        
+        # Update status label if it exists
+        if hasattr(self, 'stripe_status_label') and self.stripe_status_label:
+            self.stripe_status_label.config(text="Payment confirmed! Processing...", fg="#27ae60")
+        
+        # Set payment received flag
+        self.stripe_payment_received = True
+        
+        # Calculate the total for logging
+        subtotal = sum(item["price"] * item["qty"] for item in self.cart_items.values())
+        taxable_subtotal = sum(
+            item["price"] * item["qty"] 
+            for item in self.cart_items.values() if item["taxable"]
+        )
+        tax_amount = taxable_subtotal * (self.tax_rate / 100)
+        total = subtotal + tax_amount
+        
+        # Store the payment method for receipt printing
+        self.current_payment_method = "Credit Card"
+        
+        # Log the transaction
+        self._log_successful_transaction("Credit Card", total)
+        
+        # Wait a moment to show the confirmation message
+        self.root.after(2000, self._show_thank_you_popup)
+
+    def _start_stripe_payment_timeout(self):
+        """Start timeout for Stripe payment."""
+        self.stripe_payment_timeout = self.root.after(60000, self._stripe_payment_timeout)
+
+    def _stripe_payment_timeout(self):
+        """Handle timeout for Stripe payment."""
+        # Check if payment was received
+        if hasattr(self, 'stripe_payment_received') and self.stripe_payment_received:
+            return
+        
+        # Show confirmation popup
+        self._show_stripe_confirmation_popup()
+
+    def _show_stripe_confirmation_popup(self):
+        """Show confirmation popup for Stripe payment."""
+        # Create popup
+        self.stripe_confirm_popup = tk.Frame(self.root, bg="white", bd=3, relief=tk.RAISED)
+        self.stripe_confirm_popup.place(relx=0.5, rely=0.5, width=500, height=300, anchor=tk.CENTER)
+        
+        # Message
+        message = tk.Label(self.stripe_confirm_popup, text="Please Confirm your Payment was submitted on your phone", 
+                         font=("Arial", 20, "bold"), bg="white", wraplength=450)
+        message.pack(pady=(40, 20))
+        
+        # Countdown
+        self.stripe_countdown_value = 30
+        self.stripe_countdown_label = tk.Label(self.stripe_confirm_popup, 
+                                             text=f"Returning to main menu in {self.stripe_countdown_value} seconds", 
+                                             font=("Arial", 18), bg="white")
+        self.stripe_countdown_label.pack(pady=20)
+        
+        # Start countdown
+        self._update_stripe_countdown()
+
+    def _update_stripe_countdown(self):
+        """Update the Stripe confirmation countdown timer."""
+        # Check if payment was received
+        if hasattr(self, 'stripe_payment_received') and self.stripe_payment_received:
+            if hasattr(self, 'stripe_confirm_popup') and self.stripe_confirm_popup:
+                self.stripe_confirm_popup.destroy()
+            return
+        
+        # Update countdown
+        self.stripe_countdown_value -= 1
+        self.stripe_countdown_label.config(text=f"Returning to main menu in {self.stripe_countdown_value} seconds")
+        
+        if self.stripe_countdown_value <= 0:
+            self._stripe_confirmation_expired()
+            return
+            
+        self.stripe_countdown_after = self.root.after(1000, self._update_stripe_countdown)
+
+    def _stripe_confirmation_expired(self):
+        """Handle expiration of Stripe confirmation popup."""
+        # Calculate the total
+        subtotal = sum(item["price"] * item["qty"] for item in self.cart_items.values())
+        taxable_subtotal = sum(
+            item["price"] * item["qty"] 
+            for item in self.cart_items.values() if item["taxable"]
+        )
+        tax_amount = taxable_subtotal * (self.tax_rate / 100)
+        total = subtotal + tax_amount
+        
+        # Log the unconfirmed payment
+        self._log_unconfirmed_stripe_payment(total)
+        
+        # Close all popups
+        self._close_all_payment_popups()
+        
+        # Clear cart and return to idle mode
+        self.cart_items = {}
+        if hasattr(self, "on_exit"):
+            self.on_exit()
+
+    def _log_unconfirmed_stripe_payment(self, total):
+        """Log an unconfirmed Stripe payment to the Service tab."""
+        try:
+            # Use more comprehensive scopes
+            scopes = [
+                "https://www.googleapis.com/auth/spreadsheets",
+                "https://www.googleapis.com/auth/drive",
+            ]
+            creds = Credentials.from_service_account_file(str(GS_CRED_PATH), scopes=scopes)
+            gc = gspread.authorize(creds)
+            
+            # Open the spreadsheet and worksheet
+            sheet = gc.open(GS_SHEET_NAME).worksheet("Service")
+            
+            # Prepare row data
+            timestamp = datetime.now().strftime("%m/%d/%Y %H:%M:%S")
+            user = self.machine_id
+            action = f"CC Payment not confirmed - ${total:.2f}"
+            
+            # Create row with the correct format
+            row = [timestamp, user, action]
+            
+            # Log locally first
+            logging.info(f"Logging unconfirmed payment: {timestamp}, {user}, {action}")
+            
+            try:
+                # Try to append to sheet
+                sheet.append_row(row)
+                logging.info(f"Successfully logged unconfirmed payment to Service tab")
+            except Exception as api_error:
+                logging.error(f"Error logging to Service tab: {api_error}")
+                # Create a local log file as fallback
+                log_dir = Path.home() / "SelfCheck" / "Logs"
+                log_dir.mk
+    
+
+        def _process_payment(self, method):
+        """Process payment with selected method."""
+        # Calculate the total
+        subtotal = sum(item["price"] * item["qty"] for item in self.cart_items.values())
+        taxable_subtotal = sum(
+            item["price"] * item["qty"] 
+            for item in self.cart_items.values() if item["taxable"]
+        )
+        tax_amount = taxable_subtotal * (self.tax_rate / 100)
+        total = subtotal + tax_amount
+        
+        # Log the payment attempt
+        logging.info(f"Processing payment of ${total:.2f} with {method}")
+
+        # Store the payment method for receipt printing
+        self.current_payment_method = method
+        
+        if method == "Venmo":
+            # Show QR code for Venmo payment
+            self._show_venmo_qr_code(total)
         else:
             # For other payment methods (temporary)
             self._close_payment_popup()
