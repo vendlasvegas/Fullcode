@@ -8,8 +8,9 @@
 # Starting to test cart functions
 # Manual Entry Added and working with image pull up
 # Setting up Pay Now options
-# Paypal mode and reciept working
-# 8/26/25 upload to git hub 15:00
+# Venmo mode and reciept working
+# Setting up Stripe Credit card
+# 8/26/25 upload to git hub 16:15
 
 import os
 import random
@@ -2099,6 +2100,7 @@ class CartMode:
                     pass
 
 
+
     def _on_touch(self, event):
         """Handle touch events in Cart mode."""
         x, y = event.x, event.y
@@ -2938,6 +2940,7 @@ class CartMode:
         self.root.bind("<Key>", self._on_key)
 
 
+
     def _show_payment_popup(self, total):
         """Show payment options popup."""
         # Cancel any existing timeout
@@ -3100,12 +3103,12 @@ class CartMode:
         logging.info(f"Processing payment of ${total:.2f} with {method}")
 
         # Store the payment method for receipt printing
-        self.current_payment_method = method
+        self.current_payment_method = "Credit Card" if method.lower() == "stripe" else method
         
-        if method == "Venmo":
+        if method.lower() == "venmo":
             # Show QR code for Venmo payment
             self._show_venmo_qr_code(total)
-        elif method == "Stripe":
+        elif method.lower() == "stripe":
             # Show QR code for Stripe payment
             self._show_stripe_qr_code(total)
         else:
@@ -3113,10 +3116,11 @@ class CartMode:
             self._close_payment_popup()
             
             # Log the transaction
-            self._log_successful_transaction(method, total)
+            self._log_successful_transaction(self.current_payment_method, total)
             
             # Show thank you popup
             self._show_thank_you_popup()
+
 
 
     def _show_stripe_qr_code(self, total):
@@ -3681,35 +3685,6 @@ class CartMode:
             import traceback
             logging.error(traceback.format_exc())
 
-    def _on_stripe_payment_received(self):
-        """Handle successful Stripe payment."""
-        logging.info("Stripe payment received and verified")
-        
-        # Update status label if it exists
-        if hasattr(self, 'stripe_status_label') and self.stripe_status_label:
-            self.stripe_status_label.config(text="Payment confirmed! Processing...", fg="#27ae60")
-        
-        # Set payment received flag
-        self.stripe_payment_received = True
-        
-        # Calculate the total for logging
-        subtotal = sum(item["price"] * item["qty"] for item in self.cart_items.values())
-        taxable_subtotal = sum(
-            item["price"] * item["qty"] 
-            for item in self.cart_items.values() if item["taxable"]
-        )
-        tax_amount = taxable_subtotal * (self.tax_rate / 100)
-        total = subtotal + tax_amount
-        
-        # Store the payment method for receipt printing
-        self.current_payment_method = "Credit Card"
-        
-        # Log the transaction
-        self._log_successful_transaction("Credit Card", total)
-        
-        # Wait a moment to show the confirmation message
-        self.root.after(2000, self._show_thank_you_popup)
-
     def _start_stripe_payment_timeout(self):
         """Start timeout for Stripe payment."""
         self.stripe_payment_timeout = self.root.after(60000, self._stripe_payment_timeout)
@@ -3829,6 +3804,7 @@ class CartMode:
             logging.error(f"Failed to log unconfirmed payment: {e}")
             import traceback
             logging.error(traceback.format_exc())
+
     
 
     def _process_payment(self, method):
