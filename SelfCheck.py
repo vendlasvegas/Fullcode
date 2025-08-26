@@ -193,7 +193,7 @@ class IdleMode:
         self._load_button_images()
         
         # Add touch support to all elements
-        self.label.bind("<Button-1>", self.on_touch)
+        #self.label.bind("<Button-1>", self.on_touch)
         self.bottom_text.bind("<Button-1>", self.on_touch)
         self.time_label.bind("<Button-1>", self.on_touch)
         self.weather_label.bind("<Button-1>", self.on_touch)
@@ -216,6 +216,13 @@ class IdleMode:
         self.weather_last_update = 0
         self.zipcode = None
         self.weather_api_key = None
+
+    def touch_handler(event):
+        x, y = event.x, event.y
+        logging.info(f"Touch in Cart mode at ({x}, {y})")
+        self.last_activity_ts = time.time()
+    
+    self.label.bind("<Button-1>", touch_handler)
 
     def _load_button_images(self):
         """Load button images and resize them to 50%."""
