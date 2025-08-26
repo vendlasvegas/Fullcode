@@ -194,12 +194,11 @@ class IdleMode:
 
         
         
-        # Add touch support to all elements - use on_touch instead of _on_touch
-        self.label.bind("<Button-1>", self.on_touch)
-        self.bottom_text.bind("<Button-1>", self.on_touch)
-        self.time_label.bind("<Button-1>", self.on_touch)
-        self.weather_label.bind("<Button-1>", self.on_touch)
-        self.admin_button.bind("<Button-1>", self._on_admin_button_click)
+        # Add touch support to all elements
+        self.label.bind("<Button-1>", self._on_touch)
+        self.bottom_text.bind("<Button-1>", self._on_touch)
+        self.time_label.bind("<Button-1>", self._on_touch)
+        self.weather_label.bind("<Button-1>", self._on_touch)
         
         # Selection screen bindings
         self.selection_label.bind("<Button-1>", self._on_selection_background_click)
@@ -218,16 +217,18 @@ class IdleMode:
         self.weather_last_update = 0
         self.zipcode = None
         self.weather_api_key = None
+
+    def _on_touch(self, event):
+        """Touch handler for idle mode"""
+        if not self.is_active:
+            return
+        
+        x, y = event.x_root, event.y_root  # Use root coordinates
+        logging.info(f"Touch in Idle mode at ({x}, {y})")
     
         
         # Show selection screen instead of directly going to PriceCheck
         self._show_selection_screen()
-
-    def on_touch(self, event):
-        """Handle touch events in Cart mode."""
-        x, y = event.x, event.y
-        logging.info(f"Touch in Cart mode at ({x}, {y})")
-        self._on_activity()
 
 
     def _load_button_images(self):
@@ -847,7 +848,7 @@ class PriceCheckMode:
             self.last_activity_ts = time.time()
     
         # Bind the touch handler
-        self.label.bind("<Button-1>", touch_handler)
+        self.label.bind("<Button-1>", self._on_touch)
 
         # Hidden entry to capture scanner input - create once and reuse
         self.scan_var = tk.StringVar()
@@ -863,9 +864,10 @@ class PriceCheckMode:
         self.scan_var.trace_add("write", self._on_scan_var_change)
 
         # Add touch support
-        self.label.bind("<Button-1>", self.on_touch)
+        self.label.bind("<Button-1>", self._on_touch)
 
-    def on_touch(self, event):
+    def _on_touch(self, event):
+        """Touch handler for PriceCheck mode"""
         # Touch handler for PriceCheck mode
         x, y = event.x, event.y
         logging.info(f"Touch in PriceCheck mode at ({x}, {y})")
@@ -1398,10 +1400,10 @@ class AdminMode:
         self.login_screen = None  # Will be created in start()
         
         # Add touch support
-        self.label.bind("<Button-1>", self.on_touch)
+        self.label.bind("<Button-1>", self._on_touch)
         self.label.bind("<Motion>", self._on_activity)
 
-    def on_touch(self, event):
+    def _on_touch(self, event):
         # Touch handler for Admin mode
         x, y = event.x, event.y
         logging.info(f"Touch in Admin mode at ({x}, {y})")
@@ -2011,6 +2013,10 @@ class CartMode:
         self.countdown_label = None
         self.countdown_after = None
         self.countdown_value = 30
+
+        # Add touch support with proper method
+        self.label.bind("<Button-1>", self._on_touch)
+        self.label.bind("<Motion>", self._on_activity)  
         
         # Add touch support - use inline function to avoid method name issues
         def handle_touch(event):
@@ -2018,8 +2024,7 @@ class CartMode:
             logging.info(f"Touch in Cart mode at ({x}, {y})")
             self.last_activity_ts = time.time()
         
-        self.label.bind("<Button-1>", handle_touch)
-        
+       
         # Add motion handler for activity tracking
         def handle_motion(event):
             self.last_activity_ts = time.time()
@@ -3658,17 +3663,11 @@ def _thank_you_complete(self):
             target_label.config(image="", text=f"Error loading image")
             return False
 
-    def on_touch(self, event):
-        # Touch handler for cart mode
+    def _on_touch(self, event):
+        """Handle touch events in Cart mode."""
         x, y = event.x, event.y
         logging.info(f"Touch in Cart mode at ({x}, {y})")
-        self._on_activity()
-
-    #def _on_touch(self, event):
-        #"""Handle touch events in Cart mode."""
-        #x, y = event.x, event.y
-        #logging.info(f"Touch in Cart mode at ({x}, {y})")
-        #self._on_activity()
+        self._on_activity(event)
 
 
 
@@ -5362,7 +5361,7 @@ class App:
         self.admin.on_exit = lambda: self.set_mode("Idle")
         self.admin.on_timeout = lambda: self.set_mode("Idle")
 
-        # Hook touch actions
+        # Hook touch actions with proper method names
         self.idle.on_touch_action = lambda: self.set_mode("PriceCheck")
         self.idle.on_wifi_tap = lambda: self.set_mode("Admin")
         self.idle.on_cart_action = lambda: self.set_mode("Cart")
@@ -5466,6 +5465,12 @@ class App:
             self.drive_service = None
             self.sheets_service = None
             return False
+
+    # Add global touch event handler for debugging
+        def global_touch_handler(event):
+            logging.info(f"Global touch event at ({event.x}, {event.y})")
+    
+        self.root.bind("<Button-1>", global_touch_handler, add="+")
 
     # Mode switcher
     def set_mode(self, mode_name: str):
@@ -5595,9 +5600,6 @@ class App:
                 self.root.destroy()
             except:
                 pass
-
-
-
 
 if __name__ == "__main__":
     App().run()
