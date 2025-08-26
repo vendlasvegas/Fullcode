@@ -2012,28 +2012,206 @@ class CartMode:
         self.countdown_after = None
         self.countdown_value = 30
         
-        # Add touch support - use lambda function for simplicity
-        self.label.bind("<Button-1>", lambda event: self._on_activity())
-    
+        # Add touch support - use inline function to avoid method name issues
+        def handle_touch(event):
+            x, y = event.x, event.y
+            logging.info(f"Touch in Cart mode at ({x}, {y})")
+            self.last_activity_ts = time.time()
+        
+        self.label.bind("<Button-1>", handle_touch)
+        
         # Add motion handler for activity tracking
-        self.label.bind("<Motion>", lambda event: self._on_activity())
+        def handle_motion(event):
+            self.last_activity_ts = time.time()
+        
+        self.label.bind("<Motion>", handle_motion)
         
         # Barcode input handling
         self.barcode_buffer = ""
         self.root.bind("<Key>", self._on_key)
         
-        # Load UPC catalog and config files
-        self._load_upc_catalog()
-        self._load_config_files()
+        # Load UPC catalog and config files - REMOVE THESE CALLS
+        # Instead of calling methods that might not exist, define them inline
         
-        # Test Google Sheets access
-        self.sheets_access_ok = self.test_sheet_access()
-        if self.sheets_access_ok:
-            logging.info("Google Sheets access test passed")
-        else:
-            logging.warning("Google Sheets access test failed - logging to Service tab may not work")
-            # Check permissions to help diagnose the issue
-            self.check_spreadsheet_permissions()
+        # Load UPC catalog
+        try:
+            # Connect to Google Sheet to get latest data
+            scopes = [
+                "https://www.googleapis.com/auth/spreadsheets.readonly",
+                "https://www.googleapis.com/auth/drive.readonly",
+                "https://www.googleapis.com/auth/spreadsheets",
+            ]
+            creds = Credentials.from_service_account_file(str(GS_CRED_PATH), scopes=scopes)
+            gc = gspread.authorize(creds)
+            
+            # First, update the tax rate from the spreadsheet
+            try:
+                sheet = gc.open(GS_SHEET_NAME).worksheet(GS_CRED_TAB)
+                tax_rate_str = sheet.acell('B27').value
+                
+                # Parse tax rate (remove % sign if present)
+                if tax_rate_str:
+                    tax_rate_str = tax_rate_str.replace('%', '').strip()
+                    tax_rate = float(tax_rate_str)
+                    
+                    # Update Tax.json file
+                    tax_path = CRED_DIR / "Tax.json"
+                    with open(tax_path, 'w') as f:
+                        json.dump({"rate": tax_rate}, f)
+                    logging.info(f"Updated Tax.json with rate {tax_rate}% from spreadsheet")
+                    
+                    # Update the instance variable
+                    self.tax_rate = tax_rate
+                else:
+                    logging.warning("Tax rate not found in spreadsheet cell B27")
+            except Exception as e:
+                logging.error(f"Failed to update tax rate from spreadsheet: {e}")
+            
+            # Now load the UPC catalog
+            catalog_path = CRED_DIR / "upc_catalog.csv"
+            if not catalog_path.exists():
+                logging.error(f"UPC catalog not found: {catalog_path}")
+            else:
+                # Define column mappings (same as standalone script)
+                headers = [
+                    "UPC", "Brand", "Name", "Size", "Calories", "Sugar", "Sodium",
+                    "Price", "Tax %", "QTY", "Image"
+                ]
+                
+                import csv
+                with open(catalog_path, 'r', newline='') as f:
+                    reader = csv.DictReader(f)
+                    
+                    # Process each row
+                    for row in reader:
+                        upc = row["UPC"].strip()
+                        if not upc:
+                            continue
+                        
+                        # Convert row dict to list for compatibility with existing code
+                        row_list = [
+                            upc,                   # A: UPC
+                            row["Brand"],          # B: Brand
+                            row["Name"],           # C: Name
+                            "",                    # D: (hidden column)
+                            row["Size"],           # E: Size
+                            row["Calories"],       # F: Calories
+                            row["Sugar"],          # G: Sugar
+                            row["Sodium"],         # H: Sodium
+                            row["Price"],          # I: Price
+                            row["Tax %"],          # J: Tax %
+                            row["QTY"],            # K: QTY
+                            row["Image"]           # L: Image
+                        ]
+                        
+                        # Store the row list for this UPC
+                        self.upc_catalog[upc] = row_list
+                        
+                        # Also store variants
+                        for variant in upc_variants_from_sheet(upc):
+                            if variant != upc:
+                                self.upc_catalog[variant] = row_list
+                
+                logging.info(f"Loaded {len(self.upc_catalog)} UPC entries from catalog")
+                
+        except Exception as e:
+            logging.error(f"Error loading UPC catalog: {e}")
+        
+        # Load config files
+        try:
+            # Business name
+            business_path = CRED_DIR / "BusinessName.json"
+            if business_path.exists():
+                try:
+                    with open(business_path, 'r') as f:
+                        data = json.load(f)
+                        self.business_name = data.get("name", self.business_name)
+                except json.JSONDecodeError:
+                    logging.error(f"Invalid JSON in BusinessName.json")
+                    # Create a new file with default value
+                    with open(business_path, 'w') as f:
+                        json.dump({"name": self.business_name}, f)
+            
+            # Location
+            location_path = CRED_DIR / "MachineLocation.json"
+            if location_path.exists():
+                try:
+                    with open(location_path, 'r') as f:
+                        data = json.load(f)
+                        self.location = data.get("location", self.location)
+                except json.JSONDecodeError:
+                    logging.error(f"Invalid JSON in MachineLocation.json")
+                    # Create a new file with default value
+                    with open(location_path, 'w') as f:
+                        json.dump({"location": self.location}, f)
+            
+            # Machine ID
+            machine_id_path = CRED_DIR / "MachineID.txt"
+            if machine_id_path.exists():
+                with open(machine_id_path, 'r') as f:
+                    self.machine_id = f.read().strip() or self.machine_id
+            
+            # Tax rate
+            tax_path = CRED_DIR / "Tax.json"
+            if tax_path.exists():
+                try:
+                    with open(tax_path, 'r') as f:
+                        data = json.load(f)
+                        old_rate = self.tax_rate
+                        self.tax_rate = float(data.get("rate", 2.9))  # Default to 2.9% if not specified
+                        logging.info(f"Loaded tax rate from Tax.json: {self.tax_rate}% (was {old_rate}%)")
+                except (json.JSONDecodeError, ValueError):
+                    # If Tax.json is malformed, create a new one with default value
+                    logging.warning(f"Tax.json is malformed, creating new file with default rate")
+                    self.tax_rate = 2.9  # Default tax rate
+                    with open(tax_path, 'w') as f:
+                        json.dump({"rate": self.tax_rate}, f)
+                    logging.info(f"Created new Tax.json with rate: {self.tax_rate}%")
+            else:
+                # If Tax.json doesn't exist, create it
+                logging.warning(f"Tax.json not found, creating new file with default rate")
+                self.tax_rate = 2.9  # Default tax rate
+                with open(tax_path, 'w') as f:
+                    json.dump({"rate": self.tax_rate}, f)
+                logging.info(f"Created new Tax.json with rate: {self.tax_rate}%")
+                
+        except Exception as e:
+            logging.error(f"Error loading config files: {e}")
+            import traceback
+            logging.error(traceback.format_exc())
+            # Set default tax rate if there was an error
+            self.tax_rate = 0.0
+        
+        # Test Google Sheets access - use a simple function instead of calling a method
+        try:
+            # Use more comprehensive scopes
+            scopes = [
+                "https://www.googleapis.com/auth/spreadsheets",
+                "https://www.googleapis.com/auth/drive",
+            ]
+            creds = Credentials.from_service_account_file(str(GS_CRED_PATH), scopes=scopes)
+            gc = gspread.authorize(creds)
+            
+            # Try to open the sheet
+            sheet = gc.open(GS_SHEET_NAME)
+            service_tab = sheet.worksheet("Service")
+            
+            # Try to read
+            values = service_tab.get_all_values()
+            logging.info(f"Successfully read {len(values)} rows from Service tab")
+            
+            # Try to write a test row
+            test_row = [datetime.now().strftime("%m/%d/%Y %H:%M:%S"), 
+                        self.machine_id, 
+                        "Test access - please ignore"]
+            service_tab.append_row(test_row)
+            logging.info("Successfully wrote test row to Service tab")
+            
+            self.sheets_access_ok = True
+        except Exception as e:
+            logging.error(f"Sheet access test failed: {e}")
+            self.sheets_access_ok = False
+
 
 
 
