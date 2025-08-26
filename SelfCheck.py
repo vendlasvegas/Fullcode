@@ -2219,47 +2219,55 @@ class CartMode:
         logging.debug("Calling _thank_you_complete to return to idle mode")
         self._thank_you_complete()
 
-
-
     def generate_transaction_id(self):
         """Generate a unique transaction ID in format YYDDD###."""
-        from datetime import datetime
-        
-        # Get current date components
-        now = datetime.now()
-        year_last_two = now.strftime("%y")  # Last two digits of year (e.g., "25" for 2025)
-        day_of_year = now.strftime("%j")    # Day of year as 3 digits (e.g., "236" for Aug 24)
-        
-        # Get the current transaction count for today
-        transaction_count_file = Path.home() / "SelfCheck" / "Logs" / f"transaction_count_{year_last_two}{day_of_year}.txt"
-        
-        # Create directory if it doesn't exist
-        transaction_count_file.parent.mkdir(parents=True, exist_ok=True)
-        
-        # Get current count or start at 0
-        current_count = 0
-        if transaction_count_file.exists():
-            try:
-                with open(transaction_count_file, 'r') as f:
-                    current_count = int(f.read().strip())
-            except (ValueError, IOError) as e:
-                logging.error(f"Error reading transaction count: {e}")
-        
-        # Increment count
-        new_count = current_count + 1
-        
-        # Save new count
         try:
-            with open(transaction_count_file, 'w') as f:
-                f.write(str(new_count))
-        except IOError as e:
-            logging.error(f"Error saving transaction count: {e}")
+            from datetime import datetime
         
-        # Format transaction ID: YYDDD### (e.g., 25236001)
-        transaction_id = f"{year_last_two}{day_of_year:03d}{new_count:03d}"
+            # Get current date components
+            now = datetime.now()
+            year_last_two = int(now.strftime("%y"))  # Convert to int
+            day_of_year = int(now.strftime("%j"))    # Convert to int
         
-        logging.info(f"Generated transaction ID: {transaction_id}")
-        return transaction_id
+            # Get the current transaction count for today
+            transaction_count_file = Path.home() / "SelfCheck" / "Logs" / f"transaction_count_{year_last_two:02d}{day_of_year:03d}.txt"
+        
+            # Create directory if it doesn't exist
+            transaction_count_file.parent.mkdir(parents=True, exist_ok=True)
+        
+            # Get current count or start at 0
+            current_count = 0
+            if transaction_count_file.exists():
+                try:
+                    with open(transaction_count_file, 'r') as f:
+                        current_count = int(f.read().strip())
+                except (ValueError, IOError) as e:
+                    logging.error(f"Error reading transaction count: {e}")
+        
+            # Increment count
+            new_count = current_count + 1
+        
+            # Save new count
+            try:
+                with open(transaction_count_file, 'w') as f:
+                    f.write(str(new_count))
+            except IOError as e:
+                logging.error(f"Error saving transaction count: {e}")
+        
+            # Format transaction ID: YYDDD### (e.g., 25236001)
+            transaction_id = f"{year_last_two:02d}{day_of_year:03d}{new_count:03d}"
+        
+            logging.info(f"Generated transaction ID: {transaction_id}")
+            return transaction_id
+        
+        except Exception as e:
+            logging.error(f"Error generating transaction ID: {e}")
+            # Fallback to a simple timestamp-based ID
+            import time
+            simple_id = f"T{int(time.time())}"
+            logging.info(f"Using fallback transaction ID: {simple_id}")
+            return simple_id
+
 
     def get_venmo_username(self):
         """Get Venmo username from VenmoUser.txt."""
