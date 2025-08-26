@@ -25,6 +25,9 @@ import shutil
 import requests
 import csv
 import uuid
+import http.server
+import stripe
+
 
 import tkinter as tk
 from tkinter import messagebox
@@ -2058,7 +2061,6 @@ class CartMode:
         self._arm_timeout()
 
     def stop(self):
-        """Stop the Cart mode and clean up resources."""
         logging.info("CartMode: Stopping")
         
         # Cancel timers
@@ -2069,6 +2071,11 @@ class CartMode:
         if self.countdown_after:
             self.root.after_cancel(self.countdown_after)
             self.countdown_after = None
+        
+        # Clean up Stripe webhook server if it exists
+        if hasattr(self, 'stripe_webhook_thread') and self.stripe_webhook_thread:
+            # The thread is daemon, so it will terminate when the main thread exits
+            self.stripe_webhook_thread = None
             
         # Hide all UI elements
         if hasattr(self, 'label'):
@@ -2082,13 +2089,15 @@ class CartMode:
             
         # Close popups
         for popup_attr in ['popup_frame', 'manual_entry_frame', 'timeout_popup', 
-                          'payment_popup', 'transaction_id_popup', 'thank_you_popup']:
+                          'payment_popup', 'transaction_id_popup', 'thank_you_popup',
+                          'stripe_confirm_popup']:
             if hasattr(self, popup_attr) and getattr(self, popup_attr):
                 try:
                     getattr(self, popup_attr).destroy()
                     setattr(self, popup_attr, None)
                 except:
                     pass
+
 
     def _on_touch(self, event):
         """Handle touch events in Cart mode."""
@@ -2899,21 +2908,25 @@ class CartMode:
         
         # Cancel all payment-related timers
         for timer_attr in ['payment_timeout', 'payment_countdown_after', 
-                          'transaction_id_timeout', 'thank_you_timeout']:
+                          'transaction_id_timeout', 'thank_you_timeout',
+                          'stripe_payment_timeout', 'stripe_countdown_after']:
             if hasattr(self, timer_attr) and getattr(self, timer_attr):
                 try:
                     self.root.after_cancel(getattr(self, timer_attr))
                     setattr(self, timer_attr, None)
+                    logging.info(f"Cancelled timer: {timer_attr}")
                 except Exception as e:
                     logging.error(f"Error cancelling timer {timer_attr}: {e}")
         
         # Destroy all payment-related popups
         for popup_attr in ['payment_popup', 'payment_timeout_popup', 
-                          'transaction_id_popup', 'thank_you_popup']:
+                          'transaction_id_popup', 'thank_you_popup',
+                          'stripe_confirm_popup']:
             if hasattr(self, popup_attr) and getattr(self, popup_attr):
                 try:
                     getattr(self, popup_attr).destroy()
                     setattr(self, popup_attr, None)
+                    logging.info(f"Destroyed popup: {popup_attr}")
                 except Exception as e:
                     logging.error(f"Error destroying popup {popup_attr}: {e}")
         
@@ -2923,6 +2936,7 @@ class CartMode:
         # Restore original key binding
         self.root.unbind("<Key>")
         self.root.bind("<Key>", self._on_key)
+
 
     def _show_payment_popup(self, total):
         """Show payment options popup."""
@@ -3103,6 +3117,228 @@ class CartMode:
             
             # Show thank you popup
             self._show_thank_you_popup()
+
+
+    def _show_stripe_qr_code(self, total):
+        """Show QR code for Stripe credit card payment."""
+        # Close the current payment popup
+        if hasattr(self, 'payment_popup') and self.payment_popup:
+            self.payment_popup.destroy()
+        
+        # Create a new popup for the QR code
+        self.payment_popup = tk.Frame(self.root, bg="white", bd=3, relief=tk.RAISED)
+        self.payment_popup.place(relx=0.5, rely=0.5, width=600, height=700, anchor=tk.CENTER)
+        
+        # Title
+        title_label = tk.Label(self.payment_popup, 
+                             text="Pay with Credit Card", 
+                             font=("Arial", 24, "bold"), 
+                             bg="white")
+        title_label.pack(pady=(20, 10))
+        
+        try:
+            # Generate QR code and get session ID
+            qr_img, session_id = self._generate_stripe_qr_code(total)
+            
+            # Store session ID for reference
+            self.current_stripe_session_id = session_id
+            
+            # Amount
+            details_frame = tk.Frame(self.payment_popup, bg="white")
+            details_frame.pack(pady=(0, 10))
+            
+            amount_label = tk.Label(details_frame, 
+                                  text=f"Amount: ${total:.2f}", 
+                                  font=("Arial", 18), 
+                                  bg="white")
+            amount_label.pack(pady=5)
+            
+            # Resize QR for display
+            qr_img = qr_img.resize((300, 300), Image.LANCZOS)
+            
+            # Convert to PhotoImage
+            qr_photo = ImageTk.PhotoImage(qr_img)
+            
+            # Display QR code
+            qr_label = tk.Label(self.payment_popup, image=qr_photo, bg="white")
+            qr_label.image = qr_photo  # Keep a reference
+            qr_label.pack(pady=10)
+            
+            # Instructions
+            instructions = (
+                "1. Open your phone's camera app\n"
+                "2. Scan this QR code\n"
+                "3. Follow the link to the payment page\n"
+                "4. Complete payment on your phone\n"
+                "5. Wait for confirmation (automatic)"
+            )
+            
+            instructions_label = tk.Label(self.payment_popup, 
+                                        text=instructions, 
+                                        font=("Arial", 14), 
+                                        bg="white",
+                                        justify=tk.LEFT)
+            instructions_label.pack(pady=10)
+            
+            # Status message (initially empty)
+            self.stripe_status_label = tk.Label(self.payment_popup,
+                                              text="Waiting for payment...",
+                                              font=("Arial", 14, "italic"),
+                                              bg="white",
+                                              fg="#888888")
+            self.stripe_status_label.pack(pady=5)
+            
+        except Exception as e:
+            logging.error(f"Error generating Stripe QR code: {e}")
+            import traceback
+            logging.error(traceback.format_exc())
+            
+            # Show error message instead of QR code
+            error_label = tk.Label(self.payment_popup, 
+                                 text=f"Error generating QR code:\n{str(e)}", 
+                                 font=("Arial", 16), 
+                                 bg="white",
+                                 fg="#e74c3c")  # Red color
+            error_label.pack(pady=20)
+        
+        # Button frame
+        button_frame = tk.Frame(self.payment_popup, bg="white")
+        button_frame.pack(pady=(20, 20), fill=tk.X, padx=20)
+        
+        # Return to Cart button
+        return_btn = tk.Button(button_frame, 
+                             text="Return to Cart", 
+                             font=("Arial", 16), 
+                             command=self._close_payment_popup,
+                             bg="#3498db", fg="white",
+                             height=1)
+        return_btn.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
+        
+        # Cancel Order button
+        cancel_btn = tk.Button(button_frame, 
+                             text="Cancel Order", 
+                             font=("Arial", 16), 
+                             command=self._cancel_from_payment,
+                             bg="#e74c3c", fg="white",
+                             height=1)
+        cancel_btn.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
+        
+        # Start webhook listener
+        self._start_stripe_webhook_listener()
+        
+        # Start timeout for payment popup - 60 seconds
+        self._start_stripe_payment_timeout()
+
+    def _generate_stripe_qr_code(self, total):
+        """Generate a Stripe payment QR code."""
+        import qrcode
+        import stripe
+        import json
+        import uuid
+        
+        # Load Stripe credentials
+        try:
+            stripe_secret_key_path = Path.home() / "SelfCheck" / "Cred" / "Stripe_Secret_Key.txt"
+            stripe_dest_id_path = Path.home() / "SelfCheck" / "Cred" / "Stripe_Dest_ID.txt"
+            stripe_url_path = Path.home() / "SelfCheck" / "Cred" / "Stripe_URL.txt"
+            
+            if not stripe_secret_key_path.exists():
+                raise FileNotFoundError(f"Stripe secret key file not found: {stripe_secret_key_path}")
+            
+            if not stripe_dest_id_path.exists():
+                raise FileNotFoundError(f"Stripe destination ID file not found: {stripe_dest_id_path}")
+                
+            if not stripe_url_path.exists():
+                raise FileNotFoundError(f"Stripe URL file not found: {stripe_url_path}")
+            
+            # Read credentials
+            with open(stripe_secret_key_path, 'r') as f:
+                stripe_secret_key = f.read().strip()
+            
+            with open(stripe_dest_id_path, 'r') as f:
+                stripe_dest_id = f.read().strip()
+                
+            with open(stripe_url_path, 'r') as f:
+                stripe_url = f.read().strip()
+            
+            # Initialize Stripe
+            stripe.api_key = stripe_secret_key
+            
+            # Format the amount with 2 decimal places
+            formatted_total = "{:.2f}".format(total)
+            
+            # Generate a unique reference ID
+            reference_id = str(uuid.uuid4())
+            
+            # Store the reference ID for verification
+            self.stripe_reference_id = reference_id
+            
+            # Create a Stripe Checkout Session
+            checkout_session = stripe.checkout.Session.create(
+                payment_method_types=['card'],
+                line_items=[{
+                    'price_data': {
+                        'currency': 'usd',
+                        'product_data': {
+                            'name': f'Purchase from {self.machine_id}',
+                            'description': f'Transaction ID: {self.transaction_id}',
+                        },
+                        'unit_amount': int(float(formatted_total) * 100),  # Convert to cents
+                    },
+                    'quantity': 1,
+                }],
+                mode='payment',
+                success_url=f'{stripe_url}/success?session_id={{CHECKOUT_SESSION_ID}}&machine_id={self.machine_id}&reference={reference_id}',
+                cancel_url=f'{stripe_url}/cancel?machine_id={self.machine_id}&reference={reference_id}',
+                metadata={
+                    'machine_id': self.machine_id,
+                    'transaction_id': self.transaction_id,
+                    'reference_id': reference_id,
+                },
+                payment_intent_data={
+                    'metadata': {
+                        'machine_id': self.machine_id,
+                        'transaction_id': self.transaction_id,
+                        'reference_id': reference_id,
+                    },
+                    'transfer_data': {
+                        'destination': stripe_dest_id,
+                    },
+                },
+            )
+            
+            # Get the session ID
+            session_id = checkout_session.id
+            
+            # Create the URL for the QR code
+            checkout_url = checkout_session.url
+            
+            logging.info(f"Generated Stripe checkout URL: {checkout_url}")
+            logging.info(f"Stripe session ID: {session_id}")
+            logging.info(f"Reference ID: {reference_id}")
+            
+            # Create QR code for the checkout URL
+            qr = qrcode.QRCode(
+                version=1,
+                error_correction=qrcode.constants.ERROR_CORRECT_L,
+                box_size=10,
+                border=4,
+            )
+            qr.add_data(checkout_url)
+            qr.make(fit=True)
+            
+            # Create an image from the QR Code
+            img = qr.make_image(fill_color="black", back_color="white")
+            
+            # Return the PIL Image and session ID
+            return img, session_id
+            
+        except Exception as e:
+            logging.error(f"Error generating Stripe QR code: {e}")
+            import traceback
+            logging.error(traceback.format_exc())
+            raise
+
 
     def _show_stripe_qr_code(self, total):
         """Show QR code for Stripe credit card payment."""
@@ -3581,10 +3817,21 @@ class CartMode:
                 logging.error(f"Error logging to Service tab: {api_error}")
                 # Create a local log file as fallback
                 log_dir = Path.home() / "SelfCheck" / "Logs"
-                log_dir.mk
+                log_dir.mkdir(parents=True, exist_ok=True)
+                log_file = log_dir / "transaction_log.csv"
+                
+                # Append to local log file
+                with open(log_file, 'a') as f:
+                    f.write(f"{timestamp},{user},{action}\n")
+                logging.info(f"Logged unconfirmed payment to local file instead: {log_file}")
+                
+        except Exception as e:
+            logging.error(f"Failed to log unconfirmed payment: {e}")
+            import traceback
+            logging.error(traceback.format_exc())
     
 
-        def _process_payment(self, method):
+    def _process_payment(self, method):
         """Process payment with selected method."""
         # Calculate the total
         subtotal = sum(item["price"] * item["qty"] for item in self.cart_items.values())
