@@ -191,9 +191,11 @@ class IdleMode:
         self.cart_img = None
         self.pc_img = None
         self._load_button_images()
+
         
-        # Add touch support to all elements
-        #self.label.bind("<Button-1>", self.on_touch)
+        
+        # Add touch support to all elements - use on_touch instead of _on_touch
+        self.label.bind("<Button-1>", self.on_touch)
         self.bottom_text.bind("<Button-1>", self.on_touch)
         self.time_label.bind("<Button-1>", self.on_touch)
         self.weather_label.bind("<Button-1>", self.on_touch)
@@ -216,13 +218,17 @@ class IdleMode:
         self.weather_last_update = 0
         self.zipcode = None
         self.weather_api_key = None
+    
+        
+        # Show selection screen instead of directly going to PriceCheck
+        self._show_selection_screen()
 
-    def touch_handler(event):
+    def on_touch(self, event):
+        """Handle touch events in Cart mode."""
         x, y = event.x, event.y
         logging.info(f"Touch in Cart mode at ({x}, {y})")
-        self.last_activity_ts = time.time()
-    
-    self.label.bind("<Button-1>", touch_handler)
+        self._on_activity()
+
 
     def _load_button_images(self):
         """Load button images and resize them to 50%."""
@@ -251,17 +257,6 @@ class IdleMode:
                 
         except Exception as e:
             logging.error(f"Error loading button images: {e}")
-
-    def on_touch(self, event):
-        # Touch handler for idle mode
-        if not self.is_active:
-            return
-            
-        x, y = event.x_root, event.y_root  # Use root coordinates
-        logging.info(f"Touch in Idle mode at ({x}, {y})")
-        
-        # Show selection screen instead of directly going to PriceCheck
-        self._show_selection_screen()
 
     def _on_admin_button_click(self, event):
         # Special handler for admin button
@@ -844,6 +839,15 @@ class PriceCheckMode:
 
         # Initialize Google Drive image loader
         self.image_loader = GoogleDriveImageLoader(GS_CRED_PATH, GDRIVE_FOLDER_ID)
+
+        # Define touch handler inside __init__
+        def touch_handler(event):
+            x, y = event.x, event.y
+            logging.info(f"Touch in Cart mode at ({x}, {y})")
+            self.last_activity_ts = time.time()
+    
+        # Bind the touch handler
+        self.label.bind("<Button-1>", touch_handler)
 
         # Hidden entry to capture scanner input - create once and reuse
         self.scan_var = tk.StringVar()
@@ -2008,9 +2012,11 @@ class CartMode:
         self.countdown_after = None
         self.countdown_value = 30
         
-        # Add touch support
-        self.label.bind("<Button-1>", self.on_touch)
-        self.label.bind("<Motion>", self._on_activity)
+        # Add touch support - use lambda function for simplicity
+        self.label.bind("<Button-1>", lambda event: self._on_activity())
+    
+        # Add motion handler for activity tracking
+        self.label.bind("<Motion>", lambda event: self._on_activity())
         
         # Barcode input handling
         self.barcode_buffer = ""
@@ -3480,11 +3486,11 @@ def _thank_you_complete(self):
         logging.info(f"Touch in Cart mode at ({x}, {y})")
         self._on_activity()
 
-    def _on_touch(self, event):
-        """Handle touch events in Cart mode."""
-        x, y = event.x, event.y
-        logging.info(f"Touch in Cart mode at ({x}, {y})")
-        self._on_activity()
+    #def _on_touch(self, event):
+        #"""Handle touch events in Cart mode."""
+        #x, y = event.x, event.y
+        #logging.info(f"Touch in Cart mode at ({x}, {y})")
+        #self._on_activity()
 
 
 
