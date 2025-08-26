@@ -8,7 +8,8 @@
 # Starting to test cart functions
 # Manual Entry Added and working with image pull up
 # Setting up Pay Now options
-# 8/26/25 upload to git hub 14:15
+# Paypal mode and reciept working
+# 8/26/25 upload to git hub 15:00
 
 import os
 import random
@@ -1958,7 +1959,6 @@ network={{
 # ==============================
 #          Cart Mode
 # ==============================
-
 class CartMode:
     """
     Shopping cart mode for adding and managing items.
@@ -1985,7 +1985,7 @@ class CartMode:
         # Cart data structures
         self.cart_items = {}  # UPC -> {data, qty}
         self.upc_catalog = {}  # UPC -> row data
-        self.transaction_id = self.generate_transaction_id()
+        self.transaction_id = self._generate_transaction_id()
         self.current_payment_method = None
         
         # UI elements
@@ -2014,46 +2014,33 @@ class CartMode:
         self.countdown_after = None
         self.countdown_value = 30
         
-        # Add touch support with inline function
-        def handle_touch(event):
-            x, y = event.x, event.y
-            logging.info(f"Touch in Cart mode at ({x}, {y})")
-            self._on_activity()
-        
-        self.label.bind("<Button-1>", handle_touch)
-        
-        # Add motion handler for activity tracking
-        def handle_motion(event):
-            self.last_activity_ts = time.time()
-        
-        self.label.bind("<Motion>", handle_motion)
+        # Add touch support
+        self.label.bind("<Button-1>", self._on_touch)
+        self.label.bind("<Motion>", self._on_activity)
         
         # Barcode input handling
         self.barcode_buffer = ""
         self.root.bind("<Key>", self._on_key)
         
         # Load UPC catalog and config files
-        self._load_upc_catalog_inline()
-        self._load_config_files_inline()
+        self._load_upc_catalog()
+        self._load_config_files()
         
         # Test Google Sheets access
-        self.sheets_access_ok = self._test_sheet_access_inline()
-    
-    def _on_activity(self, event=None):
-        """Reset inactivity timer."""
-        # Reset inactivity timer
-        self.last_activity_ts = time.time()
-        
-        # Cancel any existing timeout popup
-        if hasattr(self, 'timeout_popup') and self.timeout_popup:
-            self._cancel_timeout_popup()
+        self.sheets_access_ok = self.test_sheet_access()
+        if self.sheets_access_ok:
+            logging.info("Google Sheets access test passed")
+        else:
+            logging.warning("Google Sheets access test failed - logging to Service tab may not work")
+            # Check permissions to help diagnose the issue
+            self.check_spreadsheet_permissions()
 
     def start(self):
         """Start the Cart mode."""
         logging.info("CartMode: Starting")
         
         # Generate a new transaction ID
-        self.transaction_id = self.generate_transaction_id()
+        self.transaction_id = self._generate_transaction_id()
         
         # Clear any existing cart data
         self.cart_items = {}
@@ -2064,676 +2051,59 @@ class CartMode:
         # Reload tax rate from Tax.json to ensure it's current
         self._reload_tax_rate()
         
-        # Make sure the label is visible
-        self.label.place(x=0, y=0, width=WINDOW_W, height=WINDOW_H)
-        self.label.lift()
-        
-        # Add debug logging
-        logging.info("CartMode: Label placed and lifted")
-        
-        try:
-            # Create fresh UI with error handling
-            self._create_ui()
-            logging.info("CartMode: UI created successfully")
-        except Exception as e:
-            logging.error(f"CartMode: Error creating UI: {e}")
-            import traceback
-            logging.error(traceback.format_exc())
-            
-            # Fallback to a simple UI if the main UI fails
-            self._create_fallback_ui()
+        # Create fresh UI
+        self._create_ui()
         
         # Start timeout timer
         self._arm_timeout()
 
-    def _reload_tax_rate(self):
-        """Reload the tax rate from Tax.json to ensure it's current."""
-        tax_path = CRED_DIR / "Tax.json"
-        if tax_path.exists():
-            try:
-                with open(tax_path, 'r') as f:
-                    data = json.load(f)
-                    self.tax_rate = float(data.get("rate", 2.9))
-                    logging.info(f"Reloaded tax rate from Tax.json: {self.tax_rate}%")
-            except (json.JSONDecodeError, ValueError) as e:
-                logging.error(f"Error reloading tax rate: {e}")
-                self.tax_rate = 2.9  # Default to 2.9% if there's an error
-        else:
-            logging.warning("Tax.json not found, using default tax rate")
-            self.tax_rate = 2.9  # Default tax rate
-    
-    def _create_fallback_ui(self):
-        """Create a simple fallback UI when the main UI fails."""
-        logging.info("CartMode: Creating fallback UI")
+    def stop(self):
+        """Stop the Cart mode and clean up resources."""
+        logging.info("CartMode: Stopping")
         
-        # Clear any existing UI elements
-        if hasattr(self, 'receipt_frame') and self.receipt_frame:
+        # Cancel timers
+        if self.timeout_after:
+            self.root.after_cancel(self.timeout_after)
+            self.timeout_after = None
+            
+        if self.countdown_after:
+            self.root.after_cancel(self.countdown_after)
+            self.countdown_after = None
+            
+        # Hide all UI elements
+        if hasattr(self, 'label'):
+            self.label.place_forget()
+            
+        if hasattr(self, 'receipt_frame'):
             self.receipt_frame.place_forget()
-        
-        if hasattr(self, 'totals_frame') and self.totals_frame:
+            
+        if hasattr(self, 'totals_frame'):
             self.totals_frame.place_forget()
-        
-        # Create a simple frame with buttons
-        fallback_frame = tk.Frame(self.root, bg="white")
-        fallback_frame.place(x=100, y=100, width=WINDOW_W-200, height=WINDOW_H-200)
-        
-        # Title
-        title_label = tk.Label(fallback_frame, text="Cart Mode", 
-                             font=("Arial", 24, "bold"), bg="white")
-        title_label.pack(pady=20)
-        
-        # Message
-        message_label = tk.Label(fallback_frame, 
-                               text="There was an error loading the full cart interface.\n" +
-                                    "You can scan items or use the buttons below.",
-                               font=("Arial", 18), bg="white", justify=tk.LEFT)
-        message_label.pack(pady=20)
-        
-        # Buttons frame
-        buttons_frame = tk.Frame(fallback_frame, bg="white")
-        buttons_frame.pack(pady=20)
-        
-        # Manual entry button
-        manual_btn = tk.Button(buttons_frame, text="Manual Entry", 
-                             font=("Arial", 18), bg="#3498db", fg="white",
-                             command=self._show_manual_entry if hasattr(self, '_show_manual_entry') else lambda: None)
-        manual_btn.pack(side=tk.LEFT, padx=20)
-        
-        # Pay now button
-        pay_btn = tk.Button(buttons_frame, text="Pay Now", 
-                          font=("Arial", 18), bg="#27ae60", fg="white",
-                          command=self._pay_now if hasattr(self, '_pay_now') else lambda: None)
-        pay_btn.pack(side=tk.LEFT, padx=20)
-        
-        # Cancel button
-        cancel_btn = tk.Button(buttons_frame, text="Cancel", 
-                             font=("Arial", 18), bg="#e74c3c", fg="white",
-                             command=self._cancel_order if hasattr(self, '_cancel_order') else lambda: None)
-        cancel_btn.pack(side=tk.LEFT, padx=20)
-        
-        # Debug exit button
-        exit_btn = tk.Button(fallback_frame, text="Emergency Exit", 
-                           font=("Arial", 14), bg="black", fg="white",
-                           command=lambda: self.on_exit() if hasattr(self, "on_exit") else None)
-        exit_btn.pack(pady=20)
-        
-        # Store reference to fallback frame
-        self.fallback_frame = fallback_frame
-
-    
-    def _load_upc_catalog_inline(self):
-        """Load UPC catalog from CSV file and update Tax.json from spreadsheet."""
-        try:
-            # Connect to Google Sheet to get latest data
-            scopes = [
-                "https://www.googleapis.com/auth/spreadsheets.readonly",
-                "https://www.googleapis.com/auth/drive.readonly",
-                "https://www.googleapis.com/auth/spreadsheets",
-            ]
-            creds = Credentials.from_service_account_file(str(GS_CRED_PATH), scopes=scopes)
-            gc = gspread.authorize(creds)
             
-            # First, update the tax rate from the spreadsheet
-            try:
-                sheet = gc.open(GS_SHEET_NAME).worksheet(GS_CRED_TAB)
-                tax_rate_str = sheet.acell('B27').value
-                
-                # Parse tax rate (remove % sign if present)
-                if tax_rate_str:
-                    tax_rate_str = tax_rate_str.replace('%', '').strip()
-                    tax_rate = float(tax_rate_str)
-                    
-                    # Update Tax.json file
-                    tax_path = CRED_DIR / "Tax.json"
-                    with open(tax_path, 'w') as f:
-                        json.dump({"rate": tax_rate}, f)
-                    logging.info(f"Updated Tax.json with rate {tax_rate}% from spreadsheet")
-                    
-                    # Update the instance variable
-                    self.tax_rate = tax_rate
-                else:
-                    logging.warning("Tax rate not found in spreadsheet cell B27")
-            except Exception as e:
-                logging.error(f"Failed to update tax rate from spreadsheet: {e}")
-            
-            # Now load the UPC catalog
-            catalog_path = CRED_DIR / "upc_catalog.csv"
-            if not catalog_path.exists():
-                logging.error(f"UPC catalog not found: {catalog_path}")
-                return
-            
-            # Define column mappings (same as standalone script)
-            headers = [
-                "UPC", "Brand", "Name", "Size", "Calories", "Sugar", "Sodium",
-                "Price", "Tax %", "QTY", "Image"
-            ]
-            
-            import csv
-            with open(catalog_path, 'r', newline='') as f:
-                reader = csv.DictReader(f)
-                
-                # Process each row
-                for row in reader:
-                    upc = row["UPC"].strip()
-                    if not upc:
-                        continue
-                    
-                    # Convert row dict to list for compatibility with existing code
-                    row_list = [
-                        upc,                   # A: UPC
-                        row["Brand"],          # B: Brand
-                        row["Name"],           # C: Name
-                        "",                    # D: (hidden column)
-                        row["Size"],           # E: Size
-                        row["Calories"],       # F: Calories
-                        row["Sugar"],          # G: Sugar
-                        row["Sodium"],         # H: Sodium
-                        row["Price"],          # I: Price
-                        row["Tax %"],          # J: Tax %
-                        row["QTY"],            # K: QTY
-                        row["Image"]           # L: Image
-                    ]
-                    
-                    # Store the row list for this UPC
-                    self.upc_catalog[upc] = row_list
-                    
-                    # Also store variants
-                    for variant in upc_variants_from_sheet(upc):
-                        if variant != upc:
-                            self.upc_catalog[variant] = row_list
-                
-            logging.info(f"Loaded {len(self.upc_catalog)} UPC entries from catalog")
-            
-        except Exception as e:
-            logging.error(f"Error loading UPC catalog: {e}")
-    
-    def _load_config_files_inline(self):
-        """Load configuration from JSON files."""
-        try:
-            # Business name
-            business_path = CRED_DIR / "BusinessName.json"
-            if business_path.exists():
+        # Close popups
+        for popup_attr in ['popup_frame', 'manual_entry_frame', 'timeout_popup', 
+                          'payment_popup', 'transaction_id_popup', 'thank_you_popup']:
+            if hasattr(self, popup_attr) and getattr(self, popup_attr):
                 try:
-                    with open(business_path, 'r') as f:
-                        data = json.load(f)
-                        self.business_name = data.get("name", self.business_name)
-                except json.JSONDecodeError:
-                    logging.error(f"Invalid JSON in BusinessName.json")
-                    # Create a new file with default value
-                    with open(business_path, 'w') as f:
-                        json.dump({"name": self.business_name}, f)
-            
-            # Location
-            location_path = CRED_DIR / "MachineLocation.json"
-            if location_path.exists():
-                try:
-                    with open(location_path, 'r') as f:
-                        data = json.load(f)
-                        self.location = data.get("location", self.location)
-                except json.JSONDecodeError:
-                    logging.error(f"Invalid JSON in MachineLocation.json")
-                    # Create a new file with default value
-                    with open(location_path, 'w') as f:
-                        json.dump({"location": self.location}, f)
-            
-            # Machine ID
-            machine_id_path = CRED_DIR / "MachineID.txt"
-            if machine_id_path.exists():
-                with open(machine_id_path, 'r') as f:
-                    self.machine_id = f.read().strip() or self.machine_id
-            
-            # Tax rate
-            tax_path = CRED_DIR / "Tax.json"
-            if tax_path.exists():
-                try:
-                    with open(tax_path, 'r') as f:
-                        data = json.load(f)
-                        old_rate = self.tax_rate
-                        self.tax_rate = float(data.get("rate", 2.9))  # Default to 2.9% if not specified
-                        logging.info(f"Loaded tax rate from Tax.json: {self.tax_rate}% (was {old_rate}%)")
-                except (json.JSONDecodeError, ValueError):
-                    # If Tax.json is malformed, create a new one with default value
-                    logging.warning(f"Tax.json is malformed, creating new file with default rate")
-                    self.tax_rate = 2.9  # Default tax rate
-                    with open(tax_path, 'w') as f:
-                        json.dump({"rate": self.tax_rate}, f)
-                    logging.info(f"Created new Tax.json with rate: {self.tax_rate}%")
-            else:
-                # If Tax.json doesn't exist, create it
-                logging.warning(f"Tax.json not found, creating new file with default rate")
-                self.tax_rate = 2.9  # Default tax rate
-                with open(tax_path, 'w') as f:
-                    json.dump({"rate": self.tax_rate}, f)
-                logging.info(f"Created new Tax.json with rate: {self.tax_rate}%")
-                
-        except Exception as e:
-            logging.error(f"Error loading config files: {e}")
-            import traceback
-            logging.error(traceback.format_exc())
-            # Set default tax rate if there was an error
-            self.tax_rate = 0.0
-    
-    def _test_sheet_access_inline(self):
-        """Test access to the Google Sheet."""
-        try:
-            # Use more comprehensive scopes
-            scopes = [
-                "https://www.googleapis.com/auth/spreadsheets",
-                "https://www.googleapis.com/auth/drive",
-            ]
-            creds = Credentials.from_service_account_file(str(GS_CRED_PATH), scopes=scopes)
-            gc = gspread.authorize(creds)
-            
-            # Try to open the sheet
-            sheet = gc.open(GS_SHEET_NAME)
-            service_tab = sheet.worksheet("Service")
-            
-            # Try to read
-            values = service_tab.get_all_values()
-            logging.info(f"Successfully read {len(values)} rows from Service tab")
-            
-            # Try to write a test row
-            test_row = [datetime.now().strftime("%m/%d/%Y %H:%M:%S"), 
-                        self.machine_id, 
-                        "Test access - please ignore"]
-            service_tab.append_row(test_row)
-            logging.info("Successfully wrote test row to Service tab")
-            
-            return True
-        except Exception as e:
-            logging.error(f"Sheet access test failed: {e}")
-            return False
+                    getattr(self, popup_attr).destroy()
+                    setattr(self, popup_attr, None)
+                except:
+                    pass
 
-    def _create_fallback_ui(self):
-        """Create a simple fallback UI when the main UI fails."""
-        logging.info("CartMode: Creating fallback UI")
-        
-        # Clear any existing UI elements
-        if hasattr(self, 'receipt_frame') and self.receipt_frame:
-            self.receipt_frame.place_forget()
-        
-        if hasattr(self, 'totals_frame') and self.totals_frame:
-            self.totals_frame.place_forget()
-        
-        # Create a simple frame with buttons
-        fallback_frame = tk.Frame(self.root, bg="white")
-        fallback_frame.place(x=100, y=100, width=WINDOW_W-200, height=WINDOW_H-200)
-        
-        # Title
-        title_label = tk.Label(fallback_frame, text="Cart Mode", 
-                             font=("Arial", 24, "bold"), bg="white")
-        title_label.pack(pady=20)
-        
-        # Message
-        message_label = tk.Label(fallback_frame, 
-                               text="There was an error loading the full cart interface.\n" +
-                                    "You can scan items or use the buttons below.",
-                               font=("Arial", 18), bg="white", justify=tk.LEFT)
-        message_label.pack(pady=20)
-        
-        # Buttons frame
-        buttons_frame = tk.Frame(fallback_frame, bg="white")
-        buttons_frame.pack(pady=20)
-        
-        # Manual entry button
-        manual_btn = tk.Button(buttons_frame, text="Manual Entry", 
-                             font=("Arial", 18), bg="#3498db", fg="white",
-                             command=self._show_manual_entry)
-        manual_btn.pack(side=tk.LEFT, padx=20)
-        
-        # Pay now button
-        pay_btn = tk.Button(buttons_frame, text="Pay Now", 
-                          font=("Arial", 18), bg="#27ae60", fg="white",
-                          command=self._pay_now)
-        pay_btn.pack(side=tk.LEFT, padx=20)
-        
-        # Cancel button
-        cancel_btn = tk.Button(buttons_frame, text="Cancel", 
-                             font=("Arial", 18), bg="#e74c3c", fg="white",
-                             command=self._cancel_order)
-        cancel_btn.pack(side=tk.LEFT, padx=20)
-        
-        # Store reference to fallback frame
-        self.fallback_frame = fallback_frame
-        
-        # Debug exit button
-        exit_btn = tk.Button(fallback_frame, text="Emergency Exit", 
-                           font=("Arial", 14), bg="black", fg="white",
-                           command=lambda: self.on_exit() if hasattr(self, "on_exit") else None)
-        exit_btn.pack(pady=20)
-    
-    
+    def _on_touch(self, event):
+        """Handle touch events in Cart mode."""
+        x, y = event.x, event.y
+        logging.info(f"Touch in Cart mode at ({x}, {y})")
+        self._on_activity()
 
-
-    def print_receipt(self, payment_method, total):
-        """Print a receipt using direct device access."""
-        try:
-            # Calculate values needed for receipt
-            subtotal = sum(item["price"] * item["qty"] for item in self.cart_items.values())
-            taxable_subtotal = sum(
-                item["price"] * item["qty"] 
-                for item in self.cart_items.values() if item["taxable"]
-            )
-            tax_amount = taxable_subtotal * (self.tax_rate / 100)
-            total_items = sum(item["qty"] for item in self.cart_items.values())
-            
-            # Format the receipt content
-            receipt = []
-            
-            # Initialize printer
-            receipt.append(b'\x1B@')
-            
-            # Center align for header
-            receipt.append(b'\x1B\x61\x01')  # Center align
-            
-            # Business name - double height and width
-            receipt.append(b'\x1D\x21\x11')  # Double height and width
-            receipt.append(self.business_name.encode('ascii', 'replace') + b'\n')
-            
-            # Normal size for the rest
-            receipt.append(b'\x1D\x21\x00')
-            
-            # Location
-            receipt.append(self.location.encode('ascii', 'replace') + b'\n')
-            
-            # Left align for details
-            receipt.append(b'\x1B\x61\x00')
-            
-            # Machine ID
-            receipt.append(f"Machine: {self.machine_id}\n".encode('ascii', 'replace'))
-            
-            # Transaction ID
-            receipt.append(f"Transaction: {self.transaction_id}\n".encode('ascii', 'replace'))
-            
-            # Date and time
-            current_time = datetime.now().strftime('%m/%d/%Y %H:%M:%S')
-            receipt.append(f"Date: {current_time}\n".encode('ascii', 'replace'))
-            
-            # Divider
-            receipt.append(b'-' * 32 + b'\n')
-            
-            # Items
-            for upc, item in self.cart_items.items():
-                name = item["name"]
-                price = item["price"]
-                qty = item["qty"]
-                item_total = price * qty
-                
-                # Format item line - truncate long names
-                if len(name) > 30:
-                    name = name[:27] + "..."
-                
-                receipt.append(f"{name}\n".encode('ascii', 'replace'))
-                receipt.append(f"  {qty} @ ${price:.2f} = ${item_total:.2f}\n".encode('ascii', 'replace'))
-            
-            # Divider
-            receipt.append(b'-' * 32 + b'\n')
-            
-            # Totals
-            receipt.append(f"Items: {total_items}\n".encode('ascii', 'replace'))
-            receipt.append(f"Subtotal: ${subtotal:.2f}\n".encode('ascii', 'replace'))
-            receipt.append(f"Tax ({self.tax_rate}%): ${tax_amount:.2f}\n".encode('ascii', 'replace'))
-            
-            # Bold for total
-            receipt.append(b'\x1B\x45\x01')  # Bold on
-            receipt.append(f"Total: ${total:.2f}\n".encode('ascii', 'replace'))
-            receipt.append(b'\x1B\x45\x00')  # Bold off
-            
-            receipt.append(f"Paid: {payment_method}\n".encode('ascii', 'replace'))
-            
-            # Divider
-            receipt.append(b'-' * 32 + b'\n')
-            
-            # Custom message from RMessage.txt
-            try:
-                rmessage_path = Path.home() / "SelfCheck" / "Cred" / "RMessage.txt"
-                if rmessage_path.exists():
-                    with open(rmessage_path, 'r') as f:
-                        rmessage = f.read().strip()
-                        receipt.append(b'\x1B\x61\x01')  # Center align
-                        receipt.append(rmessage.encode('ascii', 'replace') + b'\n')
-                else:
-                    # Create default RMessage.txt if it doesn't exist
-                    rmessage = "Thank you for shopping with us!"
-                    rmessage_path.parent.mkdir(parents=True, exist_ok=True)
-                    with open(rmessage_path, 'w') as f:
-                        f.write(rmessage)
-                    receipt.append(b'\x1B\x61\x01')  # Center align
-                    receipt.append(rmessage.encode('ascii', 'replace') + b'\n')
-            except Exception as e:
-                logging.error(f"Error reading/writing RMessage.txt: {e}")
-                # Add a default message
-                receipt.append(b'\x1B\x61\x01')  # Center align
-                receipt.append(b'Thank you for shopping with us!\n')
-            
-            # Feed and cut - REMOVE the duplicate thank you message
-            receipt.append(b'\n\n\n\n')  # Just feed paper without additional message
-            
-            # Cut paper
-            receipt.append(b'\x1D\x56\x00')
-            
-            # Combine all parts
-            receipt_data = b''.join(receipt)
-            
-            # Save receipt to file
-            receipt_path = Path.home() / "SelfCheck" / "Cred" / "last_receipt.txt"
-            receipt_path.parent.mkdir(parents=True, exist_ok=True)
-            with open(receipt_path, 'wb') as f:
-                f.write(receipt_data)
-            
-            # Check if printer device exists
-            if hasattr(self, 'printer_path') and self.printer_path:
-                printer_path = self.printer_path
-            else:
-                printer_path = '/dev/usb/lp0'
-                if not Path(printer_path).exists():
-                    logging.error(f"Printer device not found: {printer_path}")
-                    # Try alternative paths
-                    alternative_paths = ['/dev/lp0', '/dev/usb/lp1', '/dev/lp1']
-                    for alt_path in alternative_paths:
-                        if Path(alt_path).exists():
-                            logging.info(f"Found alternative printer device: {alt_path}")
-                            printer_path = alt_path
-                            break
-                    else:
-                        logging.error("No printer device found")
-                        return False
-            
-            # Print using direct device access
-            try:
-                with open(printer_path, 'wb') as printer:
-                    printer.write(receipt_data)
-                logging.info(f"Receipt printed successfully to {printer_path}")
-                return True
-            except PermissionError:
-                logging.error(f"Permission denied accessing printer at {printer_path}")
-                messagebox.showerror("Printer Error", 
-                                   f"Permission denied accessing printer.\n\n"
-                                   f"Please run: sudo chmod 666 {printer_path}")
-                return False
-            
-        except Exception as e:
-            logging.error(f"Error printing receipt: {e}")
-            import traceback
-            logging.error(traceback.format_exc())
-            return False
-
-
-    def _receipt_option_selected(self, option):
-        """Handle receipt option selection."""
-        logging.info(f"Receipt option selected: {option}")
+    def _on_activity(self, event=None):
+        """Reset inactivity timer on any user activity."""
+        # Reset inactivity timer
+        self.last_activity_ts = time.time()
         
-        if option == "print":
-            logging.debug("Processing print receipt option")
-            # Calculate the total
-            subtotal = sum(item["price"] * item["qty"] for item in self.cart_items.values())
-            taxable_subtotal = sum(
-                item["price"] * item["qty"] 
-                for item in self.cart_items.values() if item["taxable"]
-            )
-            tax_amount = taxable_subtotal * (self.tax_rate / 100)
-            total = subtotal + tax_amount
-            
-            # Get payment method (default to "Unknown" if not set)
-            payment_method = getattr(self, 'current_payment_method', "Unknown")
-            
-            # Try to print receipt
-            logging.debug("Calling print_receipt method")
-            success = self.print_receipt(payment_method, total)
-            
-            if success:
-                logging.debug("Receipt printed successfully")
-                messagebox.showinfo("Receipt", "Receipt printed successfully.")
-            else:
-                logging.debug("Receipt printing failed")
-                # If printing fails, show a text-based receipt
-                response = messagebox.askquestion("Printer Error", 
-                                               "Failed to print receipt. Would you like to view it on screen instead?")
-                if response == 'yes':
-                    self._show_text_receipt(payment_method, total)
-        
-        elif option == "email":
-            # Future implementation
-            messagebox.showinfo("Receipt", "Email receipt option selected.\nThis feature will be implemented soon.")
-        
-        # Always complete the thank you process and return to idle mode
-        logging.debug("Calling _thank_you_complete to return to idle mode")
-        self._thank_you_complete()
-
-    def generate_transaction_id(self):
-        """Generate a unique transaction ID in format YYDDD###."""
-        try:
-            from datetime import datetime
-        
-            # Get current date components
-            now = datetime.now()
-            year_last_two = int(now.strftime("%y"))  # Convert to int
-            day_of_year = int(now.strftime("%j"))    # Convert to int
-        
-            # Get the current transaction count for today
-            transaction_count_file = Path.home() / "SelfCheck" / "Logs" / f"transaction_count_{year_last_two:02d}{day_of_year:03d}.txt"
-        
-            # Create directory if it doesn't exist
-            transaction_count_file.parent.mkdir(parents=True, exist_ok=True)
-        
-            # Get current count or start at 0
-            current_count = 0
-            if transaction_count_file.exists():
-                try:
-                    with open(transaction_count_file, 'r') as f:
-                        current_count = int(f.read().strip())
-                except (ValueError, IOError) as e:
-                    logging.error(f"Error reading transaction count: {e}")
-        
-            # Increment count
-            new_count = current_count + 1
-        
-            # Save new count
-            try:
-                with open(transaction_count_file, 'w') as f:
-                    f.write(str(new_count))
-            except IOError as e:
-                logging.error(f"Error saving transaction count: {e}")
-        
-            # Format transaction ID: YYDDD### (e.g., 25236001)
-            transaction_id = f"{year_last_two:02d}{day_of_year:03d}{new_count:03d}"
-        
-            logging.info(f"Generated transaction ID: {transaction_id}")
-            return transaction_id
-        
-        except Exception as e:
-            logging.error(f"Error generating transaction ID: {e}")
-            # Fallback to a simple timestamp-based ID
-            import time
-            simple_id = f"T{int(time.time())}"
-            logging.info(f"Using fallback transaction ID: {simple_id}")
-            return simple_id
-
-
-    def get_venmo_username(self):
-        """Get Venmo username from VenmoUser.txt."""
-        venmo_user_path = Path.home() / "SelfCheck" / "Cred" / "VenmoUser.txt"
-        
-        if not venmo_user_path.exists():
-            logging.error("VenmoUser.txt not found")
-            return "YourVenmoUsername"  # Default fallback
-        
-        try:
-            with open(venmo_user_path, 'r') as f:
-                username = f.read().strip()
-                if username:
-                    return username
-                else:
-                    logging.error("VenmoUser.txt is empty")
-                    return "YourVenmoUsername"  # Default fallback
-        except IOError as e:
-            logging.error(f"Error reading VenmoUser.txt: {e}")
-            return "YourVenmoUsername"  # Default fallback
-
-
-    def _update_totals(self):
-        """Update the totals display with current cart values."""
-        if not hasattr(self, 'totals_frame') or not self.totals_frame:
-            return
-        
-        # Clear existing totals display
-        for widget in self.totals_frame.winfo_children():
-            widget.destroy()
-        
-        # Calculate totals
-        subtotal = sum(item["price"] * item["qty"] for item in self.cart_items.values())
-        taxable_subtotal = sum(
-            item["price"] * item["qty"] 
-            for item in self.cart_items.values() if item["taxable"]
-        )
-        tax_amount = taxable_subtotal * (self.tax_rate / 100)
-        total = subtotal + tax_amount
-        total_items = sum(item["qty"] for item in self.cart_items.values())
-        
-        # Title
-        title_label = tk.Label(self.totals_frame, text="Order Summary", 
-                              font=("Arial", 18, "bold"), bg="white")
-        title_label.pack(pady=(10, 20))
-        
-        # Items count
-        items_label = tk.Label(self.totals_frame, 
-                              text=f"Items: {total_items}", 
-                              font=("Arial", 16), bg="white")
-        items_label.pack(pady=5)
-        
-        # Subtotal
-        subtotal_label = tk.Label(self.totals_frame, 
-                                 text=f"Subtotal: ${subtotal:.2f}", 
-                                 font=("Arial", 16), bg="white")
-        subtotal_label.pack(pady=5)
-        
-        # Tax
-        tax_label = tk.Label(self.totals_frame, 
-                            text=f"Tax ({self.tax_rate}%): ${tax_amount:.2f}", 
-                            font=("Arial", 16), bg="white")
-        tax_label.pack(pady=5)
-        
-        # Total (bold and larger)
-        total_label = tk.Label(self.totals_frame, 
-                              text=f"Total: ${total:.2f}", 
-                              font=("Arial", 20, "bold"), bg="white")
-        total_label.pack(pady=(10, 5))
-
-
-
-
-    def _reload_tax_rate(self):
-        """Reload the tax rate from Tax.json to ensure it's current."""
-        tax_path = CRED_DIR / "Tax.json"
-        if tax_path.exists():
-            try:
-                with open(tax_path, 'r') as f:
-                    data = json.load(f)
-                    self.tax_rate = float(data.get("rate", 2.9))
-                    logging.info(f"Reloaded tax rate from Tax.json: {self.tax_rate}%")
-            except (json.JSONDecodeError, ValueError) as e:
-                logging.error(f"Error reloading tax rate: {e}")
-
+        # Cancel any existing timeout popup
+        if hasattr(self, 'timeout_popup') and self.timeout_popup:
+            self._cancel_timeout_popup()
 
     def _on_key(self, event):
         """Handle keyboard input for barcode scanning."""
@@ -2747,429 +2117,6 @@ class CartMode:
         elif event.char.isprintable():
             self.barcode_buffer += event.char
 
-    def handle_barcode_input(self, barcode):
-        """Process a barcode input from scanner."""
-        logging.info(f"CartMode: Received barcode input: {barcode}")
-        return self.scan_item(barcode)
-
-    def _load_config_files(self):
-        """Load configuration from JSON files."""
-        try:
-            # Business name
-            business_path = CRED_DIR / "BusinessName.json"
-            if business_path.exists():
-                try:
-                    with open(business_path, 'r') as f:
-                        data = json.load(f)
-                        self.business_name = data.get("name", self.business_name)
-                except json.JSONDecodeError:
-                    logging.error(f"Invalid JSON in BusinessName.json")
-                    # Create a new file with default value
-                    with open(business_path, 'w') as f:
-                        json.dump({"name": self.business_name}, f)
-            
-            # Location
-            location_path = CRED_DIR / "MachineLocation.json"
-            if location_path.exists():
-                try:
-                    with open(location_path, 'r') as f:
-                        data = json.load(f)
-                        self.location = data.get("location", self.location)
-                except json.JSONDecodeError:
-                    logging.error(f"Invalid JSON in MachineLocation.json")
-                    # Create a new file with default value
-                    with open(location_path, 'w') as f:
-                        json.dump({"location": self.location}, f)
-            
-            # Machine ID
-            machine_id_path = CRED_DIR / "MachineID.txt"
-            if machine_id_path.exists():
-                with open(machine_id_path, 'r') as f:
-                    self.machine_id = f.read().strip() or self.machine_id
-            
-            # Tax rate
-            tax_path = CRED_DIR / "Tax.json"
-            if tax_path.exists():
-                try:
-                    with open(tax_path, 'r') as f:
-                        data = json.load(f)
-                        old_rate = self.tax_rate
-                        self.tax_rate = float(data.get("rate", 2.9))  # Default to 2.9% if not specified
-                        logging.info(f"Loaded tax rate from Tax.json: {self.tax_rate}% (was {old_rate}%)")
-                except (json.JSONDecodeError, ValueError):
-                    # If Tax.json is malformed, create a new one with default value
-                    logging.warning(f"Tax.json is malformed, creating new file with default rate")
-                    self.tax_rate = 2.9  # Default tax rate
-                    with open(tax_path, 'w') as f:
-                        json.dump({"rate": self.tax_rate}, f)
-                    logging.info(f"Created new Tax.json with rate: {self.tax_rate}%")
-            else:
-                # If Tax.json doesn't exist, create it
-                logging.warning(f"Tax.json not found, creating new file with default rate")
-                self.tax_rate = 2.9  # Default tax rate
-                with open(tax_path, 'w') as f:
-                    json.dump({"rate": self.tax_rate}, f)
-                logging.info(f"Created new Tax.json with rate: {self.tax_rate}%")
-                
-        except Exception as e:
-            logging.error(f"Error loading config files: {e}")
-            import traceback
-            logging.error(traceback.format_exc())
-            # Set default tax rate if there was an error
-            self.tax_rate = 0.0
-
-
-    def _generate_venmo_qr_code(self, total):
-        """Generate a Venmo QR code for payment."""
-        import qrcode
-        import urllib.parse
-        
-        # Generate a unique transaction ID
-        if not hasattr(self, 'current_transaction_id'):
-            self.current_transaction_id = self.generate_transaction_id()
-        
-        # Format the amount with 2 decimal places
-        formatted_total = "{:.2f}".format(total)
-        
-        # Get Venmo username
-        venmo_username = self.get_venmo_username()
-        
-        # Create a detailed note with machine ID and transaction ID
-        note = f"Payment #{self.current_transaction_id} - Machine: {self.machine_id}"
-        
-        # Create the Venmo URL - use URL encoding for the note
-        encoded_note = urllib.parse.quote(note)
-        
-        venmo_url = f"venmo://paycharge?txn=pay&recipients={venmo_username}&amount={formatted_total}&note={encoded_note}"
-        
-        # Also create a web URL for devices that don't have Venmo app
-        web_url = f"https://venmo.com/{venmo_username}?txn=pay&amount={formatted_total}&note={encoded_note}"
-        
-        logging.info(f"Generated Venmo payment URL: {venmo_url}")
-        logging.info(f"Generated Venmo web URL: {web_url}")
-        
-        # Create QR code for the Venmo URL
-        qr = qrcode.QRCode(
-            version=1,
-            error_correction=qrcode.constants.ERROR_CORRECT_L,
-            box_size=10,
-            border=4,
-        )
-        qr.add_data(venmo_url)
-        qr.make(fit=True)
-        
-        # Create an image from the QR Code
-        img = qr.make_image(fill_color="black", back_color="white")
-        
-        # Return the PIL Image and transaction ID
-        return img, self.current_transaction_id
-
-
-
-
-    def _show_venmo_qr_code(self, total):
-        """Show QR code for Venmo payment."""
-        # Close the current payment popup
-        if hasattr(self, 'payment_popup') and self.payment_popup:
-            self.payment_popup.destroy()
-        
-        # Create a new popup for the QR code
-        self.payment_popup = tk.Frame(self.root, bg="white", bd=3, relief=tk.RAISED)
-        self.payment_popup.place(relx=0.5, rely=0.5, width=600, height=700, anchor=tk.CENTER)
-        
-        # Title
-        title_label = tk.Label(self.payment_popup, 
-                             text="Pay with Venmo", 
-                             font=("Arial", 24, "bold"), 
-                             bg="white")
-        title_label.pack(pady=(20, 10))
-        
-        try:
-            # Generate QR code and get transaction ID
-            qr_img, transaction_id = self._generate_venmo_qr_code(total)
-            
-            # Store transaction ID for reference
-            self.current_transaction_id = transaction_id
-            
-            # Amount and transaction ID
-            details_frame = tk.Frame(self.payment_popup, bg="white")
-            details_frame.pack(pady=(0, 10))
-            
-            amount_label = tk.Label(details_frame, 
-                                  text=f"Amount: ${total:.2f}", 
-                                  font=("Arial", 18), 
-                                  bg="white")
-            amount_label.pack(pady=5)
-            
-            # Resize QR for display
-            qr_img = qr_img.resize((300, 300), Image.LANCZOS)
-            
-            # Convert to PhotoImage
-            qr_photo = ImageTk.PhotoImage(qr_img)
-            
-            # Display QR code
-            qr_label = tk.Label(self.payment_popup, image=qr_photo, bg="white")
-            qr_label.image = qr_photo  # Keep a reference
-            qr_label.pack(pady=10)
-            
-            # Instructions
-            instructions = (
-                "1. Open your phone's camera app\n"
-                "2. Scan this QR code\n"
-                "3. Follow the link to the Venmo app\n"
-                "4. Complete payment in the Venmo app\n"
-                "5. After payment, click 'Record Payment' below\n"
-                "   and enter the last 4 digits of your transaction ID"
-            )
-            
-            instructions_label = tk.Label(self.payment_popup, 
-                                        text=instructions, 
-                                        font=("Arial", 14), 
-                                        bg="white",
-                                        justify=tk.LEFT)
-            instructions_label.pack(pady=10)
-            
-        except Exception as e:
-            logging.error(f"Error generating Venmo QR code: {e}")
-            import traceback
-            logging.error(traceback.format_exc())
-            
-            # Show error message instead of QR code
-            error_label = tk.Label(self.payment_popup, 
-                                 text=f"Error generating QR code:\n{str(e)}", 
-                                 font=("Arial", 16), 
-                                 bg="white",
-                                 fg="#e74c3c")  # Red color
-            error_label.pack(pady=20)
-        
-        # Button frame
-        button_frame = tk.Frame(self.payment_popup, bg="white")
-        button_frame.pack(pady=(20, 20), fill=tk.X, padx=20)
-        
-        # Record Payment button
-        record_btn = tk.Button(button_frame, 
-                             text="Record Payment", 
-                             font=("Arial", 16), 
-                             command=self._show_transaction_id_entry,
-                             bg="#27ae60", fg="white",
-                             height=1)
-        record_btn.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
-        
-        # Return to Cart button
-        return_btn = tk.Button(button_frame, 
-                             text="Return to Cart", 
-                             font=("Arial", 16), 
-                             command=self._close_payment_popup,
-                             bg="#3498db", fg="white",
-                             height=1)
-        return_btn.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
-        
-        # Cancel Order button
-        cancel_btn = tk.Button(button_frame, 
-                             text="Cancel Order", 
-                             font=("Arial", 16), 
-                             command=self._cancel_from_payment,
-                             bg="#e74c3c", fg="white",
-                             height=1)
-        cancel_btn.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
-        
-        # Start timeout for payment popup - 60 seconds
-        self._start_payment_timeout(timeout_seconds=60)
-
-    def _thank_you_timeout(self):
-        """Handle timeout on the thank you screen."""
-        logging.info("Thank you screen timed out")
-        self._thank_you_complete()
-
-
-    def _show_idle_screen(self):
-        """Show the idle screen and hide the cart screen."""
-        logging.debug("Showing idle screen")
-        
-        # Hide cart container if it exists
-        if hasattr(self, 'cart_container'):
-            self.cart_container.pack_forget()
-        
-        # Show welcome message
-        welcome_frame = tk.Frame(self.root, bg="white")
-        welcome_frame.pack(fill=tk.BOTH, expand=True)
-        
-        # Store reference to welcome frame
-        self.welcome_frame = welcome_frame
-        
-        # Welcome message
-        welcome_label = tk.Label(welcome_frame, 
-                               text="Welcome to Self-Checkout", 
-                               font=("Arial", 36, "bold"), 
-                               bg="white")
-        welcome_label.pack(pady=(100, 20))
-        
-        # Instructions
-        instructions = tk.Label(welcome_frame, 
-                              text="Scan an item to begin", 
-                              font=("Arial", 24), 
-                              bg="white")
-        instructions.pack(pady=20)
-        
-        # Logo or image if available
-        try:
-            logo_path = Path.home() / "SelfCheck" / "logo.png"
-            if logo_path.exists():
-                logo_img = Image.open(logo_path)
-                logo_img = logo_img.resize((300, 300), Image.LANCZOS)
-                logo_photo = ImageTk.PhotoImage(logo_img)
-                
-                logo_label = tk.Label(welcome_frame, image=logo_photo, bg="white")
-                logo_label.image = logo_photo  # Keep a reference
-                logo_label.pack(pady=20)
-        except Exception as e:
-            logging.error(f"Error loading logo: {e}")
-        
-        # Set mode to idle
-        self.mode = "idle"
-        
-        # Generate a new transaction ID for the next customer
-        self.transaction_id = self._generate_transaction_id()
-        logging.info(f"New transaction ID generated: {self.transaction_id}")
-
-    def update_cart_display(self):
-        """Update the cart display with current items and totals."""
-        logging.debug("Updating cart display")
-        
-        # If cart frame doesn't exist yet, create it
-        if not hasattr(self, 'cart_frame'):
-            logging.warning("Cart frame doesn't exist, can't update display")
-            return
-        
-        # Clear existing items
-        for widget in self.cart_frame.winfo_children():
-            widget.destroy()
-        
-        # If cart is empty, show message
-        if not self.cart_items:
-            empty_label = tk.Label(self.cart_frame, text="Cart is empty", 
-                                 font=("Arial", 14), bg="white")
-            empty_label.pack(pady=20)
-            
-            # Update totals
-            self.update_totals_display(0, 0, 0)
-            return
-        
-        # Add header
-        header_frame = tk.Frame(self.cart_frame, bg="white")
-        header_frame.pack(fill=tk.X, padx=10, pady=(10, 5))
-        
-        # Header labels
-        tk.Label(header_frame, text="Item", font=("Arial", 12, "bold"), 
-               bg="white", width=20, anchor="w").pack(side=tk.LEFT)
-        tk.Label(header_frame, text="Price", font=("Arial", 12, "bold"), 
-               bg="white", width=8, anchor="e").pack(side=tk.LEFT)
-        tk.Label(header_frame, text="Qty", font=("Arial", 12, "bold"), 
-               bg="white", width=5, anchor="e").pack(side=tk.LEFT)
-        tk.Label(header_frame, text="Total", font=("Arial", 12, "bold"), 
-               bg="white", width=8, anchor="e").pack(side=tk.LEFT)
-        
-        # Add separator
-        separator = tk.Frame(self.cart_frame, height=2, bg="#ddd")
-        separator.pack(fill=tk.X, padx=10, pady=5)
-        
-        # Add items
-        for upc, item in self.cart_items.items():
-            item_frame = tk.Frame(self.cart_frame, bg="white")
-            item_frame.pack(fill=tk.X, padx=10, pady=2)
-            
-            # Truncate long names
-            name = item["name"]
-            if len(name) > 25:
-                name = name[:22] + "..."
-            
-            # Item details
-            tk.Label(item_frame, text=name, font=("Arial", 12), 
-                   bg="white", width=20, anchor="w").pack(side=tk.LEFT)
-            tk.Label(item_frame, text=f"${item['price']:.2f}", font=("Arial", 12), 
-                   bg="white", width=8, anchor="e").pack(side=tk.LEFT)
-            
-            # Quantity with +/- buttons
-            qty_frame = tk.Frame(item_frame, bg="white")
-            qty_frame.pack(side=tk.LEFT, padx=5)
-            
-            minus_btn = tk.Button(qty_frame, text="-", font=("Arial", 10), 
-                                command=lambda u=upc: self.decrease_quantity(u),
-                                width=1, height=1)
-            minus_btn.pack(side=tk.LEFT)
-            
-            tk.Label(qty_frame, text=str(item["qty"]), font=("Arial", 12), 
-                   bg="white", width=2).pack(side=tk.LEFT, padx=2)
-            
-            plus_btn = tk.Button(qty_frame, text="+", font=("Arial", 10), 
-                               command=lambda u=upc: self.increase_quantity(u),
-                               width=1, height=1)
-            plus_btn.pack(side=tk.LEFT)
-            
-            # Total for this item
-            item_total = item["price"] * item["qty"]
-            tk.Label(item_frame, text=f"${item_total:.2f}", font=("Arial", 12), 
-                   bg="white", width=8, anchor="e").pack(side=tk.LEFT)
-            
-            # Remove button
-            remove_btn = tk.Button(item_frame, text="Ã—", font=("Arial", 12, "bold"), 
-                                 command=lambda u=upc: self.remove_item(u),
-                                 bg="#ff6b6b", fg="white", width=2)
-            remove_btn.pack(side=tk.LEFT, padx=(5, 0))
-        
-        # Calculate totals
-        subtotal = sum(item["price"] * item["qty"] for item in self.cart_items.values())
-        taxable_subtotal = sum(
-            item["price"] * item["qty"] 
-            for item in self.cart_items.values() if item["taxable"]
-        )
-        tax_amount = taxable_subtotal * (self.tax_rate / 100)
-        total = subtotal + tax_amount
-        
-        # Update totals display
-        self.update_totals_display(subtotal, tax_amount, total)
-
-
-
-def _thank_you_complete(self):
-    """Complete the thank you process and return to idle mode."""
-    logging.debug("Entering _thank_you_complete method")
-    
-    # Cancel timeout if it exists
-    if hasattr(self, 'thank_you_timeout') and self.thank_you_timeout:
-        logging.debug("Canceling thank you timeout")
-        self.root.after_cancel(self.thank_you_timeout)
-        self.thank_you_timeout = None
-    
-    # Close thank you popup if it exists
-    if hasattr(self, 'thank_you_popup') and self.thank_you_popup:
-        logging.debug("Destroying thank you popup")
-        self.thank_you_popup.destroy()
-        self.thank_you_popup = None
-    
-    # Reset cart
-    logging.debug("Resetting cart")
-    self._reset_cart()
-    
-    # Only destroy specific CartMode widgets, not all widgets
-    if hasattr(self, 'receipt_frame') and self.receipt_frame:
-        self.receipt_frame.place_forget()
-    
-    if hasattr(self, 'totals_frame') and self.totals_frame:
-        self.totals_frame.place_forget()
-    
-    if hasattr(self, 'label') and self.label:
-        self.label.place_forget()
-    
-    # Call the exit callback to return to idle mode
-    if hasattr(self, 'on_exit') and callable(self.on_exit):
-        logging.info("Transaction complete, calling exit callback to return to idle mode")
-        self.on_exit()
-    else:
-        logging.warning("No exit callback found, cannot return to idle mode")
-
-
-
     def _generate_transaction_id(self):
         """Generate a unique transaction ID in format YYDDD###."""
         try:
@@ -3177,8 +2124,8 @@ def _thank_you_complete(self):
             
             # Get current date components
             now = datetime.now()
-            year_last_two = int(now.strftime("%y"))  # Convert to int first
-            day_of_year = int(now.strftime("%j"))    # Convert to int first
+            year_last_two = int(now.strftime("%y"))  # Convert to int
+            day_of_year = int(now.strftime("%j"))    # Convert to int
             
             # Get the current transaction count for today
             transaction_count_file = Path.home() / "SelfCheck" / "Logs" / f"transaction_count_{year_last_two:02d}{day_of_year:03d}.txt"
@@ -3218,729 +2165,21 @@ def _thank_you_complete(self):
             logging.info(f"Using fallback transaction ID: {fallback_id}")
             return fallback_id
 
-
-
-
-    def _reset_cart(self):
-        """Reset the cart and related variables."""
-        # Clear cart items
-        self.cart_items = {}
-        
-        # Generate a new transaction ID
-        self.transaction_id = self._generate_transaction_id()
-        logging.info(f"New transaction ID generated: {self.transaction_id}")
-        
-        # Reset payment method
-        self.current_payment_method = None
-        
-        logging.info("Cart reset")
-
-
-
-    def _show_transaction_id_entry(self):
-        """Show transaction ID entry popup with number pad."""
-        # Close any existing transaction ID entry popup
-        if hasattr(self, 'transaction_id_popup') and self.transaction_id_popup:
-            self.transaction_id_popup.destroy()
-        
-        # Create transaction ID entry popup
-        self.transaction_id_popup = tk.Frame(self.root, bg="white", bd=3, relief=tk.RAISED)
-        self.transaction_id_popup.place(relx=0.5, rely=0.5, width=500, height=600, anchor=tk.CENTER)
-        
-        # Title
-        title_label = tk.Label(self.transaction_id_popup, 
-                             text="Enter last 4 digits of Venmo Transaction ID", 
-                             font=("Arial", 18, "bold"), 
-                             bg="white",
-                             wraplength=450)
-        title_label.pack(pady=(20, 10))
-        
-        # Entry field
-        self.transaction_id_var = tk.StringVar()
-        entry_frame = tk.Frame(self.transaction_id_popup, bg="white")
-        entry_frame.pack(pady=20)
-        
-        entry_field = tk.Entry(entry_frame, 
-                             textvariable=self.transaction_id_var, 
-                             font=("Arial", 24), 
-                             width=6, 
-                             justify=tk.CENTER)
-        entry_field.pack(side=tk.LEFT, padx=10)
-        entry_field.focus_set()  # Set focus to the entry field
-        
-        # Number pad frame
-        numpad_frame = tk.Frame(self.transaction_id_popup, bg="white")
-        numpad_frame.pack(pady=20)
-        
-        # Create number buttons
-        buttons = [
-            ['1', '2', '3'],
-            ['4', '5', '6'],
-            ['7', '8', '9'],
-            ['Backspace', '0', 'Enter']
-        ]
-        
-        for row_idx, row in enumerate(buttons):
-            for col_idx, btn_text in enumerate(row):
-                if btn_text == 'Backspace':
-                    # Backspace button
-                    btn = tk.Button(numpad_frame, 
-                                  text=btn_text, 
-                                  font=("Arial", 16), 
-                                  bg="#e74c3c", fg="white",
-                                  width=8, height=2,
-                                  command=lambda: self._transaction_id_backspace())
-                elif btn_text == 'Enter':
-                    # Enter button
-                    btn = tk.Button(numpad_frame, 
-                                  text=btn_text, 
-                                  font=("Arial", 16), 
-                                  bg="#27ae60", fg="white",
-                                  width=8, height=2,
-                                  command=self._process_transaction_id)
-                else:
-                    # Number button
-                    btn = tk.Button(numpad_frame, 
-                                  text=btn_text, 
-                                  font=("Arial", 20), 
-                                  bg="#3498db", fg="white",
-                                  width=4, height=2,
-                                  command=lambda b=btn_text: self._transaction_id_add_digit(b))
-                
-                btn.grid(row=row_idx, column=col_idx, padx=5, pady=5)
-        
-        # Bind keyboard events
-        self.root.bind("<Key>", self._transaction_id_key_press)
-        
-        # Start timeout - 60 seconds
-        self.transaction_id_timeout = self.root.after(60000, self._transaction_id_timeout)
-    
-    def _transaction_id_add_digit(self, digit):
-        """Add a digit to the transaction ID entry."""
-        current = self.transaction_id_var.get()
-        if len(current) < 4:  # Limit to 4 digits
-            self.transaction_id_var.set(current + digit)
-    
-    def _transaction_id_backspace(self):
-        """Remove the last digit from the transaction ID entry."""
-        current = self.transaction_id_var.get()
-        self.transaction_id_var.set(current[:-1])
-    
-    def _transaction_id_key_press(self, event):
-        """Handle keyboard input for transaction ID entry."""
-        if not hasattr(self, 'transaction_id_popup') or not self.transaction_id_popup:
-            return
-            
-        if event.char.isdigit() and len(self.transaction_id_var.get()) < 4:
-            # Add digit
-            self.transaction_id_var.set(self.transaction_id_var.get() + event.char)
-        elif event.keysym == 'BackSpace':
-            # Backspace
-            self.transaction_id_backspace()
-        elif event.keysym == 'Return':
-            # Enter
-            self._process_transaction_id()
-    
-    def _transaction_id_timeout(self):
-        """Handle timeout for transaction ID entry."""
-        if hasattr(self, 'transaction_id_popup') and self.transaction_id_popup:
-            self.transaction_id_popup.destroy()
-            self.transaction_id_popup = None
-            
-        # Unbind keyboard events
-        self.root.unbind("<Key>")
-        self.root.bind("<Key>", self._on_key)  # Restore original key binding
-        
-        # Return to payment popup
-        messagebox.showinfo("Timeout", "Transaction ID entry timed out.")
-    
-
-    def _process_transaction_id(self):
-        """Process the entered transaction ID."""
-        # Cancel timeout
-        if hasattr(self, 'transaction_id_timeout') and self.transaction_id_timeout:
-            self.root.after_cancel(self.transaction_id_timeout)
-            self.transaction_id_timeout = None
-        
-        # Get entered ID
-        entered_id = self.transaction_id_var.get().strip()
-        
-        # Log the entered ID
-        logging.info(f"Transaction ID entered: {entered_id}")
-        
-        # Close transaction ID popup
-        if hasattr(self, 'transaction_id_popup') and self.transaction_id_popup:
-            self.transaction_id_popup.destroy()
-            self.transaction_id_popup = None
-        
-        # Unbind keyboard events
-        self.root.unbind("<Key>")
-        self.root.bind("<Key>", self._on_key)  # Restore original key binding
-        
-        # Calculate the total for processing
-        subtotal = sum(item["price"] * item["qty"] for item in self.cart_items.values())
-        taxable_subtotal = sum(
-            item["price"] * item["qty"] 
-            for item in self.cart_items.values() if item["taxable"]
-        )
-        tax_amount = taxable_subtotal * (self.tax_rate / 100)
-        total = subtotal + tax_amount
-        
-        # Store the payment method for receipt printing
-        self.current_payment_method = "Venmo"
-        
-        # Log the transaction with the entered ID
-        self._log_successful_transaction("Venmo", total, entered_id)
-        
-        # Show thank you popup
-        self._show_thank_you_popup()
-
-    def _show_thank_you_popup(self):
-        """Show thank you popup with receipt options."""
-        # Close any existing popups
-        self._close_all_payment_popups()
-        
-        # Create thank you popup
-        self.thank_you_popup = tk.Frame(self.root, bg="white", bd=3, relief=tk.RAISED)
-        self.thank_you_popup.place(relx=0.5, rely=0.5, width=500, height=400, anchor=tk.CENTER)
-        
-        # Title
-        title_label = tk.Label(self.thank_you_popup, 
-                             text="Thank you for your payment", 
-                             font=("Arial", 24, "bold"), 
-                             bg="white")
-        title_label.pack(pady=(40, 20))
-        
-        # Receipt text
-        receipt_label = tk.Label(self.thank_you_popup, 
-                               text="Would you like a receipt?", 
-                               font=("Arial", 20), 
-                               bg="white")
-        receipt_label.pack(pady=(0, 40))
-        
-        # Button frame
-        button_frame = tk.Frame(self.thank_you_popup, bg="white")
-        button_frame.pack(pady=20, fill=tk.X, padx=40)
-        
-        # Print button - make it more prominent
-        print_btn = tk.Button(button_frame, 
-                            text="Print", 
-                            font=("Arial", 18, "bold"), 
-                            bg="#3498db", fg="white",
-                            command=lambda: self._receipt_option_selected("print"),
-                            width=8, height=2)
-        print_btn.pack(side=tk.LEFT, padx=10, expand=True)
-        
-        # Email button
-        email_btn = tk.Button(button_frame, 
-                            text="Email", 
-                            font=("Arial", 18), 
-                            bg="#2ecc71", fg="white",
-                            command=lambda: self._receipt_option_selected("email"),
-                            width=8, height=2)
-        email_btn.pack(side=tk.LEFT, padx=10, expand=True)
-        
-        # None button
-        none_btn = tk.Button(button_frame, 
-                           text="None", 
-                           font=("Arial", 18), 
-                           bg="#7f8c8d", fg="white",
-                           command=self._thank_you_complete,
-                           width=8, height=2)
-        none_btn.pack(side=tk.LEFT, padx=10, expand=True)
-        
-        # Start timeout - 20 seconds
-        self.thank_you_timeout = self.root.after(20000, self._thank_you_timeout)
-
-
-    def _receipt_option_selected(self, option):
-        """Handle receipt option selection."""
-        logging.info(f"Receipt option selected: {option}")
-        
-        if option == "print":
-            # Calculate the total
-            subtotal = sum(item["price"] * item["qty"] for item in self.cart_items.values())
-            taxable_subtotal = sum(
-                item["price"] * item["qty"] 
-                for item in self.cart_items.values() if item["taxable"]
-            )
-            tax_amount = taxable_subtotal * (self.tax_rate / 100)
-            total = subtotal + tax_amount
-            
-            # Get payment method (default to "Unknown" if not set)
-            payment_method = getattr(self, 'current_payment_method', "Unknown")
-            
-            # Try to print receipt
-            success = self.print_receipt(payment_method, total)
-            
-            if success:
-                messagebox.showinfo("Receipt", "Receipt printed successfully.")
-            else:
-                # If printing fails, show a text-based receipt
-                response = messagebox.askquestion("Printer Error", 
-                                               "Failed to print receipt. Would you like to view it on screen instead?")
-                if response == 'yes':
-                    self._show_text_receipt(payment_method, total)
-        
-        elif option == "email":
-            # Future implementation
-            messagebox.showinfo("Receipt", "Email receipt option selected.\nThis feature will be implemented soon.")
-        
-        # Always complete the thank you process and return to idle mode
-        self._thank_you_complete()
-    
- 
-    def _verify_venmo_transaction(self, scanned_code):
-        """Verify the scanned Venmo transaction code."""
-        if not hasattr(self, 'expected_transaction_id'):
-            logging.error("No expected transaction ID found")
-            self.verification_label.config(text="Error: No transaction to verify", fg="#e74c3c")  # Red
-            return
-        
-        # Clean up the scanned code - extract just the transaction ID if needed
-        # This might need adjustment based on what exactly gets scanned from the phone
-        # For now, we'll just check if the expected ID is contained in the scanned code
-        if self.expected_transaction_id in scanned_code:
-            logging.info(f"Venmo payment verified! Transaction ID: {self.expected_transaction_id}")
-            self.verification_label.config(text="Payment Verified! Processing...", fg="#27ae60")  # Green
-            
-            # Calculate the total for logging
-            subtotal = sum(item["price"] * item["qty"] for item in self.cart_items.values())
-            taxable_subtotal = sum(
-                item["price"] * item["qty"] 
-                for item in self.cart_items.values() if item["taxable"]
-            )
-            tax_amount = taxable_subtotal * (self.tax_rate / 100)
-            total = subtotal + tax_amount
-            
-            # Process successful payment after a short delay
-            self.root.after(2000, lambda: self._process_successful_payment("Venmo", total))
-        else:
-            logging.warning(f"Venmo verification failed. Expected: {self.expected_transaction_id}, Got: {scanned_code}")
-            self.verification_label.config(text="Verification Failed - Try Again", fg="#e74c3c")  # Red
-
-    def _process_successful_payment(self, method, total):
-        """Process a successful payment."""
-        from tkinter import messagebox
-        
-        # Close all payment popups
-        self._close_all_payment_popups()
-        
-        # Disable Venmo verification mode
-        # self._disable_venmo_verification()
-        
-        # Show success message
-        messagebox.showinfo("Payment Successful", 
-                          f"${total:.2f} payment with {method} was successful.\n\n" +
-                          "Thank you for your purchase!")
-        
-        # Log the successful transaction
-        self._log_successful_transaction(method, total)
-        
-        # Clear the cart and return to idle mode
-        self.cart_items = {}
-        if hasattr(self, "on_exit"):
-            self.on_exit()
-
-
-    def _test_qr_generation(self):
-        """Test QR code generation without UI."""
-        try:
-            import qrcode
-            from PIL import Image
-            
-            # Create a simple QR code
-            qr = qrcode.QRCode(
-                version=1,
-                error_correction=qrcode.constants.ERROR_CORRECT_L,
-                box_size=10,
-                border=4,
-            )
-            qr.add_data("https://example.com")
-            qr.make(fit=True)
-            
-            # Create an image
-            img = qr.make_image(fill_color="black", back_color="white")
-            
-            # Save to a file for inspection
-            test_path = Path.home() / "SelfCheck" / "Logs" / "test_qr.png"
-            img.save(test_path)
-            
-            logging.info(f"Test QR code saved to {test_path}")
-            return True
-        except Exception as e:
-            logging.error(f"QR test failed: {e}")
-            import traceback
-            logging.error(traceback.format_exc())
-            return False
-
-
-
-
-    def _log_cancelled_cart(self, reason):
-        """Log a cancelled cart to the Service tab."""
-        try:
-            # Use more comprehensive scopes
-            scopes = [
-                "https://www.googleapis.com/auth/spreadsheets",
-                "https://www.googleapis.com/auth/drive",
-            ]
-            creds = Credentials.from_service_account_file(str(GS_CRED_PATH), scopes=scopes)
-            gc = gspread.authorize(creds)
-            
-            # Open the spreadsheet and worksheet
-            sheet = gc.open(GS_SHEET_NAME).worksheet("Service")
-            
-            # Calculate cart value for logging
-            subtotal = sum(item["price"] * item["qty"] for item in self.cart_items.values())
-            
-            # Prepare row data
-            timestamp = datetime.now().strftime("%m/%d/%Y %H:%M:%S")
-            user = self.machine_id
-            action = f"Cart Cancelled - {reason} - ${subtotal:.2f} - {len(self.cart_items)} items"
-            
-            # Create row with the correct format
-            row = [timestamp, user, action]
-            
-            # Log locally first
-            logging.info(f"Logging cancelled cart: {timestamp}, {user}, {action}")
-            
+    def _reload_tax_rate(self):
+        """Reload the tax rate from Tax.json to ensure it's current."""
+        tax_path = CRED_DIR / "Tax.json"
+        if tax_path.exists():
             try:
-                # Try to append to sheet
-                sheet.append_row(row)
-                logging.info(f"Successfully logged cancelled cart to Service tab")
-            except Exception as api_error:
-                logging.error(f"Error logging to Service tab: {api_error}")
-                # Create a local log file as fallback
-                log_dir = Path.home() / "SelfCheck" / "Logs"
-                log_dir.mkdir(parents=True, exist_ok=True)
-                log_file = log_dir / "transaction_log.csv"
-                
-                # Append to local log file
-                with open(log_file, 'a') as f:
-                    f.write(f"{timestamp},{user},{action}\n")
-                logging.info(f"Logged cancelled cart to local file instead: {log_file}")
-                
-        except Exception as e:
-            logging.error(f"Failed to log cancelled cart: {e}")
-            import traceback
-            logging.error(traceback.format_exc())
-
-
-    def _load_upc_catalog(self):
-        """Load UPC catalog from CSV file and update Tax.json from spreadsheet."""
-        try:
-            # Connect to Google Sheet to get latest data
-            scopes = [
-                "https://www.googleapis.com/auth/spreadsheets.readonly",
-                "https://www.googleapis.com/auth/drive.readonly",
-                "https://www.googleapis.com/auth/spreadsheets",
-            ]
-            creds = Credentials.from_service_account_file(str(GS_CRED_PATH), scopes=scopes)
-            gc = gspread.authorize(creds)
-            
-            # First, update the tax rate from the spreadsheet
-            try:
-                sheet = gc.open(GS_SHEET_NAME).worksheet(GS_CRED_TAB)
-                tax_rate_str = sheet.acell('B27').value
-                
-                # Parse tax rate (remove % sign if present)
-                if tax_rate_str:
-                    tax_rate_str = tax_rate_str.replace('%', '').strip()
-                    tax_rate = float(tax_rate_str)
-                    
-                    # Update Tax.json file
-                    tax_path = CRED_DIR / "Tax.json"
-                    with open(tax_path, 'w') as f:
-                        json.dump({"rate": tax_rate}, f)
-                    logging.info(f"Updated Tax.json with rate {tax_rate}% from spreadsheet")
-                    
-                    # Update the instance variable
-                    self.tax_rate = tax_rate
-                else:
-                    logging.warning("Tax rate not found in spreadsheet cell B27")
-            except Exception as e:
-                logging.error(f"Failed to update tax rate from spreadsheet: {e}")
-            
-            # Now load the UPC catalog
-            catalog_path = CRED_DIR / "upc_catalog.csv"
-            if not catalog_path.exists():
-                logging.error(f"UPC catalog not found: {catalog_path}")
-                return
-            
-            # Define column mappings (same as standalone script)
-            headers = [
-                "UPC", "Brand", "Name", "Size", "Calories", "Sugar", "Sodium",
-                "Price", "Tax %", "QTY", "Image"
-            ]
-            
-            import csv
-            with open(catalog_path, 'r', newline='') as f:
-                reader = csv.DictReader(f)
-                
-                # Process each row
-                for row in reader:
-                    upc = row["UPC"].strip()
-                    if not upc:
-                        continue
-                    
-                    # Convert row dict to list for compatibility with existing code
-                    row_list = [
-                        upc,                   # A: UPC
-                        row["Brand"],          # B: Brand
-                        row["Name"],           # C: Name
-                        "",                    # D: (hidden column)
-                        row["Size"],           # E: Size
-                        row["Calories"],       # F: Calories
-                        row["Sugar"],          # G: Sugar
-                        row["Sodium"],         # H: Sodium
-                        row["Price"],          # I: Price
-                        row["Tax %"],          # J: Tax %
-                        row["QTY"],            # K: QTY
-                        row["Image"]           # L: Image
-                    ]
-                    
-                    # Store the row list for this UPC
-                    self.upc_catalog[upc] = row_list
-                    
-                    # Also store variants
-                    for variant in upc_variants_from_sheet(upc):
-                        if variant != upc:
-                            self.upc_catalog[variant] = row_list
-                
-            logging.info(f"Loaded {len(self.upc_catalog)} UPC entries from catalog")
-            
-        except Exception as e:
-            logging.error(f"Error loading UPC catalog: {e}")
-
-
-
-
-    def check_spreadsheet_permissions(self):
-        """Check and log permissions for the Google Sheet."""
-        try:
-            scopes = ["https://www.googleapis.com/auth/spreadsheets"]
-            creds = Credentials.from_service_account_file(str(GS_CRED_PATH), scopes=scopes)
-            gc = gspread.authorize(creds)
-            
-            # Get service account email
-            service_account_info = json.loads(Path(GS_CRED_PATH).read_text())
-            service_account_email = service_account_info.get('client_email', 'Unknown')
-            
-            logging.info(f"Service account email: {service_account_email}")
-            
-            # Try to open the sheet
-            sheet = gc.open(GS_SHEET_NAME)
-            
-            # Get permissions
-            permissions = sheet.list_permissions()
-            
-            # Log permissions
-            for perm in permissions:
-                role = perm.get('role', 'Unknown')
-                email = perm.get('emailAddress', 'Unknown')
-                perm_type = perm.get('type', 'Unknown')
-                logging.info(f"Permission: {email} has {role} access (type: {perm_type})")
-                
-            # Check if service account has edit access
-            service_account_has_access = False
-            for perm in permissions:
-                if perm.get('emailAddress') == service_account_email:
-                    if perm.get('role') in ['writer', 'owner']:
-                        service_account_has_access = True
-                        break
-            
-            if service_account_has_access:
-                logging.info("Service account has write access to the spreadsheet")
-            else:
-                logging.warning("Service account does NOT have write access to the spreadsheet")
-                logging.warning(f"Please share the spreadsheet with {service_account_email} as an Editor")
-                
-            return service_account_has_access
-            
-        except Exception as e:
-            logging.error(f"Error checking spreadsheet permissions: {e}")
-            return False
-
-    def _load_product_image(self, image_name, target_label, size=(225, 225)):
-        """
-        Load a product image from cache or Google Drive.
-        
-        Args:
-            image_name: Name of the image file
-            target_label: The tk.Label widget to display the image in
-            size: Tuple of (width, height) for resizing
-        """
-        if not image_name:
-            target_label.config(image="", text="No image available")
-            return
-            
-        # Import necessary modules
-        import io
-        from googleapiclient.http import MediaIoBaseDownload
-        
-        # Store the image reference as an attribute of the label to prevent garbage collection
-        if not hasattr(target_label, 'image_ref'):
-            target_label.image_ref = None
-        
-        try:
-            # Ensure cache directory exists
-            self.cache_dir.mkdir(parents=True, exist_ok=True)
-            
-            # Check local cache first
-            image_path = self.cache_dir / image_name
-            logging.info(f"Looking for image: {image_name} at path: {image_path}")
-            
-            if image_path.exists():
-                logging.info(f"Loading image from cache: {image_path}")
-                with Image.open(image_path) as img:
-                    img = img.resize(size, Image.LANCZOS)
-                    photo_image = ImageTk.PhotoImage(img)
-                    target_label.image_ref = photo_image  # Prevent garbage collection
-                    target_label.config(image=photo_image, text="")
-                    return True
-            
-            # If not in cache, try to download from Google Drive
-            if self.drive_service:
-                logging.info(f"Searching for image in Google Drive: {image_name}")
-                query = f"name = '{image_name}' and trashed = false"
-                results = self.drive_service.files().list(
-                    q=query, spaces='drive', fields='files(id, name)').execute()
-                items = results.get('files', [])
-                
-                if items:
-                    file_id = items[0]['id']
-                    logging.info(f"Found image in Drive with ID: {file_id}")
-                    
-                    # Download file
-                    request = self.drive_service.files().get_media(fileId=file_id)
-                    fh = io.BytesIO()
-                    downloader = MediaIoBaseDownload(fh, request)
-                    done = False
-                    while not done:
-                        status, done = downloader.next_chunk()
-                    
-                    # Save to cache
-                    fh.seek(0)
-                    with open(image_path, 'wb') as f:
-                        f.write(fh.read())
-                    logging.info(f"Saved image to cache: {image_path}")
-                    
-                    # Display image
-                    with Image.open(image_path) as img:
-                        img = img.resize(size, Image.LANCZOS)
-                        photo_image = ImageTk.PhotoImage(img)
-                        target_label.image_ref = photo_image  # Prevent garbage collection
-                        target_label.config(image=photo_image, text="")
-                        return True
-                else:
-                    logging.warning(f"Image not found in Drive: {image_name}")
-                    target_label.config(image="", text="Image not found in Drive")
-                    return False
-            else:
-                logging.warning("Drive service not available")
-                target_label.config(image="", text="Drive service not available")
-                return False
-        except Exception as e:
-            logging.error(f"Error loading image {image_name}: {e}")
-            import traceback
-            logging.error(traceback.format_exc())
-            target_label.config(image="", text=f"Error loading image")
-            return False
-
-    def _on_touch(self, event):
-        """Handle touch events in Cart mode."""
-        x, y = event.x, event.y
-        logging.info(f"Touch in Cart mode at ({x}, {y})")
-        self._on_activity(event)
-
-
-
-    def _on_activity(self, event=None):
-        """Reset inactivity timer."""
-        # Reset inactivity timer
-        self.last_activity_ts = time.time()
-    
-        # Cancel any existing timeout popup
-        if hasattr(self, 'timeout_popup') and self.timeout_popup:
-            self._cancel_timeout_popup()
-
-    def start(self):
-        logging.info("CartMode: Starting")
-        
-        # Generate a new transaction ID
-        self.transaction_id = self.generate_transaction_id()
-        
-        # Clear any existing cart data
-        self.cart_items = {}
-        
-        # Clear barcode buffer
-        self.barcode_buffer = ""
-        
-        # Reload tax rate from Tax.json to ensure it's current
-        self._reload_tax_rate()
-        
-        # Make sure the label is visible
-        self.label.place(x=0, y=0, width=WINDOW_W, height=WINDOW_H)
-        self.label.lift()
-        
-        # Add debug logging
-        logging.info("CartMode: Label placed and lifted")
-        
-        try:
-            # Create fresh UI with error handling
-            self._create_ui()
-            logging.info("CartMode: UI created successfully")
-        except Exception as e:
-            logging.error(f"CartMode: Error creating UI: {e}")
-            import traceback
-            logging.error(traceback.format_exc())
-            
-            # Fallback to a simple UI if the main UI fails
-            self._create_fallback_ui()
-        
-        # Start timeout timer
-        self._arm_timeout()
-
-
- 
-
- 
-    def stop(self):
-        logging.info("CartMode: Stopping")
-        
-        # Cancel timers
-        if hasattr(self, 'timeout_after') and self.timeout_after:
-            self.root.after_cancel(self.timeout_after)
-            self.timeout_after = None
-            
-        if hasattr(self, 'countdown_after') and self.countdown_after:
-            self.root.after_cancel(self.countdown_after)
-            self.countdown_after = None
-        
-        # Hide all UI elements
-        for attr_name in ['label', 'receipt_frame', 'totals_frame', 'popup_frame', 
-                         'manual_entry_frame', 'timeout_popup', 'fallback_frame']:
-            if hasattr(self, attr_name):
-                widget = getattr(self, attr_name)
-                if widget and hasattr(widget, 'place_forget'):
-                    try:
-                        widget.place_forget()
-                    except Exception as e:
-                        logging.error(f"CartMode: Error hiding {attr_name}: {e}")
-                elif widget and hasattr(widget, 'destroy'):
-                    try:
-                        widget.destroy()
-                        setattr(self, attr_name, None)
-                    except Exception as e:
-                        logging.error(f"CartMode: Error destroying {attr_name}: {e}")
-        
-        logging.info("CartMode: Successfully stopped")
+                with open(tax_path, 'r') as f:
+                    data = json.load(f)
+                    self.tax_rate = float(data.get("rate", 2.9))
+                    logging.info(f"Reloaded tax rate from Tax.json: {self.tax_rate}%")
+            except (json.JSONDecodeError, ValueError) as e:
+                logging.error(f"Error reloading tax rate: {e}")
+                self.tax_rate = 2.9  # Default to 2.9% if there's an error
 
     def _create_ui(self):
         """Create the cart UI elements."""
-        logging.info("CartMode: Creating UI elements")
-        
         # Show main background
         self.label.place(x=0, y=0, width=WINDOW_W, height=WINDOW_H)
         
@@ -3958,41 +2197,27 @@ def _thank_you_complete(self):
         try:
             # Create receipt area (left side, 2 inches down)
             self._create_receipt_area()
-            logging.info("CartMode: Receipt area created")
-        except Exception as e:
-            logging.error(f"CartMode: Error creating receipt area: {e}")
-        
-        try:
+            
             # Create totals area (lower right)
             self._create_totals_area()
-            logging.info("CartMode: Totals area created")
-        except Exception as e:
-            logging.error(f"CartMode: Error creating totals area: {e}")
-        
-        try:
+            
             # Create buttons (Cancel Order, Manual Entry, Pay Now)
             self._create_cancel_button()
-            logging.info("CartMode: Buttons created")
-        except Exception as e:
-            logging.error(f"CartMode: Error creating buttons: {e}")
-        
-        try:
+            
             # Update UI with current cart items
             self._update_receipt()
             self._update_totals()
-            logging.info("CartMode: UI updated with cart items")
         except Exception as e:
-            logging.error(f"CartMode: Error updating UI with cart items: {e}")
+            logging.error(f"CartMode: Error creating UI elements: {e}")
+            import traceback
+            logging.error(traceback.format_exc())
 
         # Reset activity timestamp to ensure full 45 seconds
         self.last_activity_ts = time.time()
 
-
     def _load_bg(self):
         """Load the cart background image."""
         bg_path = Path.home() / "SelfCheck" / "SysPics" / "Cart.png"
-        logging.info(f"CartMode: Loading background from {bg_path}")
-    
         if bg_path.exists():
             try:
                 with Image.open(bg_path) as im:
@@ -4001,14 +2226,10 @@ def _thank_you_complete(self):
                     # Full screen - no letterboxing
                     return im.resize((WINDOW_W, WINDOW_H), Image.LANCZOS)
             except Exception as e:
-                logging.error(f"CartMode: Error loading cart background: {e}")
-        else:
-            logging.error(f"CartMode: Background image not found: {bg_path}")
-    
+                logging.error(f"Error loading cart background: {e}")
+        
         # Fallback to white background
-        logging.info("CartMode: Using fallback white background")
         return Image.new("RGB", (WINDOW_W, WINDOW_H), (255, 255, 255))
-
 
     def _render_base(self):
         """Display the background image."""
@@ -4016,17 +2237,10 @@ def _thank_you_complete(self):
             self.tk_img = ImageTk.PhotoImage(self.base_bg)
             self.label.configure(image=self.tk_img)
             self.label.lift()
-            logging.info("CartMode: Base background rendered successfully")
         except Exception as e:
-            logging.error(f"CartMode: Error rendering base background: {e}")
-            # Try a simpler approach
-            try:
-                self.label.configure(bg="white")
-                self.label.lift()
-                logging.info("CartMode: Fallback to white background")
-            except Exception as e2:
-                logging.error(f"CartMode: Error setting fallback background: {e2}")
-
+            logging.error(f"Error rendering base: {e}")
+            # Fallback to plain background
+            self.label.configure(bg="white")
 
     def _create_receipt_area(self):
         """Create the scrollable receipt area."""
@@ -4089,55 +2303,99 @@ def _thank_you_complete(self):
                                  command=self._pay_now)
         pay_now_button.place(x=WINDOW_W//2 + 100, y=WINDOW_H-150, width=WINDOW_W//2 - 150, height=70)
 
-    def generate_transaction_id(self):
-        """Generate a unique transaction ID in format YYDDD###."""
-        try:
-            from datetime import datetime
+    def _update_receipt(self):
+        """Update the receipt display with current cart items."""
+        if not hasattr(self, 'receipt_items_frame') or not self.receipt_items_frame:
+            return
+        
+        # Clear existing items
+        for widget in self.receipt_items_frame.winfo_children():
+            widget.destroy()
+        
+        if not self.cart_items:
+            # Show empty cart message
+            empty_label = tk.Label(self.receipt_items_frame, 
+                                  text="Cart is empty\nScan items to begin", 
+                                  font=("Arial", 14), bg="white", fg="gray")
+            empty_label.pack(pady=20)
+            return
+        
+        # Add items to receipt
+        for upc, item in self.cart_items.items():
+            item_frame = tk.Frame(self.receipt_items_frame, bg="white", bd=1, relief=tk.SOLID)
+            item_frame.pack(fill=tk.X, padx=5, pady=2)
             
-            # Get current date components
-            now = datetime.now()
-            year_last_two = now.strftime("%y")  # Last two digits of year (e.g., "25" for 2025)
-            day_of_year = now.strftime("%j")    # Day of year as 3 digits (e.g., "236" for Aug 24)
+            # Make item frame clickable for editing
+            item_frame.bind("<Button-1>", lambda e, u=upc: self._edit_item(u))
             
-            # Get the current transaction count for today
-            transaction_count_file = Path.home() / "SelfCheck" / "Logs" / f"transaction_count_{year_last_two}{day_of_year}.txt"
+            # Item name (truncate if too long)
+            name = item["name"]
+            if len(name) > 20:
+                name = name[:17] + "..."
             
-            # Create directory if it doesn't exist
-            transaction_count_file.parent.mkdir(parents=True, exist_ok=True)
+            name_label = tk.Label(item_frame, text=name, font=("Arial", 12, "bold"), 
+                                 bg="white", anchor="w")
+            name_label.pack(fill=tk.X, padx=5, pady=2)
+            name_label.bind("<Button-1>", lambda e, u=upc: self._edit_item(u))
             
-            # Get current count or start at 0
-            current_count = 0
-            if transaction_count_file.exists():
-                try:
-                    with open(transaction_count_file, 'r') as f:
-                        current_count = int(f.read().strip())
-                except (ValueError, IOError) as e:
-                    logging.error(f"Error reading transaction count: {e}")
-            
-            # Increment count
-            new_count = current_count + 1
-            
-            # Save new count
-            try:
-                with open(transaction_count_file, 'w') as f:
-                    f.write(str(new_count))
-            except IOError as e:
-                logging.error(f"Error saving transaction count: {e}")
-            
-            # Format transaction ID: YYDDD### (e.g., 25236001)
-            transaction_id = f"{year_last_two}{day_of_year:03d}{new_count:03d}"
-            
-            logging.info(f"Generated transaction ID: {transaction_id}")
-            return transaction_id
-            
-        except Exception as e:
-            logging.error(f"Error generating transaction ID: {e}")
-            # Fallback to a simple timestamp-based ID
-            import time
-            simple_id = f"T{int(time.time())}"
-            logging.info(f"Using fallback transaction ID: {simple_id}")
-            return simple_id
+            # Price and quantity info
+            info_text = f"${item['price']:.2f} x {item['qty']} = ${item['price'] * item['qty']:.2f}"
+            info_label = tk.Label(item_frame, text=info_text, font=("Arial", 10), 
+                                 bg="white", anchor="w")
+            info_label.pack(fill=tk.X, padx=5, pady=(0, 2))
+            info_label.bind("<Button-1>", lambda e, u=upc: self._edit_item(u))
+        
+        # Update scroll region
+        self.receipt_items_frame.update_idletasks()
+        self.receipt_canvas.configure(scrollregion=self.receipt_canvas.bbox("all"))
 
+    def _update_totals(self):
+        """Update the totals display with current cart values."""
+        if not hasattr(self, 'totals_frame') or not self.totals_frame:
+            return
+        
+        # Clear existing totals display
+        for widget in self.totals_frame.winfo_children():
+            widget.destroy()
+        
+        # Calculate totals
+        subtotal = sum(item["price"] * item["qty"] for item in self.cart_items.values())
+        taxable_subtotal = sum(
+            item["price"] * item["qty"] 
+            for item in self.cart_items.values() if item["taxable"]
+        )
+        tax_amount = taxable_subtotal * (self.tax_rate / 100)
+        total = subtotal + tax_amount
+        total_items = sum(item["qty"] for item in self.cart_items.values())
+        
+        # Title
+        title_label = tk.Label(self.totals_frame, text="Order Summary", 
+                              font=("Arial", 18, "bold"), bg="white")
+        title_label.pack(pady=(10, 20))
+        
+        # Items count
+        items_label = tk.Label(self.totals_frame, 
+                              text=f"Items: {total_items}", 
+                              font=("Arial", 16), bg="white")
+        items_label.pack(pady=5)
+        
+        # Subtotal
+        subtotal_label = tk.Label(self.totals_frame, 
+                                 text=f"Subtotal: ${subtotal:.2f}", 
+                                 font=("Arial", 16), bg="white")
+        subtotal_label.pack(pady=5)
+        
+        # Tax
+        tax_label = tk.Label(self.totals_frame, 
+                            text=f"Tax ({self.tax_rate}%): ${tax_amount:.2f}", 
+                            font=("Arial", 16), bg="white")
+        tax_label.pack(pady=5)
+        
+        # Total (bold and larger)
+        total_label = tk.Label(self.totals_frame, 
+                              text=f"Total: ${total:.2f}", 
+                              font=("Arial", 20, "bold"), bg="white")
+        total_label.pack(pady=(10, 5))
 
     def scan_item(self, upc):
         """Process a scanned item and add to cart."""
@@ -4198,53 +2456,6 @@ def _thank_you_complete(self):
         self._update_totals()
         return True
 
-    def _update_receipt(self):
-        """Update the receipt display with current cart items."""
-        if not hasattr(self, 'receipt_items_frame') or not self.receipt_items_frame:
-            return
-        
-        # Clear existing items
-        for widget in self.receipt_items_frame.winfo_children():
-            widget.destroy()
-        
-        if not self.cart_items:
-            # Show empty cart message
-            empty_label = tk.Label(self.receipt_items_frame, 
-                                  text="Cart is empty\nScan items to begin", 
-                                  font=("Arial", 14), bg="white", fg="gray")
-            empty_label.pack(pady=20)
-            return
-        
-        # Add items to receipt
-        for upc, item in self.cart_items.items():
-            item_frame = tk.Frame(self.receipt_items_frame, bg="white", bd=1, relief=tk.SOLID)
-            item_frame.pack(fill=tk.X, padx=5, pady=2)
-            
-            # Make item frame clickable for editing
-            item_frame.bind("<Button-1>", lambda e, u=upc: self._edit_item(u))
-            
-            # Item name (truncate if too long)
-            name = item["name"]
-            if len(name) > 20:
-                name = name[:17] + "..."
-            
-            name_label = tk.Label(item_frame, text=name, font=("Arial", 12, "bold"), 
-                                 bg="white", anchor="w")
-            name_label.pack(fill=tk.X, padx=5, pady=2)
-            name_label.bind("<Button-1>", lambda e, u=upc: self._edit_item(u))
-            
-            # Price and quantity info
-            info_text = f"${item['price']:.2f} x {item['qty']} = ${item['price'] * item['qty']:.2f}"
-            info_label = tk.Label(item_frame, text=info_text, font=("Arial", 10), 
-                                 bg="white", anchor="w")
-            info_label.pack(fill=tk.X, padx=5, pady=(0, 2))
-            info_label.bind("<Button-1>", lambda e, u=upc: self._edit_item(u))
-        
-        # Update scroll region
-        self.receipt_items_frame.update_idletasks()
-        self.receipt_canvas.configure(scrollregion=self.receipt_canvas.bbox("all"))
-
-
     def _edit_item(self, upc):
         """Show edit options for an item."""
         if upc not in self.cart_items:
@@ -4296,7 +2507,6 @@ def _thank_you_complete(self):
                              command=edit_popup.destroy)
         close_btn.pack(pady=5)
 
-
     def _change_quantity(self, upc, change, popup):
         """Change the quantity of an item."""
         if upc in self.cart_items:
@@ -4317,68 +2527,6 @@ def _thank_you_complete(self):
             popup.destroy()
             self._update_receipt()
             self._update_totals()
-
-
-    def update_totals_display(self, subtotal, tax, total):
-        """Update the totals section of the display."""
-        logging.debug("Updating totals display")
-        
-        # If totals frame doesn't exist yet, create it
-        if not hasattr(self, 'totals_frame'):
-            logging.warning("Totals frame doesn't exist, can't update display")
-            return
-        
-        # Clear existing widgets
-        for widget in self.totals_frame.winfo_children():
-            widget.destroy()
-        
-        # Transaction ID
-        trans_frame = tk.Frame(self.totals_frame, bg="white")
-        trans_frame.pack(fill=tk.X, padx=10, pady=5)
-        
-        tk.Label(trans_frame, text="Transaction ID:", font=("Arial", 12), 
-               bg="white", anchor="w").pack(side=tk.LEFT)
-        
-        # Display transaction ID if it exists
-        trans_id = getattr(self, 'transaction_id', 'Unknown')
-        tk.Label(trans_frame, text=trans_id, font=("Arial", 12), 
-               bg="white", anchor="e").pack(side=tk.RIGHT)
-        
-        # Subtotal
-        subtotal_frame = tk.Frame(self.totals_frame, bg="white")
-        subtotal_frame.pack(fill=tk.X, padx=10, pady=5)
-        
-        tk.Label(subtotal_frame, text="Subtotal:", font=("Arial", 12), 
-               bg="white", anchor="w").pack(side=tk.LEFT)
-        tk.Label(subtotal_frame, text=f"${subtotal:.2f}", font=("Arial", 12), 
-               bg="white", anchor="e").pack(side=tk.RIGHT)
-        
-        # Tax
-        tax_frame = tk.Frame(self.totals_frame, bg="white")
-        tax_frame.pack(fill=tk.X, padx=10, pady=5)
-        
-        tk.Label(tax_frame, text=f"Tax ({self.tax_rate}%):", font=("Arial", 12), 
-               bg="white", anchor="w").pack(side=tk.LEFT)
-        tk.Label(tax_frame, text=f"${tax:.2f}", font=("Arial", 12), 
-               bg="white", anchor="e").pack(side=tk.RIGHT)
-        
-        # Total
-        total_frame = tk.Frame(self.totals_frame, bg="white")
-        total_frame.pack(fill=tk.X, padx=10, pady=5)
-        
-        tk.Label(total_frame, text="Total:", font=("Arial", 14, "bold"), 
-               bg="white", anchor="w").pack(side=tk.LEFT)
-        tk.Label(total_frame, text=f"${total:.2f}", font=("Arial", 14, "bold"), 
-               bg="white", anchor="e").pack(side=tk.RIGHT)
-        
-        # Update checkout button state
-        if hasattr(self, 'checkout_btn'):
-            if self.cart_items:
-                self.checkout_btn.config(state=tk.NORMAL)
-            else:
-                self.checkout_btn.config(state=tk.DISABLED)
-
-
 
     def _show_manual_entry(self):
         """Show manual entry popup with numeric keypad."""
@@ -4459,10 +2607,6 @@ def _thank_you_complete(self):
             current = self.manual_entry_var.get()
             self.manual_entry_var.set(current[:-1])
         
-        # Calculate button size - make them half the previous size
-        button_width = int(popup_width * 0.15)  # 15% of popup width
-        button_height = int((WINDOW_H-50) * 0.06)  # 6% of popup height
-        
         for row_idx, row in enumerate(keys):
             for col_idx, key in enumerate(row):
                 # Determine button color and command
@@ -4542,18 +2686,12 @@ def _thank_you_complete(self):
             messagebox.showerror("Error", f"Item not found: {upc}")
             return
             
-        # Log the row data for debugging
-        logging.info(f"Found row data: {row}")
-        
         # Extract item data
         try:
             name = f"{row[1]} {row[2]} {row[4]}"  # Brand (B=1), Name (C=2), Size (E=4)
             price = float(row[8].replace('$', '').strip())  # Price (I=8)
             taxable = row[9].strip().lower() == 'yes'  # Taxable (J=9)
             image_name = row[11] if len(row) > 11 else ""  # Image (L=11)
-            
-            # Debug log
-            logging.info(f"Found item: {name}, Price: ${price}, Taxable: {taxable}, Image: {image_name}")
             
             # Display the item
             self._display_manual_item(name, price, taxable, image_name, upc)
@@ -4566,9 +2704,6 @@ def _thank_you_complete(self):
 
     def _display_manual_item(self, name, price, taxable, image_name, upc):
         """Display item details in the manual entry popup."""
-        # Log for debugging
-        logging.info("Displaying manual item details")
-        
         # Clear the item display frame
         for widget in self.item_display_frame.winfo_children():
             widget.destroy()
@@ -4607,7 +2742,7 @@ def _thank_you_complete(self):
                                          font=("Arial", 14), bg="white")
         self.item_details_label.pack(fill=tk.X, padx=10, pady=5)
         
-        # Quantity control - moved above the image as requested
+        # Quantity control
         qty_frame = tk.Frame(scrollable_frame, bg="white")
         qty_frame.pack(pady=10)
         
@@ -4627,17 +2762,17 @@ def _thank_you_complete(self):
             if self.manual_qty_var.get() < 10:
                 self.manual_qty_var.set(self.manual_qty_var.get() + 1)
                 
-        down_btn = tk.Button(qty_frame, text="â–¼", font=("Arial", 16), command=decrease_qty)
+        down_btn = tk.Button(qty_frame, text="▼", font=("Arial", 16), command=decrease_qty)
         down_btn.pack(side=tk.LEFT, padx=5)
         
-        up_btn = tk.Button(qty_frame, text="â–²", font=("Arial", 16), command=increase_qty)
+        up_btn = tk.Button(qty_frame, text="▲", font=("Arial", 16), command=increase_qty)
         up_btn.pack(side=tk.LEFT, padx=5)
         
-        # Image display - now below the quantity controls
+        # Image display
         self.item_image_label = tk.Label(scrollable_frame, bg="white")
         self.item_image_label.pack(pady=10)
         
-        # Load image - reduced size to 75% of original (225x225 instead of 300x300)
+        # Load image
         if image_name:
             self.item_image_label.config(text="Loading image...")
             self._load_product_image(image_name, self.item_image_label, size=(225, 225))
@@ -4664,9 +2799,6 @@ def _thank_you_complete(self):
         
         # Store the current UPC for later use
         self.current_manual_upc = upc
-        
-        # Log for debugging
-        logging.info("Action buttons created and displayed")
 
     def _manual_entry_add(self):
         """Add manually entered item to cart."""
@@ -4745,20 +2877,6 @@ def _thank_you_complete(self):
 
     def _pay_now(self):
         """Handle Pay Now button click."""
-        # Calculate the total for display
-        subtotal = sum(item["price"] * item["qty"] for item in self.cart_items.values())
-        taxable_subtotal = sum(
-            item["price"] * item["qty"] 
-            for item in self.cart_items.values() if item["taxable"]
-        )
-        tax_amount = taxable_subtotal * (self.tax_rate / 100)
-        total = subtotal + tax_amount
-        
-        # Create payment popup
-        self._show_payment_popup(total)
-
-    def _pay_now(self):
-        """Handle Pay Now button click."""
         # First, ensure any existing payment popups are destroyed
         self._close_all_payment_popups()
         
@@ -4786,7 +2904,6 @@ def _thank_you_complete(self):
                 try:
                     self.root.after_cancel(getattr(self, timer_attr))
                     setattr(self, timer_attr, None)
-                    logging.info(f"Cancelled timer: {timer_attr}")
                 except Exception as e:
                     logging.error(f"Error cancelling timer {timer_attr}: {e}")
         
@@ -4797,7 +2914,6 @@ def _thank_you_complete(self):
                 try:
                     getattr(self, popup_attr).destroy()
                     setattr(self, popup_attr, None)
-                    logging.info(f"Destroyed popup: {popup_attr}")
                 except Exception as e:
                     logging.error(f"Error destroying popup {popup_attr}: {e}")
         
@@ -4808,17 +2924,11 @@ def _thank_you_complete(self):
         self.root.unbind("<Key>")
         self.root.bind("<Key>", self._on_key)
 
-
     def _show_payment_popup(self, total):
         """Show payment options popup."""
         # Cancel any existing timeout
         self._on_activity()
     
-        # Debug: Check if payment popup already exists
-        if hasattr(self, 'payment_popup') and self.payment_popup:
-            logging.info("Payment popup already exists - destroying it first")
-            self.payment_popup.destroy()
-        
         # Create popup frame - ensure we're starting fresh
         self.payment_popup = tk.Frame(self.root, bg="white", bd=3, relief=tk.RAISED)
         self.payment_popup.place(relx=0.5, rely=0.5, width=600, height=500, anchor=tk.CENTER)
@@ -4942,11 +3052,6 @@ def _thank_you_complete(self):
     
         # Start timeout for payment popup
         self._start_payment_timeout()
-    
-        # Debug: Log that we've created the payment popup
-        logging.info("Payment popup created with all buttons")
-
-
 
     def _close_payment_popup(self):
         """Close the payment popup."""
@@ -4966,7 +3071,6 @@ def _thank_you_complete(self):
         else:
             logging.info("User declined order cancellation from payment popup")
 
-
     def _process_payment(self, method):
         """Process payment with selected method."""
         # Calculate the total
@@ -4980,7 +3084,6 @@ def _thank_you_complete(self):
         
         # Log the payment attempt
         logging.info(f"Processing payment of ${total:.2f} with {method}")
-
 
         # Store the payment method for receipt printing
         self.current_payment_method = method
@@ -4998,80 +3101,697 @@ def _thank_you_complete(self):
             # Show thank you popup
             self._show_thank_you_popup()
 
-
+    def _show_venmo_qr_code(self, total):
+        """Show QR code for Venmo payment."""
+        # Close the current payment popup
+        if hasattr(self, 'payment_popup') and self.payment_popup:
+            self.payment_popup.destroy()
         
-    def _finish_payment(self, method, total):
-        """Complete the payment process after simulated delay."""
-        from tkinter import messagebox
+        # Create a new popup for the QR code
+        self.payment_popup = tk.Frame(self.root, bg="white", bd=3, relief=tk.RAISED)
+        self.payment_popup.place(relx=0.5, rely=0.5, width=600, height=700, anchor=tk.CENTER)
         
-        # Close the payment popup
-        self._close_payment_popup()
+        # Title
+        title_label = tk.Label(self.payment_popup, 
+                             text="Pay with Venmo", 
+                             font=("Arial", 24, "bold"), 
+                             bg="white")
+        title_label.pack(pady=(20, 10))
         
-        # Show success message
-        messagebox.showinfo("Payment Successful", 
-                          f"${total:.2f} payment with {method} was successful.\n\n" +
-                          "Thank you for your purchase!")
-        
-        # Log the successful transaction
-        self._log_successful_transaction(method, total)
-        
-        # Clear the cart and return to idle mode
-        self.cart_items = {}
-        if hasattr(self, "on_exit"):
-            self.on_exit()
-            
-    def _log_successful_transaction(self, method, total, verification_code=None):
-        """Log a successful transaction to the Service tab."""
         try:
-            # Use more comprehensive scopes
-            scopes = [
-                "https://www.googleapis.com/auth/spreadsheets",
-                "https://www.googleapis.com/auth/drive",
-            ]
-            creds = Credentials.from_service_account_file(str(GS_CRED_PATH), scopes=scopes)
-            gc = gspread.authorize(creds)
+            # Generate QR code and get transaction ID
+            qr_img, transaction_id = self._generate_venmo_qr_code(total)
             
-            # Open the spreadsheet and worksheet
-            sheet = gc.open(GS_SHEET_NAME).worksheet("Service")
+            # Store transaction ID for reference
+            self.current_transaction_id = transaction_id
             
-            # Prepare row data
-            timestamp = datetime.now().strftime("%m/%d/%Y %H:%M:%S")
-            user = self.machine_id
+            # Amount and transaction ID
+            details_frame = tk.Frame(self.payment_popup, bg="white")
+            details_frame.pack(pady=(0, 10))
             
-            # Include verification code in the log if provided
-            if verification_code:
-                action = f"Payment - {method} - ${total:.2f} - Verification: {verification_code}"
-            else:
-                action = f"Payment - {method} - ${total:.2f}"
+            amount_label = tk.Label(details_frame, 
+                                  text=f"Amount: ${total:.2f}", 
+                                  font=("Arial", 18), 
+                                  bg="white")
+            amount_label.pack(pady=5)
             
-            # Create row with the correct format
-            row = [timestamp, user, action]
+            # Resize QR for display
+            qr_img = qr_img.resize((300, 300), Image.LANCZOS)
             
-            # Log locally first
-            logging.info(f"Logging successful transaction: {timestamp}, {user}, {action}")
+            # Convert to PhotoImage
+            qr_photo = ImageTk.PhotoImage(qr_img)
             
-            try:
-                # Try to append to sheet
-                sheet.append_row(row)
-                logging.info(f"Successfully logged transaction to Service tab")
-            except Exception as api_error:
-                logging.error(f"Error logging to Service tab: {api_error}")
-                # Create a local log file as fallback
-                log_dir = Path.home() / "SelfCheck" / "Logs"
-                log_dir.mkdir(parents=True, exist_ok=True)
-                log_file = log_dir / "transaction_log.csv"
-                
-                # Append to local log file
-                with open(log_file, 'a') as f:
-                    f.write(f"{timestamp},{user},{action}\n")
-                logging.info(f"Logged transaction to local file instead: {log_file}")
-                
+            # Display QR code
+            qr_label = tk.Label(self.payment_popup, image=qr_photo, bg="white")
+            qr_label.image = qr_photo  # Keep a reference
+            qr_label.pack(pady=10)
+            
+            # Instructions
+            instructions = (
+                "1. Open your phone's camera app\n"
+                "2. Scan this QR code\n"
+                "3. Follow the link to the Venmo app\n"
+                "4. Complete payment in the Venmo app\n"
+                "5. After payment, click 'Record Payment' below\n"
+                "   and enter the last 4 digits of your transaction ID"
+            )
+            
+            instructions_label = tk.Label(self.payment_popup, 
+                                        text=instructions, 
+                                        font=("Arial", 14), 
+                                        bg="white",
+                                        justify=tk.LEFT)
+            instructions_label.pack(pady=10)
+            
         except Exception as e:
-            logging.error(f"Failed to log transaction: {e}")
+            logging.error(f"Error generating Venmo QR code: {e}")
             import traceback
             logging.error(traceback.format_exc())
+            
+            # Show error message instead of QR code
+            error_label = tk.Label(self.payment_popup, 
+                                 text=f"Error generating QR code:\n{str(e)}", 
+                                 font=("Arial", 16), 
+                                 bg="white",
+                                 fg="#e74c3c")  # Red color
+            error_label.pack(pady=20)
+        
+        # Button frame
+        button_frame = tk.Frame(self.payment_popup, bg="white")
+        button_frame.pack(pady=(20, 20), fill=tk.X, padx=20)
+        
+        # Record Payment button
+        record_btn = tk.Button(button_frame, 
+                             text="Record Payment", 
+                             font=("Arial", 16), 
+                             command=self._show_transaction_id_entry,
+                             bg="#27ae60", fg="white",
+                             height=1)
+        record_btn.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
+        
+        # Return to Cart button
+        return_btn = tk.Button(button_frame, 
+                             text="Return to Cart", 
+                             font=("Arial", 16), 
+                             command=self._close_payment_popup,
+                             bg="#3498db", fg="white",
+                             height=1)
+        return_btn.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
+        
+        # Cancel Order button
+        cancel_btn = tk.Button(button_frame, 
+                             text="Cancel Order", 
+                             font=("Arial", 16), 
+                             command=self._cancel_from_payment,
+                             bg="#e74c3c", fg="white",
+                             height=1)
+        cancel_btn.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
+        
+        # Start timeout for payment popup - 60 seconds
+        self._start_payment_timeout(timeout_seconds=60)
 
+    def _generate_venmo_qr_code(self, total):
+        """Generate a Venmo QR code for payment."""
+        import qrcode
+        import urllib.parse
+        
+        # Generate a unique transaction ID
+        if not hasattr(self, 'current_transaction_id'):
+            self.current_transaction_id = self._generate_transaction_id()
+        
+        # Format the amount with 2 decimal places
+        formatted_total = "{:.2f}".format(total)
+        
+        # Get Venmo username
+        venmo_username = self.get_venmo_username()
+        
+        # Create a detailed note with machine ID and transaction ID
+        note = f"Payment #{self.current_transaction_id} - Machine: {self.machine_id}"
+        
+        # Create the Venmo URL - use URL encoding for the note
+        encoded_note = urllib.parse.quote(note)
+        
+        venmo_url = f"venmo://paycharge?txn=pay&recipients={venmo_username}&amount={formatted_total}&note={encoded_note}"
+        
+        # Also create a web URL for devices that don't have Venmo app
+        web_url = f"https://venmo.com/{venmo_username}?txn=pay&amount={formatted_total}&note={encoded_note}"
+        
+        logging.info(f"Generated Venmo payment URL: {venmo_url}")
+        logging.info(f"Generated Venmo web URL: {web_url}")
+        
+        # Create QR code for the Venmo URL
+        qr = qrcode.QRCode(
+            version=1,
+            error_correction=qrcode.constants.ERROR_CORRECT_L,
+            box_size=10,
+            border=4,
+        )
+        qr.add_data(venmo_url)
+        qr.make(fit=True)
+        
+        # Create an image from the QR Code
+        img = qr.make_image(fill_color="black", back_color="white")
+        
+        # Return the PIL Image and transaction ID
+        return img, self.current_transaction_id
 
+    def get_venmo_username(self):
+        """Get Venmo username from VenmoUser.txt."""
+        venmo_user_path = Path.home() / "SelfCheck" / "Cred" / "VenmoUser.txt"
+        
+        if not venmo_user_path.exists():
+            logging.error("VenmoUser.txt not found")
+            return "YourVenmoUsername"  # Default fallback
+        
+        try:
+            with open(venmo_user_path, 'r') as f:
+                username = f.read().strip()
+                if username:
+                    return username
+                else:
+                    logging.error("VenmoUser.txt is empty")
+                    return "YourVenmoUsername"  # Default fallback
+        except IOError as e:
+            logging.error(f"Error reading VenmoUser.txt: {e}")
+            return "YourVenmoUsername"  # Default fallback
+
+    def _show_transaction_id_entry(self):
+        """Show transaction ID entry popup with number pad."""
+        # Close any existing transaction ID entry popup
+        if hasattr(self, 'transaction_id_popup') and self.transaction_id_popup:
+            self.transaction_id_popup.destroy()
+        
+        # Create transaction ID entry popup
+        self.transaction_id_popup = tk.Frame(self.root, bg="white", bd=3, relief=tk.RAISED)
+        self.transaction_id_popup.place(relx=0.5, rely=0.5, width=500, height=600, anchor=tk.CENTER)
+        
+        # Title
+        title_label = tk.Label(self.transaction_id_popup, 
+                             text="Enter last 4 digits of Venmo Transaction ID", 
+                             font=("Arial", 18, "bold"), 
+                             bg="white",
+                             wraplength=450)
+        title_label.pack(pady=(20, 10))
+        
+        # Entry field
+        self.transaction_id_var = tk.StringVar()
+        entry_frame = tk.Frame(self.transaction_id_popup, bg="white")
+        entry_frame.pack(pady=20)
+        
+        entry_field = tk.Entry(entry_frame, 
+                             textvariable=self.transaction_id_var, 
+                             font=("Arial", 24), 
+                             width=6, 
+                             justify=tk.CENTER)
+        entry_field.pack(side=tk.LEFT, padx=10)
+        entry_field.focus_set()  # Set focus to the entry field
+        
+        # Number pad frame
+        numpad_frame = tk.Frame(self.transaction_id_popup, bg="white")
+        numpad_frame.pack(pady=20)
+        
+        # Create number buttons
+        buttons = [
+            ['1', '2', '3'],
+            ['4', '5', '6'],
+            ['7', '8', '9'],
+            ['Backspace', '0', 'Enter']
+        ]
+        
+        for row_idx, row in enumerate(buttons):
+            for col_idx, btn_text in enumerate(row):
+                if btn_text == 'Backspace':
+                    # Backspace button
+                    btn = tk.Button(numpad_frame, 
+                                  text=btn_text, 
+                                  font=("Arial", 16), 
+                                  bg="#e74c3c", fg="white",
+                                  width=8, height=2,
+                                  command=lambda: self._transaction_id_backspace())
+                elif btn_text == 'Enter':
+                    # Enter button
+                    btn = tk.Button(numpad_frame, 
+                                  text=btn_text, 
+                                  font=("Arial", 16), 
+                                  bg="#27ae60", fg="white",
+                                  width=8, height=2,
+                                  command=self._process_transaction_id)
+                else:
+                    # Number button
+                    btn = tk.Button(numpad_frame, 
+                                  text=btn_text, 
+                                  font=("Arial", 20), 
+                                  bg="#3498db", fg="white",
+                                  width=4, height=2,
+                                  command=lambda b=btn_text: self._transaction_id_add_digit(b))
+                
+                btn.grid(row=row_idx, column=col_idx, padx=5, pady=5)
+        
+        # Bind keyboard events
+        self.root.bind("<Key>", self._transaction_id_key_press)
+        
+        # Start timeout - 60 seconds
+        self.transaction_id_timeout = self.root.after(60000, self._transaction_id_timeout)
+    
+    def _transaction_id_add_digit(self, digit):
+        """Add a digit to the transaction ID entry."""
+        current = self.transaction_id_var.get()
+        if len(current) < 4:  # Limit to 4 digits
+            self.transaction_id_var.set(current + digit)
+    
+    def _transaction_id_backspace(self):
+        """Remove the last digit from the transaction ID entry."""
+        current = self.transaction_id_var.get()
+        self.transaction_id_var.set(current[:-1])
+    
+    def _transaction_id_key_press(self, event):
+        """Handle keyboard input for transaction ID entry."""
+        if not hasattr(self, 'transaction_id_popup') or not self.transaction_id_popup:
+            return
+            
+        if event.char.isdigit() and len(self.transaction_id_var.get()) < 4:
+            # Add digit
+            self.transaction_id_var.set(self.transaction_id_var.get() + event.char)
+        elif event.keysym == 'BackSpace':
+            # Backspace
+            self._transaction_id_backspace()
+        elif event.keysym == 'Return':
+            # Enter
+            self._process_transaction_id()
+    
+    def _transaction_id_timeout(self):
+        """Handle timeout for transaction ID entry."""
+        if hasattr(self, 'transaction_id_popup') and self.transaction_id_popup:
+            self.transaction_id_popup.destroy()
+            self.transaction_id_popup = None
+            
+        # Unbind keyboard events
+        self.root.unbind("<Key>")
+        self.root.bind("<Key>", self._on_key)  # Restore original key binding
+        
+        # Return to payment popup
+        messagebox.showinfo("Timeout", "Transaction ID entry timed out.")
+    
+    def _process_transaction_id(self):
+        """Process the entered transaction ID."""
+        # Cancel timeout
+        if hasattr(self, 'transaction_id_timeout') and self.transaction_id_timeout:
+            self.root.after_cancel(self.transaction_id_timeout)
+            self.transaction_id_timeout = None
+        
+        # Get entered ID
+        entered_id = self.transaction_id_var.get().strip()
+        
+        # Log the entered ID
+        logging.info(f"Transaction ID entered: {entered_id}")
+        
+        # Close transaction ID popup
+        if hasattr(self, 'transaction_id_popup') and self.transaction_id_popup:
+            self.transaction_id_popup.destroy()
+            self.transaction_id_popup = None
+        
+        # Unbind keyboard events
+        self.root.unbind("<Key>")
+        self.root.bind("<Key>", self._on_key)  # Restore original key binding
+        
+        # Calculate the total for processing
+        subtotal = sum(item["price"] * item["qty"] for item in self.cart_items.values())
+        taxable_subtotal = sum(
+            item["price"] * item["qty"] 
+            for item in self.cart_items.values() if item["taxable"]
+        )
+        tax_amount = taxable_subtotal * (self.tax_rate / 100)
+        total = subtotal + tax_amount
+        
+        # Store the payment method for receipt printing
+        self.current_payment_method = "Venmo"
+        
+        # Log the transaction with the entered ID
+        self._log_successful_transaction("Venmo", total, entered_id)
+        
+        # Show thank you popup
+        self._show_thank_you_popup()
+
+    def _show_thank_you_popup(self):
+        """Show thank you popup with receipt options."""
+        # Close any existing popups
+        self._close_all_payment_popups()
+        
+        # Create thank you popup
+        self.thank_you_popup = tk.Frame(self.root, bg="white", bd=3, relief=tk.RAISED)
+        self.thank_you_popup.place(relx=0.5, rely=0.5, width=500, height=400, anchor=tk.CENTER)
+        
+        # Title
+        title_label = tk.Label(self.thank_you_popup, 
+                             text="Thank you for your payment", 
+                             font=("Arial", 24, "bold"), 
+                             bg="white")
+        title_label.pack(pady=(40, 20))
+        
+        # Receipt text
+        receipt_label = tk.Label(self.thank_you_popup, 
+                               text="Would you like a receipt?", 
+                               font=("Arial", 20), 
+                               bg="white")
+        receipt_label.pack(pady=(0, 40))
+        
+        # Button frame
+        button_frame = tk.Frame(self.thank_you_popup, bg="white")
+        button_frame.pack(pady=20, fill=tk.X, padx=40)
+        
+        # Print button - make it more prominent
+        print_btn = tk.Button(button_frame, 
+                            text="Print", 
+                            font=("Arial", 18, "bold"), 
+                            bg="#3498db", fg="white",
+                            command=lambda: self._receipt_option_selected("print"),
+                            width=8, height=2)
+        print_btn.pack(side=tk.LEFT, padx=10, expand=True)
+        
+        # Email button
+        email_btn = tk.Button(button_frame, 
+                            text="Email", 
+                            font=("Arial", 18), 
+                            bg="#2ecc71", fg="white",
+                            command=lambda: self._receipt_option_selected("email"),
+                            width=8, height=2)
+        email_btn.pack(side=tk.LEFT, padx=10, expand=True)
+        
+        # None button
+        none_btn = tk.Button(button_frame, 
+                           text="None", 
+                           font=("Arial", 18), 
+                           bg="#7f8c8d", fg="white",
+                           command=self._thank_you_complete,
+                           width=8, height=2)
+        none_btn.pack(side=tk.LEFT, padx=10, expand=True)
+        
+        # Start timeout - 20 seconds
+        self.thank_you_timeout = self.root.after(20000, self._thank_you_timeout)
+
+    def _thank_you_timeout(self):
+        """Handle timeout on the thank you screen."""
+        logging.info("Thank you screen timed out")
+        self._thank_you_complete()
+
+    def _receipt_option_selected(self, option):
+        """Handle receipt option selection."""
+        logging.info(f"Receipt option selected: {option}")
+        
+        if option == "print":
+            # Calculate the total
+            subtotal = sum(item["price"] * item["qty"] for item in self.cart_items.values())
+            taxable_subtotal = sum(
+                item["price"] * item["qty"] 
+                for item in self.cart_items.values() if item["taxable"]
+            )
+            tax_amount = taxable_subtotal * (self.tax_rate / 100)
+            total = subtotal + tax_amount
+            
+            # Get payment method (default to "Unknown" if not set)
+            payment_method = getattr(self, 'current_payment_method', "Unknown")
+            
+            # Try to print receipt
+            success = self.print_receipt(payment_method, total)
+            
+            if success:
+                messagebox.showinfo("Receipt", "Receipt printed successfully.")
+            else:
+                # If printing fails, show a text-based receipt
+                response = messagebox.askquestion("Printer Error", 
+                                               "Failed to print receipt. Would you like to view it on screen instead?")
+                if response == 'yes':
+                    self._show_text_receipt(payment_method, total)
+        
+        elif option == "email":
+            # Future implementation
+            messagebox.showinfo("Receipt", "Email receipt option selected.\nThis feature will be implemented soon.")
+        
+        # Always complete the thank you process and return to idle mode
+        self._thank_you_complete()
+
+    def _thank_you_complete(self):
+        """Complete the thank you process and return to idle mode."""
+        logging.debug("Entering _thank_you_complete method")
+        
+        # Cancel timeout if it exists
+        if hasattr(self, 'thank_you_timeout') and self.thank_you_timeout:
+            logging.debug("Canceling thank you timeout")
+            self.root.after_cancel(self.thank_you_timeout)
+            self.thank_you_timeout = None
+        
+        # Close thank you popup if it exists
+        if hasattr(self, 'thank_you_popup') and self.thank_you_popup:
+            logging.debug("Destroying thank you popup")
+            self.thank_you_popup.destroy()
+            self.thank_you_popup = None
+        
+        # Reset cart
+        logging.debug("Resetting cart")
+        self._reset_cart()
+        
+        # Hide CartMode UI elements instead of destroying them
+        if hasattr(self, 'label'):
+            self.label.place_forget()
+        
+        if hasattr(self, 'receipt_frame'):
+            self.receipt_frame.place_forget()
+        
+        if hasattr(self, 'totals_frame'):
+            self.totals_frame.place_forget()
+        
+        # Call the exit callback to return to idle mode
+        if hasattr(self, 'on_exit') and callable(self.on_exit):
+            logging.info("Transaction complete, calling exit callback to return to idle mode")
+            self.on_exit()
+        else:
+            logging.warning("No exit callback found, cannot return to idle mode")
+
+    def _reset_cart(self):
+        """Reset the cart and related variables."""
+        # Clear cart items
+        self.cart_items = {}
+        
+        # Generate a new transaction ID
+        self.transaction_id = self._generate_transaction_id()
+        logging.info(f"New transaction ID generated: {self.transaction_id}")
+        
+        # Reset payment method
+        self.current_payment_method = None
+        
+        logging.info("Cart reset")
+
+    def _show_text_receipt(self, payment_method, total):
+        """Show a text-based receipt on screen."""
+        # Calculate values needed for receipt
+        subtotal = sum(item["price"] * item["qty"] for item in self.cart_items.values())
+        taxable_subtotal = sum(
+            item["price"] * item["qty"] 
+            for item in self.cart_items.values() if item["taxable"]
+        )
+        tax_amount = taxable_subtotal * (self.tax_rate / 100)
+        total_items = sum(item["qty"] for item in self.cart_items.values())
+        
+        # Format the receipt content
+        receipt_text = f"{self.business_name}\n"
+        receipt_text += f"{self.location}\n\n"
+        receipt_text += f"Machine: {self.machine_id}\n"
+        receipt_text += f"Transaction: {self.transaction_id}\n"
+        receipt_text += f"Date: {datetime.now().strftime('%m/%d/%Y %H:%M:%S')}\n"
+        receipt_text += "-" * 40 + "\n"
+        
+        # Items
+        for upc, item in self.cart_items.items():
+            name = item["name"]
+            price = item["price"]
+            qty = item["qty"]
+            item_total = price * qty
+            
+            # Format item line - truncate long names
+            if len(name) > 30:
+                name = name[:27] + "..."
+            
+            receipt_text += f"{name}\n"
+            receipt_text += f"  {qty} @ ${price:.2f} = ${item_total:.2f}\n"
+        
+        receipt_text += "-" * 40 + "\n"
+        receipt_text += f"Items: {total_items}\n"
+        receipt_text += f"Subtotal: ${subtotal:.2f}\n"
+        receipt_text += f"Tax ({self.tax_rate}%): ${tax_amount:.2f}\n"
+        receipt_text += f"Total: ${total:.2f}\n"
+        receipt_text += f"Paid: {payment_method}\n"
+        receipt_text += "-" * 40 + "\n"
+        receipt_text += "Thank you for shopping with us!\n"
+        
+        # Show in a popup
+        receipt_popup = tk.Toplevel(self.root)
+        receipt_popup.title("Receipt")
+        receipt_popup.geometry("400x600")
+        
+        # Scrollable text widget
+        from tkinter import scrolledtext
+        text_widget = scrolledtext.ScrolledText(receipt_popup, font=("Courier", 12))
+        text_widget.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        text_widget.insert(tk.END, receipt_text)
+        text_widget.config(state=tk.DISABLED)  # Make read-only
+        
+        # Close button
+        close_btn = tk.Button(receipt_popup, text="Close", font=("Arial", 14),
+                            command=receipt_popup.destroy)
+        close_btn.pack(pady=10)
+
+    def print_receipt(self, payment_method, total):
+        """Print a receipt using direct device access."""
+        try:
+            # Calculate values needed for receipt
+            subtotal = sum(item["price"] * item["qty"] for item in self.cart_items.values())
+            taxable_subtotal = sum(
+                item["price"] * item["qty"] 
+                for item in self.cart_items.values() if item["taxable"]
+            )
+            tax_amount = taxable_subtotal * (self.tax_rate / 100)
+            total_items = sum(item["qty"] for item in self.cart_items.values())
+            
+            # Format the receipt content
+            receipt = []
+            
+            # Initialize printer
+            receipt.append(b'\x1B@')
+            
+            # Center align for header
+            receipt.append(b'\x1B\x61\x01')  # Center align
+            
+            # Business name - double height and width
+            receipt.append(b'\x1D\x21\x11')  # Double height and width
+            receipt.append(self.business_name.encode('ascii', 'replace') + b'\n')
+            
+            # Normal size for the rest
+            receipt.append(b'\x1D\x21\x00')
+            
+            # Location
+            receipt.append(self.location.encode('ascii', 'replace') + b'\n')
+            
+            # Left align for details
+            receipt.append(b'\x1B\x61\x00')
+            
+            # Machine ID
+            receipt.append(f"Machine: {self.machine_id}\n".encode('ascii', 'replace'))
+            
+            # Transaction ID
+            receipt.append(f"Transaction: {self.transaction_id}\n".encode('ascii', 'replace'))
+            
+            # Date and time
+            current_time = datetime.now().strftime('%m/%d/%Y %H:%M:%S')
+            receipt.append(f"Date: {current_time}\n".encode('ascii', 'replace'))
+            
+            # Divider
+            receipt.append(b'-' * 32 + b'\n')
+            
+            # Items
+            for upc, item in self.cart_items.items():
+                name = item["name"]
+                price = item["price"]
+                qty = item["qty"]
+                item_total = price * qty
+                
+                # Format item line - truncate long names
+                if len(name) > 30:
+                    name = name[:27] + "..."
+                
+                receipt.append(f"{name}\n".encode('ascii', 'replace'))
+                receipt.append(f"  {qty} @ ${price:.2f} = ${item_total:.2f}\n".encode('ascii', 'replace'))
+            
+            # Divider
+            receipt.append(b'-' * 32 + b'\n')
+            
+            # Totals
+            receipt.append(f"Items: {total_items}\n".encode('ascii', 'replace'))
+            receipt.append(f"Subtotal: ${subtotal:.2f}\n".encode('ascii', 'replace'))
+            receipt.append(f"Tax ({self.tax_rate}%): ${tax_amount:.2f}\n".encode('ascii', 'replace'))
+            
+            # Bold for total
+            receipt.append(b'\x1B\x45\x01')  # Bold on
+            receipt.append(f"Total: ${total:.2f}\n".encode('ascii', 'replace'))
+            receipt.append(b'\x1B\x45\x00')  # Bold off
+            
+            receipt.append(f"Paid: {payment_method}\n".encode('ascii', 'replace'))
+            
+            # Divider
+            receipt.append(b'-' * 32 + b'\n')
+            
+            # Custom message from RMessage.txt
+            try:
+                rmessage_path = Path.home() / "SelfCheck" / "Cred" / "RMessage.txt"
+                if rmessage_path.exists():
+                    with open(rmessage_path, 'r') as f:
+                        rmessage = f.read().strip()
+                        receipt.append(b'\x1B\x61\x01')  # Center align
+                        receipt.append(rmessage.encode('ascii', 'replace') + b'\n')
+                else:
+                    # Create default RMessage.txt if it doesn't exist
+                    rmessage = "Thank you for shopping with us!"
+                    rmessage_path.parent.mkdir(parents=True, exist_ok=True)
+                    with open(rmessage_path, 'w') as f:
+                        f.write(rmessage)
+                    receipt.append(b'\x1B\x61\x01')  # Center align
+                    receipt.append(rmessage.encode('ascii', 'replace') + b'\n')
+            except Exception as e:
+                logging.error(f"Error reading/writing RMessage.txt: {e}")
+                # Add a default message
+                receipt.append(b'\x1B\x61\x01')  # Center align
+                receipt.append(b'Thank you for shopping with us!\n')
+            
+            # Feed and cut
+            receipt.append(b'\n\n\n\n')  # Just feed paper
+            
+            # Cut paper
+            receipt.append(b'\x1D\x56\x00')
+            
+            # Combine all parts
+            receipt_data = b''.join(receipt)
+            
+            # Save receipt to file
+            receipt_path = Path.home() / "SelfCheck" / "Cred" / "last_receipt.txt"
+            receipt_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(receipt_path, 'wb') as f:
+                f.write(receipt_data)
+            
+            # Check if printer device exists
+            if hasattr(self, 'printer_path') and self.printer_path:
+                printer_path = self.printer_path
+            else:
+                printer_path = '/dev/usb/lp0'
+                if not Path(printer_path).exists():
+                    logging.error(f"Printer device not found: {printer_path}")
+                    # Try alternative paths
+                    alternative_paths = ['/dev/lp0', '/dev/usb/lp1', '/dev/lp1']
+                    for alt_path in alternative_paths:
+                        if Path(alt_path).exists():
+                            logging.info(f"Found alternative printer device: {alt_path}")
+                            printer_path = alt_path
+                            break
+                    else:
+                        logging.error("No printer device found")
+                        return False
+            
+            # Print using direct device access
+            try:
+                with open(printer_path, 'wb') as printer:
+                    printer.write(receipt_data)
+                logging.info(f"Receipt printed successfully to {printer_path}")
+                return True
+            except PermissionError:
+                logging.error(f"Permission denied accessing printer at {printer_path}")
+                messagebox.showerror("Printer Error", 
+                                   f"Permission denied accessing printer.\n\n"
+                                   f"Please run: sudo chmod 666 {printer_path}")
+                return False
+            
+        except Exception as e:
+            logging.error(f"Error printing receipt: {e}")
+            import traceback
+            logging.error(traceback.format_exc())
+            return False
 
     def _start_payment_timeout(self, timeout_seconds=45):
         """Start timeout for payment popup."""
@@ -5093,7 +3813,6 @@ def _thank_you_complete(self):
             self.payment_timeout = self.root.after(1000, check_payment_timeout)
             
         self.payment_timeout = self.root.after(1000, check_payment_timeout)
-
 
     def _show_payment_timeout_popup(self):
         """Show timeout popup for payment screen."""
@@ -5177,114 +3896,6 @@ def _thank_you_complete(self):
         if hasattr(self, "on_exit"):
             self.on_exit()
 
-
-
-    def _show_item_popup(self, upc):
-        """Show popup for editing an item."""
-        if self.popup_frame:
-            self.popup_frame.destroy()
-            
-        item = self.cart_items.get(upc)
-        if not item:
-            return
-            
-        # Create popup frame
-        self.popup_frame = tk.Frame(self.root, bg="white", bd=3, relief=tk.RAISED)
-        self.popup_frame.place(relx=0.5, rely=0.5, width=600, height=300, anchor=tk.CENTER)
-        
-        # Item name
-        name_label = tk.Label(self.popup_frame, text=item["name"], font=("Arial", 18, "bold"),
-                            bg="white", wraplength=550)
-        name_label.pack(pady=(20, 10))
-        
-        # Price and taxable info
-        details = f"Price: ${item['price']:.2f}  Taxable: {'Yes' if item['taxable'] else 'No'}"
-        details_label = tk.Label(self.popup_frame, text=details, font=("Arial", 14),
-                               bg="white")
-        details_label.pack(pady=5)
-        
-        # Quantity controls
-        qty_frame = tk.Frame(self.popup_frame, bg="white")
-        qty_frame.pack(pady=10)
-        
-        qty_label = tk.Label(qty_frame, text="QTY:", font=("Arial", 16), bg="white")
-        qty_label.pack(side=tk.LEFT, padx=5)
-        
-        qty_var = tk.IntVar(value=item["qty"])
-        qty_display = tk.Label(qty_frame, textvariable=qty_var, font=("Arial", 16, "bold"),
-                             bg="white", width=2)
-        qty_display.pack(side=tk.LEFT, padx=5)
-        
-        def decrease_qty():
-            if qty_var.get() > 1:
-                qty_var.set(qty_var.get() - 1)
-                
-        def increase_qty():
-            if qty_var.get() < 10:
-                qty_var.set(qty_var.get() + 1)
-                
-        down_btn = tk.Button(qty_frame, text="â–¼", font=("Arial", 16), command=decrease_qty)
-        down_btn.pack(side=tk.LEFT, padx=5)
-        
-        up_btn = tk.Button(qty_frame, text="â–²", font=("Arial", 16), command=increase_qty)
-        up_btn.pack(side=tk.LEFT, padx=5)
-        
-        # Subtotal (updates with quantity)
-        subtotal_var = tk.StringVar()
-        
-        def update_subtotal(*args):
-            qty = qty_var.get()
-            subtotal = item["price"] * qty
-            subtotal_var.set(f"Sub Total: ${subtotal:.2f}")
-            
-        qty_var.trace_add("write", update_subtotal)
-        update_subtotal()  # Initial update
-        
-        subtotal_label = tk.Label(self.popup_frame, textvariable=subtotal_var, 
-                                font=("Arial", 16), bg="white")
-        subtotal_label.pack(pady=10)
-        
-        # Buttons
-        btn_frame = tk.Frame(self.popup_frame, bg="white")
-        btn_frame.pack(pady=20, fill=tk.X)
-        
-        # Save button
-        save_btn = tk.Button(btn_frame, text="Save", font=("Arial", 14), bg="#27ae60", fg="white",
-                           command=lambda: self._save_item_changes(upc, qty_var.get()))
-        save_btn.pack(side=tk.LEFT, padx=20, pady=10, fill=tk.X, expand=True)
-        
-        # Delete button
-        delete_btn = tk.Button(btn_frame, text="Delete", font=("Arial", 14), bg="#e74c3c", fg="white",
-                             command=lambda: self._delete_item(upc))
-        delete_btn.pack(side=tk.LEFT, padx=20, pady=10, fill=tk.X, expand=True)
-        
-        # Cancel button
-        cancel_btn = tk.Button(btn_frame, text="Cancel", font=("Arial", 14), bg="#7f8c8d", fg="white",
-                             command=lambda: self.popup_frame.destroy())
-        cancel_btn.pack(side=tk.LEFT, padx=20, pady=10, fill=tk.X, expand=True)
-
-    def _save_item_changes(self, upc, new_qty):
-        """Save changes to an item."""
-        if upc in self.cart_items:
-            self.cart_items[upc]["qty"] = new_qty
-            self._update_receipt()
-            self._update_totals()
-            
-        if self.popup_frame:
-            self.popup_frame.destroy()
-            self.popup_frame = None
-
-    def _delete_item(self, upc):
-        """Delete an item from the cart."""
-        if upc in self.cart_items:
-            del self.cart_items[upc]
-            self._update_receipt()
-            self._update_totals()
-            
-        if self.popup_frame:
-            self.popup_frame.destroy()
-            self.popup_frame = None
-
     def _show_error(self, message):
         """Show an error message."""
         # Simple messagebox for now
@@ -5323,66 +3934,91 @@ def _thank_you_complete(self):
             # Open the spreadsheet and worksheet
             sheet = gc.open(GS_SHEET_NAME).worksheet("Service")
             
-            # Prepare row data - match the format in the screenshot
+            # Calculate cart value for logging
+            subtotal = sum(item["price"] * item["qty"] for item in self.cart_items.values())
+            
+            # Prepare row data
             timestamp = datetime.now().strftime("%m/%d/%Y %H:%M:%S")
-            user = self.machine_id  # Use machine ID as user
-            action = f"Cancelled Cart - {reason}"
+            user = self.machine_id
+            action = f"Cart Cancelled - {reason} - ${subtotal:.2f} - {len(self.cart_items)} items"
             
             # Create row with the correct format
             row = [timestamp, user, action]
             
             # Log locally first
-            logging.info(f"Attempting to log to Service tab: {timestamp}, {user}, {action}")
+            logging.info(f"Logging cancelled cart: {timestamp}, {user}, {action}")
             
             try:
                 # Try to append to sheet
                 sheet.append_row(row)
-                logging.info(f"Successfully logged to Service tab: {timestamp}, {user}, {action}")
+                logging.info(f"Successfully logged cancelled cart to Service tab")
             except Exception as api_error:
                 logging.error(f"Error logging to Service tab: {api_error}")
                 # Create a local log file as fallback
                 log_dir = Path.home() / "SelfCheck" / "Logs"
                 log_dir.mkdir(parents=True, exist_ok=True)
-                log_file = log_dir / "service_log.csv"
+                log_file = log_dir / "transaction_log.csv"
                 
                 # Append to local log file
                 with open(log_file, 'a') as f:
                     f.write(f"{timestamp},{user},{action}\n")
-                logging.info(f"Logged to local file instead: {log_file}")
+                logging.info(f"Logged cancelled cart to local file instead: {log_file}")
                 
-                # Try to diagnose the issue
-                try:
-                    # Check if we can at least read the sheet
-                    values = sheet.get_all_values()
-                    logging.info(f"Could read Service tab, found {len(values)} rows")
-                    
-                    # Check permissions
-                    spreadsheet = gc.open(GS_SHEET_NAME)
-                    permissions = spreadsheet.list_permissions()
-                    logging.info(f"Spreadsheet permissions: {permissions}")
-                except Exception as diag_error:
-                    logging.error(f"Diagnostic error: {diag_error}")
-            
         except Exception as e:
             logging.error(f"Failed to log cancelled cart: {e}")
             import traceback
             logging.error(traceback.format_exc())
+
+    def _log_successful_transaction(self, method, total, verification_code=None):
+        """Log a successful transaction to the Service tab."""
+        try:
+            # Use more comprehensive scopes
+            scopes = [
+                "https://www.googleapis.com/auth/spreadsheets",
+                "https://www.googleapis.com/auth/drive",
+            ]
+            creds = Credentials.from_service_account_file(str(GS_CRED_PATH), scopes=scopes)
+            gc = gspread.authorize(creds)
             
-            # Try to create a local log file as fallback
+            # Open the spreadsheet and worksheet
+            sheet = gc.open(GS_SHEET_NAME).worksheet("Service")
+            
+            # Prepare row data
+            timestamp = datetime.now().strftime("%m/%d/%Y %H:%M:%S")
+            user = self.machine_id
+            
+            # Include verification code in the log if provided
+            if verification_code:
+                action = f"Payment - {method} - ${total:.2f} - Verification: {verification_code}"
+            else:
+                action = f"Payment - {method} - ${total:.2f}"
+            
+            # Create row with the correct format
+            row = [timestamp, user, action]
+            
+            # Log locally first
+            logging.info(f"Logging successful transaction: {timestamp}, {user}, {action}")
+            
             try:
+                # Try to append to sheet
+                sheet.append_row(row)
+                logging.info(f"Successfully logged transaction to Service tab")
+            except Exception as api_error:
+                logging.error(f"Error logging to Service tab: {api_error}")
+                # Create a local log file as fallback
                 log_dir = Path.home() / "SelfCheck" / "Logs"
                 log_dir.mkdir(parents=True, exist_ok=True)
-                log_file = log_dir / "service_log.csv"
+                log_file = log_dir / "transaction_log.csv"
                 
-                timestamp = datetime.now().strftime("%m/%d/%Y %H:%M:%S")
-                user = self.machine_id
-                action = f"Cancelled Cart - {reason}"
-                
+                # Append to local log file
                 with open(log_file, 'a') as f:
                     f.write(f"{timestamp},{user},{action}\n")
-                logging.info(f"Logged to local file: {log_file}")
-            except Exception as log_error:
-                logging.error(f"Failed to create local log: {log_error}")
+                logging.info(f"Logged transaction to local file instead: {log_file}")
+                
+        except Exception as e:
+            logging.error(f"Failed to log transaction: {e}")
+            import traceback
+            logging.error(traceback.format_exc())
 
     def _arm_timeout(self):
         """Set up inactivity timeout."""
@@ -5429,7 +4065,6 @@ def _thank_you_complete(self):
         btn_frame = tk.Frame(self.timeout_popup, bg="white")
         btn_frame.pack(pady=20, fill=tk.X)
         
-
         # Yes button
         yes_btn = tk.Button(btn_frame, text="Yes", font=("Arial", 18), bg="#27ae60", fg="white",
                           command=self._cancel_timeout_popup)
@@ -5485,26 +4120,243 @@ def _thank_you_complete(self):
         if hasattr(self, "on_exit"):
             self.on_exit()
 
+    def _load_upc_catalog(self):
+        """Load UPC catalog from CSV file and update Tax.json from spreadsheet."""
+        try:
+            # Connect to Google Sheet to get latest data
+            scopes = [
+                "https://www.googleapis.com/auth/spreadsheets.readonly",
+                "https://www.googleapis.com/auth/drive.readonly",
+                "https://www.googleapis.com/auth/spreadsheets",
+            ]
+            creds = Credentials.from_service_account_file(str(GS_CRED_PATH), scopes=scopes)
+            gc = gspread.authorize(creds)
+            
+            # First, update the tax rate from the spreadsheet
+            try:
+                sheet = gc.open(GS_SHEET_NAME).worksheet(GS_CRED_TAB)
+                tax_rate_str = sheet.acell('B27').value
+                
+                # Parse tax rate (remove % sign if present)
+                if tax_rate_str:
+                    tax_rate_str = tax_rate_str.replace('%', '').strip()
+                    tax_rate = float(tax_rate_str)
+                    
+                    # Update Tax.json file
+                    tax_path = CRED_DIR / "Tax.json"
+                    with open(tax_path, 'w') as f:
+                        json.dump({"rate": tax_rate}, f)
+                    logging.info(f"Updated Tax.json with rate {tax_rate}% from spreadsheet")
+                    
+                    # Update the instance variable
+                    self.tax_rate = tax_rate
+                else:
+                    logging.warning("Tax rate not found in spreadsheet cell B27")
+            except Exception as e:
+                logging.error(f"Failed to update tax rate from spreadsheet: {e}")
+            
+            # Now load the UPC catalog
+            catalog_path = CRED_DIR / "upc_catalog.csv"
+            if not catalog_path.exists():
+                logging.error(f"UPC catalog not found: {catalog_path}")
+                return
+            
+            # Define column mappings (same as standalone script)
+            headers = [
+                "UPC", "Brand", "Name", "Size", "Calories", "Sugar", "Sodium",
+                "Price", "Tax %", "QTY", "Image"
+            ]
+            
+            import csv
+            with open(catalog_path, 'r', newline='') as f:
+                reader = csv.DictReader(f)
+                
+                # Process each row
+                for row in reader:
+                    upc = row["UPC"].strip()
+                    if not upc:
+                        continue
+                    
+                    # Convert row dict to list for compatibility with existing code
+                    row_list = [
+                        upc,                   # A: UPC
+                        row["Brand"],          # B: Brand
+                        row["Name"],           # C: Name
+                        "",                    # D: (hidden column)
+                        row["Size"],           # E: Size
+                        row["Calories"],       # F: Calories
+                        row["Sugar"],          # G: Sugar
+                        row["Sodium"],         # H: Sodium
+                        row["Price"],          # I: Price
+                        row["Tax %"],          # J: Tax %
+                        row["QTY"],            # K: QTY
+                        row["Image"]           # L: Image
+                    ]
+                    
+                    # Store the row list for this UPC
+                    self.upc_catalog[upc] = row_list
+                    
+                    # Also store variants
+                    for variant in upc_variants_from_sheet(upc):
+                        if variant != upc:
+                            self.upc_catalog[variant] = row_list
+                
+            logging.info(f"Loaded {len(self.upc_catalog)} UPC entries from catalog")
+            
+        except Exception as e:
+            logging.error(f"Error loading UPC catalog: {e}")
 
+    def _load_config_files(self):
+        """Load configuration from JSON files."""
+        try:
+            # Business name
+            business_path = CRED_DIR / "BusinessName.json"
+            if business_path.exists():
+                try:
+                    with open(business_path, 'r') as f:
+                        data = json.load(f)
+                        self.business_name = data.get("name", self.business_name)
+                except json.JSONDecodeError:
+                    logging.error(f"Invalid JSON in BusinessName.json")
+                    # Create a new file with default value
+                    with open(business_path, 'w') as f:
+                        json.dump({"name": self.business_name}, f)
+            
+            # Location
+            location_path = CRED_DIR / "MachineLocation.json"
+            if location_path.exists():
+                try:
+                    with open(location_path, 'r') as f:
+                        data = json.load(f)
+                        self.location = data.get("location", self.location)
+                except json.JSONDecodeError:
+                    logging.error(f"Invalid JSON in MachineLocation.json")
+                    # Create a new file with default value
+                    with open(location_path, 'w') as f:
+                        json.dump({"location": self.location}, f)
+            
+            # Machine ID
+            machine_id_path = CRED_DIR / "MachineID.txt"
+            if machine_id_path.exists():
+                with open(machine_id_path, 'r') as f:
+                    self.machine_id = f.read().strip() or self.machine_id
+            
+            # Tax rate
+            tax_path = CRED_DIR / "Tax.json"
+            if tax_path.exists():
+                try:
+                    with open(tax_path, 'r') as f:
+                        data = json.load(f)
+                        old_rate = self.tax_rate
+                        self.tax_rate = float(data.get("rate", 2.9))  # Default to 2.9% if not specified
+                        logging.info(f"Loaded tax rate from Tax.json: {self.tax_rate}% (was {old_rate}%)")
+                except (json.JSONDecodeError, ValueError):
+                    # If Tax.json is malformed, create a new one with default value
+                    logging.warning(f"Tax.json is malformed, creating new file with default rate")
+                    self.tax_rate = 2.9  # Default tax rate
+                    with open(tax_path, 'w') as f:
+                        json.dump({"rate": self.tax_rate}, f)
+                    logging.info(f"Created new Tax.json with rate: {self.tax_rate}%")
+            else:
+                # If Tax.json doesn't exist, create it
+                logging.warning(f"Tax.json not found, creating new file with default rate")
+                self.tax_rate = 2.9  # Default tax rate
+                with open(tax_path, 'w') as f:
+                    json.dump({"rate": self.tax_rate}, f)
+                logging.info(f"Created new Tax.json with rate: {self.tax_rate}%")
+                
+        except Exception as e:
+            logging.error(f"Error loading config files: {e}")
+            import traceback
+            logging.error(traceback.format_exc())
+            # Set default tax rate if there was an error
+            self.tax_rate = 0.0
 
-    def _process_successful_payment(self, method, total):
-        """Process a successful payment."""
-        # Close payment popup
-        self._close_all_payment_popups()
+    def _load_product_image(self, image_name, target_label, size=(225, 225)):
+        """
+        Load a product image from cache or Google Drive.
         
-        # Restore original barcode handler if needed
-        if hasattr(self, 'original_barcode_handler'):
-            self.root.bind("<Key>", self.original_barcode_handler)
+        Args:
+            image_name: Name of the image file
+            target_label: The tk.Label widget to display the image in
+            size: Tuple of (width, height) for resizing
+        """
+        if not image_name:
+            target_label.config(image="", text="No image available")
+            return
+            
+        # Import necessary modules
+        import io
+        from googleapiclient.http import MediaIoBaseDownload
         
-        # Show success message
-        from tkinter import messagebox
-        messagebox.showinfo("Payment Successful", 
-                          f"Thank you for your payment of ${total:.2f}.")
+        # Store the image reference as an attribute of the label to prevent garbage collection
+        if not hasattr(target_label, 'image_ref'):
+            target_label.image_ref = None
         
-        # Clear the cart and return to idle mode
-        self.cart_items = {}
-        if hasattr(self, "on_exit"):
-            self.on_exit()
+        try:
+            # Ensure cache directory exists
+            self.cache_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Check local cache first
+            image_path = self.cache_dir / image_name
+            logging.info(f"Looking for image: {image_name} at path: {image_path}")
+            
+            if image_path.exists():
+                logging.info(f"Loading image from cache: {image_path}")
+                with Image.open(image_path) as img:
+                    img = img.resize(size, Image.LANCZOS)
+                    photo_image = ImageTk.PhotoImage(img)
+                    target_label.image_ref = photo_image  # Prevent garbage collection
+                    target_label.config(image=photo_image, text="")
+                    return True
+            
+            # If not in cache, try to download from Google Drive
+            if self.drive_service:
+                logging.info(f"Searching for image in Google Drive: {image_name}")
+                query = f"name = '{image_name}' and trashed = false"
+                results = self.drive_service.files().list(
+                    q=query, spaces='drive', fields='files(id, name)').execute()
+                items = results.get('files', [])
+                
+                if items:
+                    file_id = items[0]['id']
+                    logging.info(f"Found image in Drive with ID: {file_id}")
+                    
+                    # Download file
+                    request = self.drive_service.files().get_media(fileId=file_id)
+                    fh = io.BytesIO()
+                    downloader = MediaIoBaseDownload(fh, request)
+                    done = False
+                    while not done:
+                        status, done = downloader.next_chunk()
+                    
+                    # Save to cache
+                    fh.seek(0)
+                    with open(image_path, 'wb') as f:
+                        f.write(fh.read())
+                    logging.info(f"Saved image to cache: {image_path}")
+                    
+                    # Display image
+                    with Image.open(image_path) as img:
+                        img = img.resize(size, Image.LANCZOS)
+                        photo_image = ImageTk.PhotoImage(img)
+                        target_label.image_ref = photo_image  # Prevent garbage collection
+                        target_label.config(image=photo_image, text="")
+                        return True
+                else:
+                    logging.warning(f"Image not found in Drive: {image_name}")
+                    target_label.config(image="", text="Image not found in Drive")
+                    return False
+            else:
+                logging.warning("Drive service not available")
+                target_label.config(image="", text="Drive service not available")
+                return False
+        except Exception as e:
+            logging.error(f"Error loading image {image_name}: {e}")
+            import traceback
+            logging.error(traceback.format_exc())
+            target_label.config(image="", text=f"Error loading image")
+            return False
 
     def test_sheet_access(self):
         """Test access to the Google Sheet."""
@@ -5536,6 +4388,57 @@ def _thank_you_complete(self):
         except Exception as e:
             logging.error(f"Sheet access test failed: {e}")
             return False
+
+    def check_spreadsheet_permissions(self):
+        """Check and log permissions for the Google Sheet."""
+        try:
+            scopes = ["https://www.googleapis.com/auth/spreadsheets"]
+            creds = Credentials.from_service_account_file(str(GS_CRED_PATH), scopes=scopes)
+            gc = gspread.authorize(creds)
+            
+            # Get service account email
+            service_account_info = json.loads(Path(GS_CRED_PATH).read_text())
+            service_account_email = service_account_info.get('client_email', 'Unknown')
+            
+            logging.info(f"Service account email: {service_account_email}")
+            
+            # Try to open the sheet
+            sheet = gc.open(GS_SHEET_NAME)
+            
+            # Get permissions
+            permissions = sheet.list_permissions()
+            
+            # Log permissions
+            for perm in permissions:
+                role = perm.get('role', 'Unknown')
+                email = perm.get('emailAddress', 'Unknown')
+                perm_type = perm.get('type', 'Unknown')
+                logging.info(f"Permission: {email} has {role} access (type: {perm_type})")
+                
+            # Check if service account has edit access
+            service_account_has_access = False
+            for perm in permissions:
+                if perm.get('emailAddress') == service_account_email:
+                    if perm.get('role') in ['writer', 'owner']:
+                        service_account_has_access = True
+                        break
+            
+            if service_account_has_access:
+                logging.info("Service account has write access to the spreadsheet")
+            else:
+                logging.warning("Service account does NOT have write access to the spreadsheet")
+                logging.warning(f"Please share the spreadsheet with {service_account_email} as an Editor")
+                
+            return service_account_has_access
+            
+        except Exception as e:
+            logging.error(f"Error checking spreadsheet permissions: {e}")
+            return False
+
+
+
+
+
 
 
 
