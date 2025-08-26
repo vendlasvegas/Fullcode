@@ -8,7 +8,7 @@
 # Starting to test cart functions
 # Manual Entry Added and working with image pull up
 # Setting up Pay Now options
-# 8/26/25 upload to git hub 12:20
+# 8/26/25 upload to git hub 14:15
 
 import os
 import random
@@ -2013,18 +2013,15 @@ class CartMode:
         self.countdown_label = None
         self.countdown_after = None
         self.countdown_value = 30
-
-        # Add touch support with proper method
-        self.label.bind("<Button-1>", self._on_touch)
-        self.label.bind("<Motion>", self._on_activity)  
         
-        # Add touch support - use inline function to avoid method name issues
+        # Add touch support with inline function
         def handle_touch(event):
             x, y = event.x, event.y
             logging.info(f"Touch in Cart mode at ({x}, {y})")
-            self.last_activity_ts = time.time()
+            self._on_activity()
         
-       
+        self.label.bind("<Button-1>", handle_touch)
+        
         # Add motion handler for activity tracking
         def handle_motion(event):
             self.last_activity_ts = time.time()
@@ -2035,10 +2032,137 @@ class CartMode:
         self.barcode_buffer = ""
         self.root.bind("<Key>", self._on_key)
         
-        # Load UPC catalog and config files - REMOVE THESE CALLS
-        # Instead of calling methods that might not exist, define them inline
+        # Load UPC catalog and config files
+        self._load_upc_catalog_inline()
+        self._load_config_files_inline()
         
-        # Load UPC catalog
+        # Test Google Sheets access
+        self.sheets_access_ok = self._test_sheet_access_inline()
+    
+    def _on_activity(self, event=None):
+        """Reset inactivity timer."""
+        # Reset inactivity timer
+        self.last_activity_ts = time.time()
+        
+        # Cancel any existing timeout popup
+        if hasattr(self, 'timeout_popup') and self.timeout_popup:
+            self._cancel_timeout_popup()
+
+    def start(self):
+        """Start the Cart mode."""
+        logging.info("CartMode: Starting")
+        
+        # Generate a new transaction ID
+        self.transaction_id = self.generate_transaction_id()
+        
+        # Clear any existing cart data
+        self.cart_items = {}
+        
+        # Clear barcode buffer
+        self.barcode_buffer = ""
+        
+        # Reload tax rate from Tax.json to ensure it's current
+        self._reload_tax_rate()
+        
+        # Make sure the label is visible
+        self.label.place(x=0, y=0, width=WINDOW_W, height=WINDOW_H)
+        self.label.lift()
+        
+        # Add debug logging
+        logging.info("CartMode: Label placed and lifted")
+        
+        try:
+            # Create fresh UI with error handling
+            self._create_ui()
+            logging.info("CartMode: UI created successfully")
+        except Exception as e:
+            logging.error(f"CartMode: Error creating UI: {e}")
+            import traceback
+            logging.error(traceback.format_exc())
+            
+            # Fallback to a simple UI if the main UI fails
+            self._create_fallback_ui()
+        
+        # Start timeout timer
+        self._arm_timeout()
+
+    def _reload_tax_rate(self):
+        """Reload the tax rate from Tax.json to ensure it's current."""
+        tax_path = CRED_DIR / "Tax.json"
+        if tax_path.exists():
+            try:
+                with open(tax_path, 'r') as f:
+                    data = json.load(f)
+                    self.tax_rate = float(data.get("rate", 2.9))
+                    logging.info(f"Reloaded tax rate from Tax.json: {self.tax_rate}%")
+            except (json.JSONDecodeError, ValueError) as e:
+                logging.error(f"Error reloading tax rate: {e}")
+                self.tax_rate = 2.9  # Default to 2.9% if there's an error
+        else:
+            logging.warning("Tax.json not found, using default tax rate")
+            self.tax_rate = 2.9  # Default tax rate
+    
+    def _create_fallback_ui(self):
+        """Create a simple fallback UI when the main UI fails."""
+        logging.info("CartMode: Creating fallback UI")
+        
+        # Clear any existing UI elements
+        if hasattr(self, 'receipt_frame') and self.receipt_frame:
+            self.receipt_frame.place_forget()
+        
+        if hasattr(self, 'totals_frame') and self.totals_frame:
+            self.totals_frame.place_forget()
+        
+        # Create a simple frame with buttons
+        fallback_frame = tk.Frame(self.root, bg="white")
+        fallback_frame.place(x=100, y=100, width=WINDOW_W-200, height=WINDOW_H-200)
+        
+        # Title
+        title_label = tk.Label(fallback_frame, text="Cart Mode", 
+                             font=("Arial", 24, "bold"), bg="white")
+        title_label.pack(pady=20)
+        
+        # Message
+        message_label = tk.Label(fallback_frame, 
+                               text="There was an error loading the full cart interface.\n" +
+                                    "You can scan items or use the buttons below.",
+                               font=("Arial", 18), bg="white", justify=tk.LEFT)
+        message_label.pack(pady=20)
+        
+        # Buttons frame
+        buttons_frame = tk.Frame(fallback_frame, bg="white")
+        buttons_frame.pack(pady=20)
+        
+        # Manual entry button
+        manual_btn = tk.Button(buttons_frame, text="Manual Entry", 
+                             font=("Arial", 18), bg="#3498db", fg="white",
+                             command=self._show_manual_entry if hasattr(self, '_show_manual_entry') else lambda: None)
+        manual_btn.pack(side=tk.LEFT, padx=20)
+        
+        # Pay now button
+        pay_btn = tk.Button(buttons_frame, text="Pay Now", 
+                          font=("Arial", 18), bg="#27ae60", fg="white",
+                          command=self._pay_now if hasattr(self, '_pay_now') else lambda: None)
+        pay_btn.pack(side=tk.LEFT, padx=20)
+        
+        # Cancel button
+        cancel_btn = tk.Button(buttons_frame, text="Cancel", 
+                             font=("Arial", 18), bg="#e74c3c", fg="white",
+                             command=self._cancel_order if hasattr(self, '_cancel_order') else lambda: None)
+        cancel_btn.pack(side=tk.LEFT, padx=20)
+        
+        # Debug exit button
+        exit_btn = tk.Button(fallback_frame, text="Emergency Exit", 
+                           font=("Arial", 14), bg="black", fg="white",
+                           command=lambda: self.on_exit() if hasattr(self, "on_exit") else None)
+        exit_btn.pack(pady=20)
+        
+        # Store reference to fallback frame
+        self.fallback_frame = fallback_frame
+
+    
+    def _load_upc_catalog_inline(self):
+        """Load UPC catalog from CSV file and update Tax.json from spreadsheet."""
         try:
             # Connect to Google Sheet to get latest data
             scopes = [
@@ -2076,53 +2200,55 @@ class CartMode:
             catalog_path = CRED_DIR / "upc_catalog.csv"
             if not catalog_path.exists():
                 logging.error(f"UPC catalog not found: {catalog_path}")
-            else:
-                # Define column mappings (same as standalone script)
-                headers = [
-                    "UPC", "Brand", "Name", "Size", "Calories", "Sugar", "Sodium",
-                    "Price", "Tax %", "QTY", "Image"
-                ]
+                return
+            
+            # Define column mappings (same as standalone script)
+            headers = [
+                "UPC", "Brand", "Name", "Size", "Calories", "Sugar", "Sodium",
+                "Price", "Tax %", "QTY", "Image"
+            ]
+            
+            import csv
+            with open(catalog_path, 'r', newline='') as f:
+                reader = csv.DictReader(f)
                 
-                import csv
-                with open(catalog_path, 'r', newline='') as f:
-                    reader = csv.DictReader(f)
+                # Process each row
+                for row in reader:
+                    upc = row["UPC"].strip()
+                    if not upc:
+                        continue
                     
-                    # Process each row
-                    for row in reader:
-                        upc = row["UPC"].strip()
-                        if not upc:
-                            continue
-                        
-                        # Convert row dict to list for compatibility with existing code
-                        row_list = [
-                            upc,                   # A: UPC
-                            row["Brand"],          # B: Brand
-                            row["Name"],           # C: Name
-                            "",                    # D: (hidden column)
-                            row["Size"],           # E: Size
-                            row["Calories"],       # F: Calories
-                            row["Sugar"],          # G: Sugar
-                            row["Sodium"],         # H: Sodium
-                            row["Price"],          # I: Price
-                            row["Tax %"],          # J: Tax %
-                            row["QTY"],            # K: QTY
-                            row["Image"]           # L: Image
-                        ]
-                        
-                        # Store the row list for this UPC
-                        self.upc_catalog[upc] = row_list
-                        
-                        # Also store variants
-                        for variant in upc_variants_from_sheet(upc):
-                            if variant != upc:
-                                self.upc_catalog[variant] = row_list
+                    # Convert row dict to list for compatibility with existing code
+                    row_list = [
+                        upc,                   # A: UPC
+                        row["Brand"],          # B: Brand
+                        row["Name"],           # C: Name
+                        "",                    # D: (hidden column)
+                        row["Size"],           # E: Size
+                        row["Calories"],       # F: Calories
+                        row["Sugar"],          # G: Sugar
+                        row["Sodium"],         # H: Sodium
+                        row["Price"],          # I: Price
+                        row["Tax %"],          # J: Tax %
+                        row["QTY"],            # K: QTY
+                        row["Image"]           # L: Image
+                    ]
+                    
+                    # Store the row list for this UPC
+                    self.upc_catalog[upc] = row_list
+                    
+                    # Also store variants
+                    for variant in upc_variants_from_sheet(upc):
+                        if variant != upc:
+                            self.upc_catalog[variant] = row_list
                 
-                logging.info(f"Loaded {len(self.upc_catalog)} UPC entries from catalog")
-                
+            logging.info(f"Loaded {len(self.upc_catalog)} UPC entries from catalog")
+            
         except Exception as e:
             logging.error(f"Error loading UPC catalog: {e}")
-        
-        # Load config files
+    
+    def _load_config_files_inline(self):
+        """Load configuration from JSON files."""
         try:
             # Business name
             business_path = CRED_DIR / "BusinessName.json"
@@ -2186,8 +2312,9 @@ class CartMode:
             logging.error(traceback.format_exc())
             # Set default tax rate if there was an error
             self.tax_rate = 0.0
-        
-        # Test Google Sheets access - use a simple function instead of calling a method
+    
+    def _test_sheet_access_inline(self):
+        """Test access to the Google Sheet."""
         try:
             # Use more comprehensive scopes
             scopes = [
@@ -2212,12 +2339,70 @@ class CartMode:
             service_tab.append_row(test_row)
             logging.info("Successfully wrote test row to Service tab")
             
-            self.sheets_access_ok = True
+            return True
         except Exception as e:
             logging.error(f"Sheet access test failed: {e}")
-            self.sheets_access_ok = False
+            return False
 
-
+    def _create_fallback_ui(self):
+        """Create a simple fallback UI when the main UI fails."""
+        logging.info("CartMode: Creating fallback UI")
+        
+        # Clear any existing UI elements
+        if hasattr(self, 'receipt_frame') and self.receipt_frame:
+            self.receipt_frame.place_forget()
+        
+        if hasattr(self, 'totals_frame') and self.totals_frame:
+            self.totals_frame.place_forget()
+        
+        # Create a simple frame with buttons
+        fallback_frame = tk.Frame(self.root, bg="white")
+        fallback_frame.place(x=100, y=100, width=WINDOW_W-200, height=WINDOW_H-200)
+        
+        # Title
+        title_label = tk.Label(fallback_frame, text="Cart Mode", 
+                             font=("Arial", 24, "bold"), bg="white")
+        title_label.pack(pady=20)
+        
+        # Message
+        message_label = tk.Label(fallback_frame, 
+                               text="There was an error loading the full cart interface.\n" +
+                                    "You can scan items or use the buttons below.",
+                               font=("Arial", 18), bg="white", justify=tk.LEFT)
+        message_label.pack(pady=20)
+        
+        # Buttons frame
+        buttons_frame = tk.Frame(fallback_frame, bg="white")
+        buttons_frame.pack(pady=20)
+        
+        # Manual entry button
+        manual_btn = tk.Button(buttons_frame, text="Manual Entry", 
+                             font=("Arial", 18), bg="#3498db", fg="white",
+                             command=self._show_manual_entry)
+        manual_btn.pack(side=tk.LEFT, padx=20)
+        
+        # Pay now button
+        pay_btn = tk.Button(buttons_frame, text="Pay Now", 
+                          font=("Arial", 18), bg="#27ae60", fg="white",
+                          command=self._pay_now)
+        pay_btn.pack(side=tk.LEFT, padx=20)
+        
+        # Cancel button
+        cancel_btn = tk.Button(buttons_frame, text="Cancel", 
+                             font=("Arial", 18), bg="#e74c3c", fg="white",
+                             command=self._cancel_order)
+        cancel_btn.pack(side=tk.LEFT, padx=20)
+        
+        # Store reference to fallback frame
+        self.fallback_frame = fallback_frame
+        
+        # Debug exit button
+        exit_btn = tk.Button(fallback_frame, text="Emergency Exit", 
+                           font=("Arial", 14), bg="black", fg="white",
+                           command=lambda: self.on_exit() if hasattr(self, "on_exit") else None)
+        exit_btn.pack(pady=20)
+    
+    
 
 
     def print_receipt(self, payment_method, total):
@@ -3684,7 +3869,7 @@ def _thank_you_complete(self):
         logging.info("CartMode: Starting")
         
         # Generate a new transaction ID
-        self.transaction_id = self._generate_transaction_id()
+        self.transaction_id = self.generate_transaction_id()
         
         # Clear any existing cart data
         self.cart_items = {}
@@ -3695,76 +3880,119 @@ def _thank_you_complete(self):
         # Reload tax rate from Tax.json to ensure it's current
         self._reload_tax_rate()
         
-        # Create fresh UI
-        self._create_ui()
+        # Make sure the label is visible
+        self.label.place(x=0, y=0, width=WINDOW_W, height=WINDOW_H)
+        self.label.lift()
+        
+        # Add debug logging
+        logging.info("CartMode: Label placed and lifted")
+        
+        try:
+            # Create fresh UI with error handling
+            self._create_ui()
+            logging.info("CartMode: UI created successfully")
+        except Exception as e:
+            logging.error(f"CartMode: Error creating UI: {e}")
+            import traceback
+            logging.error(traceback.format_exc())
+            
+            # Fallback to a simple UI if the main UI fails
+            self._create_fallback_ui()
         
         # Start timeout timer
         self._arm_timeout()
 
+
  
 
+ 
     def stop(self):
         logging.info("CartMode: Stopping")
         
         # Cancel timers
-        if self.timeout_after:
+        if hasattr(self, 'timeout_after') and self.timeout_after:
             self.root.after_cancel(self.timeout_after)
             self.timeout_after = None
             
-        if self.countdown_after:
+        if hasattr(self, 'countdown_after') and self.countdown_after:
             self.root.after_cancel(self.countdown_after)
             self.countdown_after = None
-            
+        
         # Hide all UI elements
-        if self.label:
-            self.label.place_forget()
-            
-        if self.receipt_frame:
-            self.receipt_frame.place_forget()
-            
-        if self.totals_frame:
-            self.totals_frame.place_forget()
-            
-        if self.popup_frame:
-            self.popup_frame.destroy()
-            self.popup_frame = None
-            
-        if self.manual_entry_frame:
-            self.manual_entry_frame.destroy()
-            self.manual_entry_frame = None
-            
-        if self.timeout_popup:
-            self.timeout_popup.destroy()
-            self.timeout_popup = None
+        for attr_name in ['label', 'receipt_frame', 'totals_frame', 'popup_frame', 
+                         'manual_entry_frame', 'timeout_popup', 'fallback_frame']:
+            if hasattr(self, attr_name):
+                widget = getattr(self, attr_name)
+                if widget and hasattr(widget, 'place_forget'):
+                    try:
+                        widget.place_forget()
+                    except Exception as e:
+                        logging.error(f"CartMode: Error hiding {attr_name}: {e}")
+                elif widget and hasattr(widget, 'destroy'):
+                    try:
+                        widget.destroy()
+                        setattr(self, attr_name, None)
+                    except Exception as e:
+                        logging.error(f"CartMode: Error destroying {attr_name}: {e}")
+        
+        logging.info("CartMode: Successfully stopped")
 
     def _create_ui(self):
         """Create the cart UI elements."""
+        logging.info("CartMode: Creating UI elements")
+        
         # Show main background
         self.label.place(x=0, y=0, width=WINDOW_W, height=WINDOW_H)
         
-        # Load background image
-        self.base_bg = self._load_bg()
-        self._render_base()
+        try:
+            # Load background image
+            self.base_bg = self._load_bg()
+            self._render_base()
+            logging.info("CartMode: Background rendered")
+        except Exception as e:
+            logging.error(f"CartMode: Error loading background: {e}")
+            # Create a simple background
+            self.base_bg = Image.new("RGB", (WINDOW_W, WINDOW_H), (255, 255, 255))
+            self._render_base()
         
-        # Create receipt area (left side, 2 inches down)
-        self._create_receipt_area()
+        try:
+            # Create receipt area (left side, 2 inches down)
+            self._create_receipt_area()
+            logging.info("CartMode: Receipt area created")
+        except Exception as e:
+            logging.error(f"CartMode: Error creating receipt area: {e}")
         
-        # Create totals area (lower right)
-        self._create_totals_area()
+        try:
+            # Create totals area (lower right)
+            self._create_totals_area()
+            logging.info("CartMode: Totals area created")
+        except Exception as e:
+            logging.error(f"CartMode: Error creating totals area: {e}")
         
-        # Create buttons (Cancel Order, Manual Entry, Pay Now)
-        self._create_cancel_button()
+        try:
+            # Create buttons (Cancel Order, Manual Entry, Pay Now)
+            self._create_cancel_button()
+            logging.info("CartMode: Buttons created")
+        except Exception as e:
+            logging.error(f"CartMode: Error creating buttons: {e}")
         
-        # Update UI with current cart items
-        self._update_receipt()
-        self._update_totals()
+        try:
+            # Update UI with current cart items
+            self._update_receipt()
+            self._update_totals()
+            logging.info("CartMode: UI updated with cart items")
+        except Exception as e:
+            logging.error(f"CartMode: Error updating UI with cart items: {e}")
 
         # Reset activity timestamp to ensure full 45 seconds
         self.last_activity_ts = time.time()
 
+
     def _load_bg(self):
         """Load the cart background image."""
         bg_path = Path.home() / "SelfCheck" / "SysPics" / "Cart.png"
+        logging.info(f"CartMode: Loading background from {bg_path}")
+    
         if bg_path.exists():
             try:
                 with Image.open(bg_path) as im:
@@ -3773,16 +4001,32 @@ def _thank_you_complete(self):
                     # Full screen - no letterboxing
                     return im.resize((WINDOW_W, WINDOW_H), Image.LANCZOS)
             except Exception as e:
-                logging.error(f"Error loading cart background: {e}")
-        
+                logging.error(f"CartMode: Error loading cart background: {e}")
+        else:
+            logging.error(f"CartMode: Background image not found: {bg_path}")
+    
         # Fallback to white background
+        logging.info("CartMode: Using fallback white background")
         return Image.new("RGB", (WINDOW_W, WINDOW_H), (255, 255, 255))
+
 
     def _render_base(self):
         """Display the background image."""
-        self.tk_img = ImageTk.PhotoImage(self.base_bg)
-        self.label.configure(image=self.tk_img)
-        self.label.lift()
+        try:
+            self.tk_img = ImageTk.PhotoImage(self.base_bg)
+            self.label.configure(image=self.tk_img)
+            self.label.lift()
+            logging.info("CartMode: Base background rendered successfully")
+        except Exception as e:
+            logging.error(f"CartMode: Error rendering base background: {e}")
+            # Try a simpler approach
+            try:
+                self.label.configure(bg="white")
+                self.label.lift()
+                logging.info("CartMode: Fallback to white background")
+            except Exception as e2:
+                logging.error(f"CartMode: Error setting fallback background: {e2}")
+
 
     def _create_receipt_area(self):
         """Create the scrollable receipt area."""
