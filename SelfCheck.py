@@ -1972,7 +1972,7 @@ class CartMode:
         # Cart data structures
         self.cart_items = {}  # UPC -> {data, qty}
         self.upc_catalog = {}  # UPC -> row data
-        self.transaction_id = self._generate_transaction_id()
+        self.transaction_id = self.generate_transaction_id()
         self.current_payment_method = None
         
         # UI elements
