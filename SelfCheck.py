@@ -2741,41 +2741,43 @@ class CartMode:
         self.update_totals_display(subtotal, tax_amount, total)
 
 
-    def _thank_you_complete(self):
-        """Complete the thank you process and return to idle mode."""
-        logging.debug("Entering _thank_you_complete method")
-        
-        # Cancel timeout if it exists
-        if hasattr(self, 'thank_you_timeout') and self.thank_you_timeout:
-            logging.debug("Canceling thank you timeout")
-            self.root.after_cancel(self.thank_you_timeout)
-            self.thank_you_timeout = None
-        
-        # Close thank you popup if it exists
-        if hasattr(self, 'thank_you_popup') and self.thank_you_popup:
-            logging.debug("Destroying thank you popup")
-            self.thank_you_popup.destroy()
-            self.thank_you_popup = None
-        
-        # Reset cart
-        logging.debug("Resetting cart")
-        self._reset_cart()
-        
-        # Clean up any existing screens - be more careful about what we destroy
-        for widget in self.root.winfo_children():
-            # Only destroy widgets that belong to CartMode, preserve system widgets
-            if hasattr(widget, 'winfo_class') and widget.winfo_class() in ['Frame', 'Label', 'Button']:
-                try:
-                    widget.destroy()
-                except:
-                    pass  # Ignore errors during cleanup
-        
-        # Call the exit callback to return to idle mode
-        if hasattr(self, 'on_exit') and callable(self.on_exit):
-            logging.info("Transaction complete, calling exit callback to return to idle mode")
-            self.on_exit()
-        else:
-            logging.warning("No exit callback found, cannot return to idle mode")
+
+def _thank_you_complete(self):
+    """Complete the thank you process and return to idle mode."""
+    logging.debug("Entering _thank_you_complete method")
+    
+    # Cancel timeout if it exists
+    if hasattr(self, 'thank_you_timeout') and self.thank_you_timeout:
+        logging.debug("Canceling thank you timeout")
+        self.root.after_cancel(self.thank_you_timeout)
+        self.thank_you_timeout = None
+    
+    # Close thank you popup if it exists
+    if hasattr(self, 'thank_you_popup') and self.thank_you_popup:
+        logging.debug("Destroying thank you popup")
+        self.thank_you_popup.destroy()
+        self.thank_you_popup = None
+    
+    # Reset cart
+    logging.debug("Resetting cart")
+    self._reset_cart()
+    
+    # Only destroy specific CartMode widgets, not all widgets
+    if hasattr(self, 'receipt_frame') and self.receipt_frame:
+        self.receipt_frame.place_forget()
+    
+    if hasattr(self, 'totals_frame') and self.totals_frame:
+        self.totals_frame.place_forget()
+    
+    if hasattr(self, 'label') and self.label:
+        self.label.place_forget()
+    
+    # Call the exit callback to return to idle mode
+    if hasattr(self, 'on_exit') and callable(self.on_exit):
+        logging.info("Transaction complete, calling exit callback to return to idle mode")
+        self.on_exit()
+    else:
+        logging.warning("No exit callback found, cannot return to idle mode")
 
 
 
