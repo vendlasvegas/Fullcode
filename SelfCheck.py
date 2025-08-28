@@ -2475,24 +2475,33 @@ class CartMode:
         
         item = self.cart_items[upc]
         
-        # Create edit popup
-        edit_popup = tk.Toplevel(self.root)
-        edit_popup.title("Edit Item")
-        edit_popup.geometry("400x400")  # Increased height for better layout
-        edit_popup.configure(bg="white")
+        # Create a frame-based popup that stays within our application
+        # First, store any existing popup to avoid multiple popups
+        if hasattr(self, 'edit_popup_frame') and self.edit_popup_frame:
+            self.edit_popup_frame.destroy()
         
-        # Center the popup relative to the main window
-        window_width = 400
-        window_height = 400
-        position_x = self.root.winfo_x() + (self.root.winfo_width() // 2) - (window_width // 2)
-        position_y = self.root.winfo_y() + (self.root.winfo_height() // 2) - (window_height // 2)
-        edit_popup.geometry(f"{window_width}x{window_height}+{position_x}+{position_y}")
+        # Create a dark overlay to dim the background
+        overlay = tk.Frame(self.root, bg='#000000')
+        overlay.place(x=0, y=0, width=WINDOW_W, height=WINDOW_H)
         
-        # Make the popup transient for the main window
-        edit_popup.transient(self.root)
+        # Create the popup frame
+        self.edit_popup_frame = tk.Frame(self.root, bg="white", bd=2, relief=tk.RAISED)
+        popup_width = 400
+        popup_height = 400
+        x_position = (WINDOW_W - popup_width) // 2
+        y_position = (WINDOW_H - popup_height) // 2
+        self.edit_popup_frame.place(x=x_position, y=y_position, width=popup_width, height=popup_height)
+        
+        # Title bar
+        title_bar = tk.Frame(self.edit_popup_frame, bg="#3498db", height=40)
+        title_bar.pack(fill=tk.X)
+        
+        title_label = tk.Label(title_bar, text="Edit Item", font=("Arial", 16, "bold"), 
+                              bg="#3498db", fg="white")
+        title_label.pack(side=tk.LEFT, padx=15, pady=5)
         
         # Main container frame
-        main_frame = tk.Frame(edit_popup, bg="white")
+        main_frame = tk.Frame(self.edit_popup_frame, bg="white")
         main_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
         
         # Item name with wrapping
@@ -2564,44 +2573,49 @@ class CartMode:
         btn_frame = tk.Frame(main_frame, bg="white")
         btn_frame.pack(pady=20, side=tk.BOTTOM, fill=tk.X)
         
+        # Helper function to close popup
+        def close_popup():
+            if hasattr(self, 'edit_popup_frame') and self.edit_popup_frame:
+                self.edit_popup_frame.destroy()
+                self.edit_popup_frame = None
+            overlay.destroy()
+        
         # Remove button
         remove_btn = tk.Button(btn_frame, text="Remove Item", font=("Arial", 14), 
                               bg="#e74c3c", fg="white", padx=10,
-                              command=lambda: self._remove_item(upc, edit_popup))
+                              command=lambda: self._remove_item(upc, close_popup))
         remove_btn.pack(side=tk.LEFT, padx=5, fill=tk.X, expand=True)
         
         # Update & Exit button
         update_btn = tk.Button(btn_frame, text="Update & Exit", font=("Arial", 14), 
                               bg="#3498db", fg="white", padx=10,
-                              command=lambda: self._update_item_qty(upc, int(qty_var.get()), edit_popup))
+                              command=lambda: self._update_item_qty(upc, int(qty_var.get()), close_popup))
         update_btn.pack(side=tk.LEFT, padx=5, fill=tk.X, expand=True)
         
-        # Update the window before attempting to grab focus
-        edit_popup.update_idletasks()
+        # Store reference to overlay for cleanup
+        self.edit_overlay = overlay
         
-        # Try to grab focus after the window is updated
-        try:
-            edit_popup.grab_set()
-        except Exception as e:
-            logging.error(f"Could not grab focus: {e}")
+        # Reset activity timestamp
+        self._on_activity()
     
-    def _remove_item(self, upc, popup):
+    def _remove_item(self, upc, close_callback):
         """Remove an item from the cart."""
         if upc in self.cart_items:
             del self.cart_items[upc]
-            popup.destroy()
+            close_callback()
             self._update_receipt()
             self._update_totals()
     
-    def _update_item_qty(self, upc, new_qty, popup):
+    def _update_item_qty(self, upc, new_qty, close_callback):
         """Update the quantity of an item."""
         if upc in self.cart_items:
             # Ensure quantity is within limits
             new_qty = max(1, min(10, new_qty))
             self.cart_items[upc]["qty"] = new_qty
-            popup.destroy()
+            close_callback()
             self._update_receipt()
             self._update_totals()
+
 
 
     def _show_manual_entry(self):
