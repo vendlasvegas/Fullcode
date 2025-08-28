@@ -8,7 +8,7 @@
 # Manual Entry Added and working with image pull up
 # Setting up Pay Now options, Venmo and Stripe good
 # reciept working
-# 8/28/25 upload to git hub 11:30
+# 8/28/25 upload to git hub 12:00
 
 import os
 import random
@@ -2379,34 +2379,81 @@ class CartMode:
         total = subtotal + tax_amount
         total_items = sum(item["qty"] for item in self.cart_items.values())
         
-        # Title
-        title_label = tk.Label(self.totals_frame, text="Order Summary", 
-                              font=("Arial", 18, "bold"), bg="white")
-        title_label.pack(pady=(10, 20))
+        # Load business name from file
+        business_name = "Vend Las Vegas"  # Default value
+        try:
+            business_name_path = Path.home() / "SelfCheck" / "Cred" / "BusinessName.txt"
+            if business_name_path.exists():
+                with open(business_name_path, 'r') as f:
+                    business_name = f.read().strip() or business_name
+        except Exception as e:
+            logging.error(f"Error reading business name: {e}")
+        
+        # Load machine ID from file
+        machine_id = "Unknown"  # Default value
+        try:
+            machine_id_path = Path.home() / "SelfCheck" / "Cred" / "MachineID.txt"
+            if machine_id_path.exists():
+                with open(machine_id_path, 'r') as f:
+                    machine_id = f.read().strip() or machine_id
+        except Exception as e:
+            logging.error(f"Error reading machine ID: {e}")
+        
+        # Get current timestamp
+        current_time = datetime.now().strftime("%m/%d/%Y %H:%M:%S")
+        
+        # Create a frame for header information
+        header_frame = tk.Frame(self.totals_frame, bg="white")
+        header_frame.pack(fill=tk.X, pady=(10, 20), anchor=tk.W)
+        
+        # Business name (bold)
+        business_label = tk.Label(header_frame, text=business_name, 
+                                font=("Arial", 18, "bold"), bg="white", anchor=tk.W)
+        business_label.pack(fill=tk.X, anchor=tk.W)
+        
+        # Machine ID
+        machine_label = tk.Label(header_frame, text=f"Machine: {machine_id}", 
+                               font=("Arial", 14), bg="white", anchor=tk.W)
+        machine_label.pack(fill=tk.X, anchor=tk.W)
+        
+        # Transaction ID
+        transaction_label = tk.Label(header_frame, text=f"Transaction #: {self.transaction_id}", 
+                                   font=("Arial", 14), bg="white", anchor=tk.W)
+        transaction_label.pack(fill=tk.X, anchor=tk.W)
+        
+        # Timestamp
+        time_label = tk.Label(header_frame, text=current_time, 
+                            font=("Arial", 14), bg="white", anchor=tk.W)
+        time_label.pack(fill=tk.X, anchor=tk.W)
+        
+        # Separator
+        separator = tk.Frame(self.totals_frame, height=2, bg="#cccccc")
+        separator.pack(fill=tk.X, pady=10)
         
         # Items count
         items_label = tk.Label(self.totals_frame, 
                               text=f"Items: {total_items}", 
-                              font=("Arial", 16), bg="white")
-        items_label.pack(pady=5)
+                              font=("Arial", 16), bg="white", anchor=tk.W)
+        items_label.pack(fill=tk.X, pady=5)
         
         # Subtotal
         subtotal_label = tk.Label(self.totals_frame, 
                                  text=f"Subtotal: ${subtotal:.2f}", 
-                                 font=("Arial", 16), bg="white")
-        subtotal_label.pack(pady=5)
+                                 font=("Arial", 16), bg="white", anchor=tk.W)
+        subtotal_label.pack(fill=tk.X, pady=5)
         
         # Tax
         tax_label = tk.Label(self.totals_frame, 
                             text=f"Tax ({self.tax_rate}%): ${tax_amount:.2f}", 
-                            font=("Arial", 16), bg="white")
-        tax_label.pack(pady=5)
+                            font=("Arial", 16), bg="white", anchor=tk.W)
+        tax_label.pack(fill=tk.X, pady=5)
         
         # Total (bold and larger)
         total_label = tk.Label(self.totals_frame, 
                               text=f"Total: ${total:.2f}", 
-                              font=("Arial", 20, "bold"), bg="white")
-        total_label.pack(pady=(10, 5))
+                              font=("Arial", 20, "bold"), bg="white", anchor=tk.W)
+        total_label.pack(fill=tk.X, pady=(10, 5))
+
 
     def scan_item(self, upc):
         """Process a scanned item and add to cart."""
@@ -4684,15 +4731,70 @@ class CartMode:
                 self.on_exit()
             return
             
-        # Confirm cancellation
-        from tkinter import messagebox
-        if messagebox.askyesno("Cancel Order", "Are you sure you want to cancel this order?"):
-            # Log the cancelled cart
-            self._log_cancelled_cart("Customer")
-            
-            # Exit to main menu
-            if hasattr(self, "on_exit"):
-                self.on_exit()
+        # Create a custom confirmation dialog instead of using messagebox
+        self._show_cancel_confirmation()
+    
+    def _show_cancel_confirmation(self):
+        """Show a custom confirmation dialog for order cancellation."""
+        # Create a dark overlay
+        overlay = tk.Frame(self.root, bg='#000000')
+        overlay.place(x=0, y=0, width=WINDOW_W, height=WINDOW_H)
+        
+        # Create the confirmation dialog
+        dialog_frame = tk.Frame(self.root, bg="white", bd=2, relief=tk.RAISED)
+        dialog_width = 400
+        dialog_height = 200
+        x_position = (WINDOW_W - dialog_width) // 2
+        y_position = (WINDOW_H - dialog_height) // 2
+        dialog_frame.place(x=x_position, y=y_position, width=dialog_width, height=dialog_height)
+        
+        # Title
+        title_label = tk.Label(dialog_frame, text="Cancel Order", 
+                              font=("Arial", 18, "bold"), bg="white")
+        title_label.pack(pady=(20, 10))
+        
+        # Message
+        message_label = tk.Label(dialog_frame, 
+                               text="Are you sure you want to cancel this order?", 
+                               font=("Arial", 14), bg="white")
+        message_label.pack(pady=10)
+        
+        # Buttons frame
+        btn_frame = tk.Frame(dialog_frame, bg="white")
+        btn_frame.pack(pady=20)
+        
+        # Helper function to close dialog
+        def close_dialog():
+            dialog_frame.destroy()
+            overlay.destroy()
+        
+        # Yes button
+        yes_btn = tk.Button(btn_frame, text="Yes", font=("Arial", 14, "bold"), 
+                          bg="#e74c3c", fg="white", width=8,
+                          command=lambda: self._confirm_cancel_order(close_dialog))
+        yes_btn.pack(side=tk.LEFT, padx=10)
+        
+        # No button
+        no_btn = tk.Button(btn_frame, text="No", font=("Arial", 14), 
+                         bg="#3498db", fg="white", width=8,
+                         command=close_dialog)
+        no_btn.pack(side=tk.LEFT, padx=10)
+        
+        # Reset activity timestamp
+        self._on_activity()
+    
+    def _confirm_cancel_order(self, close_callback):
+        """Handle confirmation of order cancellation."""
+        # Close the dialog
+        close_callback()
+        
+        # Log the cancelled cart
+        self._log_cancelled_cart("Customer")
+        
+        # Exit to main menu
+        if hasattr(self, "on_exit"):
+            self.on_exit()
+
 
     def _log_cancelled_cart(self, reason):
         """Log a cancelled cart to the Service tab."""
