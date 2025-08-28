@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 # SelfCheck.py
 # Idle slideshow on HDMI + PriceCheck mode
 # Target display: 1280x1024 (square format)
 # Price Checker is Good
-# Admin Login Screen Good / Secret button Top Left Passwords good === this needs to be updated
+# Admin Login Screen Good / Secret button Top Left Passwords good long press
 # Starting to test cart functions
 # Manual Entry Added and working with image pull up
 # Setting up Pay Now options, Venmo and Stripe good
@@ -180,8 +181,13 @@ class IdleMode:
         # Weather display
         self.weather_label = tk.Label(root, text="", font=("Arial", 24), fg="white", bg="black")
         
-        # Hidden admin button (invisible but clickable)
+        # Hidden admin button (invisible but clickable) - increased size by 50%
         self.admin_button = tk.Label(root, text="", bg="black")
+        
+        # Variables for long press detection
+        self.press_start_time = 0
+        self.long_press_timer = None
+        self.long_press_duration = 2000  # 2 seconds for long press
         
         # Selection screen elements
         self.selection_active = False
@@ -208,6 +214,10 @@ class IdleMode:
         self.cart_button.bind("<Button-1>", self._on_cart_button_click)
         self.pc_button.bind("<Button-1>", self._on_pc_button_click)
         
+        # Admin button bindings for long press
+        self.admin_button.bind("<Button-1>", self._on_admin_button_press)
+        self.admin_button.bind("<ButtonRelease-1>", self._on_admin_button_release)
+        
         self.tk_img = None
         self.slide_after = None
         self.overlay_timer = None
@@ -220,6 +230,70 @@ class IdleMode:
         self.weather_last_update = 0
         self.zipcode = None
         self.weather_api_key = None
+        
+    def _on_admin_button_press(self, event):
+        """Start timer for long press detection."""
+        if not self.is_active:
+            return
+            
+        self.press_start_time = time.time()
+        # Cancel any existing timer
+        if self.long_press_timer:
+            self.root.after_cancel(self.long_press_timer)
+        
+        # Start a new timer for long press detection
+        self.long_press_timer = self.root.after(self.long_press_duration, self._check_long_press)
+    
+    def _on_admin_button_release(self, event):
+        """Cancel long press detection on button release."""
+        if self.long_press_timer:
+            self.root.after_cancel(self.long_press_timer)
+            self.long_press_timer = None
+    
+    def _check_long_press(self):
+        """Check if button has been pressed long enough."""
+        self.long_press_timer = None
+        # If we got here, the button was held long enough
+        logging.info("Admin button long-pressed, entering Admin mode")
+        if hasattr(self, "on_wifi_tap"):
+            self.on_wifi_tap()
+
+    def _update_overlays(self):
+        """Update text overlays"""
+        if not self.is_active:
+            return
+            
+        # Position bottom text
+        self.bottom_text.place(x=WINDOW_W//2, y=WINDOW_H-50, anchor="center")
+        
+        # Update and position time
+        current_time = datetime.now().strftime("%I:%M %p")
+        self.time_label.config(text=current_time)
+        self.time_label.place(x=WINDOW_W-100, y=30, anchor="center")
+        
+        # Update and position weather
+        if self.weather_data:
+            try:
+                temp = self.weather_data.get('main', {}).get('temp', 'N/A')
+                city = self.weather_data.get('name', 'Unknown')
+                # Use the word "degrees" instead of the symbol
+                weather_text = f"{city} {int(temp)} degrees F"
+                self.weather_label.config(text=weather_text)
+                self.weather_label.place(x=WINDOW_W//2, y=30, anchor="center")
+            except Exception as e:
+                logging.error(f"Error displaying weather: {e}")
+
+        
+        # Position hidden admin button in top-left corner - increased size by 50%
+        # Original size was 25x25, increasing by 50% makes it 38x38
+        self.admin_button.place(x=0, y=0, width=38, height=38)
+        
+        # Ensure overlays stay on top
+        self._lift_overlays()
+        
+        # Schedule next update only if still active
+        if self.is_active:
+            self.overlay_timer = self.root.after(1000, self._update_overlays)        
 
     def _on_touch(self, event):
         """Touch handler for idle mode"""
@@ -508,7 +582,7 @@ class IdleMode:
             d.text(((WINDOW_W - w)//2, (WINDOW_H - h)//2), msg, font=load_ttf(24), fill=(255,255,255))
         else:
             path = self.order[self.idx]
-            logging.info("Idle: showing %s", path.name)
+            #logging.info("Idle: showing %s", path.name)
             self.idx = (self.idx + 1) % len(self.order)
             try:
                 with Image.open(path) as im:
