@@ -10,7 +10,9 @@
 # Setting up Pay Now options, Venmo and Stripe good
 # reciept working
 # CashApp Working
-# 8/28/25 upload to git hub 14:00
+# Inventory Synced to Inv tab
+# Transactions synced
+# 8/28/25 upload to git hub 14:30
 
 import os
 import random
@@ -4630,6 +4632,89 @@ class CartMode:
             # Always complete the thank you process and return to idle mode
             self._thank_you_complete()
 
+    def _log_transaction_details(self):
+        """Log detailed transaction information to the Transactions tab in Google Sheet."""
+        if not self.cart_items:
+            logging.info("No items in cart to log transaction details")
+            return
+            
+        logging.info("Logging transaction details to Transactions tab")
+        
+        try:
+            # Connect to Google Sheet
+            scopes = [
+                "https://www.googleapis.com/auth/spreadsheets",
+                "https://www.googleapis.com/auth/drive",
+            ]
+            creds = Credentials.from_service_account_file(str(GS_CRED_PATH), scopes=scopes)
+            gc = gspread.authorize(creds)
+            
+            # Open the transactions sheet
+            sheet = gc.open(GS_SHEET_NAME).worksheet("Transactions")
+            
+            # Calculate totals
+            subtotal = sum(item["price"] * item["qty"] for item in self.cart_items.values())
+            taxable_subtotal = sum(
+                item["price"] * item["qty"] 
+                for item in self.cart_items.values() if item["taxable"]
+            )
+            tax_amount = taxable_subtotal * (self.tax_rate / 100)
+            total = subtotal + tax_amount
+            total_items = sum(item["qty"] for item in self.cart_items.values())
+            
+            # Get current date and time
+            now = datetime.now()
+            date_str = now.strftime("%m/%d/%Y")
+            time_str = now.strftime("%H:%M:%S")
+            
+            # Prepare row data
+            row_data = [
+                f"TXN-{self.transaction_id}",  # Transaction ID
+                date_str,                      # Date
+                time_str,                      # Time
+                str(total_items),              # Items
+                self.current_payment_method,   # Payment Method
+                f"${subtotal:.2f}",            # Subtotal
+                f"${tax_amount:.2f}",          # Tax
+                f"${total:.2f}",               # Total
+                self.machine_id,               # Machine ID
+                "Completed"                    # Status
+            ]
+            
+            # Add item details (up to 15 items)
+            item_count = 0
+            for upc, item in self.cart_items.items():
+                item_count += 1
+                if item_count > 15:  # Only support up to 15 items
+                    logging.warning(f"Transaction has more than 15 items, only logging first 15")
+                    break
+                    
+                # For each item, add 6 columns: UPC, Name, Qty, Price, Total, Taxable
+                row_data.extend([
+                    upc,                                # Item X UPC
+                    item["name"],                       # Item X Name
+                    str(item["qty"]),                   # Item X Qty
+                    f"${item['price']:.2f}",            # Item X Price
+                    f"${item['price'] * item['qty']:.2f}", # Item X Total
+                    "Yes" if item["taxable"] else "No"  # Item X Taxable
+                ])
+            
+            # Fill remaining item slots with empty values if needed
+            remaining_items = 15 - item_count
+            if remaining_items > 0:
+                # Each item has 6 columns
+                row_data.extend([""] * (remaining_items * 6))
+            
+            # Append the row to the sheet
+            sheet.append_row(row_data)
+            logging.info(f"Successfully logged transaction {self.transaction_id} to Transactions tab")
+            
+        except Exception as e:
+            logging.error(f"Failed to log transaction details: {e}")
+            import traceback
+            logging.error(traceback.format_exc())
+    
+
 
     def _thank_you_complete(self):
         """Complete the thank you process and return to idle mode."""
@@ -4646,6 +4731,12 @@ class CartMode:
             logging.debug("Destroying thank you popup")
             self.thank_you_popup.destroy()
             self.thank_you_popup = None
+        
+        # Update inventory quantities in Google Sheet
+        self._update_inventory_quantities()
+        
+        # Log transaction details to Transactions tab
+        self._log_transaction_details()
         
         # Reset cart
         logging.debug("Resetting cart")
@@ -4667,6 +4758,81 @@ class CartMode:
             self.on_exit()
         else:
             logging.warning("No exit callback found, cannot return to idle mode")
+
+    def _update_inventory_quantities(self):
+        """Update inventory quantities in Google Sheet after successful payment."""
+        if not self.cart_items:
+            logging.info("No items in cart to update inventory for")
+            return
+            
+        logging.info("Updating inventory quantities in Google Sheet")
+        
+        try:
+            # Connect to Google Sheet
+            scopes = [
+                "https://www.googleapis.com/auth/spreadsheets",
+                "https://www.googleapis.com/auth/drive",
+            ]
+            creds = Credentials.from_service_account_file(str(GS_CRED_PATH), scopes=scopes)
+            gc = gspread.authorize(creds)
+            
+            # Open the inventory sheet
+            sheet = gc.open(GS_SHEET_NAME).worksheet(GS_TAB)
+            
+            # Get all UPCs from the sheet (column A)
+            all_upcs = sheet.col_values(1)  # Column A (UPC)
+            
+            # Track updates for batch processing
+            updates = []
+            
+            # Process each item in the cart
+            for upc, item in self.cart_items.items():
+                # Find the row for this UPC
+                try:
+                    # Try to find exact match first
+                    row_idx = all_upcs.index(upc) + 1  # +1 because gspread is 1-indexed
+                except ValueError:
+                    # If not found, try variants
+                    row_idx = None
+                    for variant in upc_variants_from_scan(upc):
+                        try:
+                            row_idx = all_upcs.index(variant) + 1
+                            break
+                        except ValueError:
+                            continue
+                
+                if row_idx:
+                    # Get current quantity
+                    current_qty_cell = f"K{row_idx}"
+                    try:
+                        current_qty = sheet.acell(current_qty_cell).value
+                        current_qty = int(current_qty) if current_qty.strip() else 0
+                    except (ValueError, AttributeError):
+                        current_qty = 0
+                    
+                    # Calculate new quantity
+                    new_qty = max(0, current_qty - item["qty"])
+                    
+                    # Add to batch update
+                    updates.append({
+                        'range': current_qty_cell,
+                        'values': [[new_qty]]
+                    })
+                    
+                    logging.info(f"Inventory update for {upc}: {current_qty} -> {new_qty} (sold {item['qty']})")
+                else:
+                    logging.warning(f"Could not find inventory row for UPC {upc}")
+            
+            # Perform batch update if we have any updates
+            if updates:
+                sheet.batch_update(updates)
+                logging.info(f"Successfully updated {len(updates)} inventory quantities")
+            
+        except Exception as e:
+            logging.error(f"Failed to update inventory quantities: {e}")
+            import traceback
+            logging.error(traceback.format_exc())
+    
 
     def _reset_cart(self):
         """Reset the cart and related variables."""
