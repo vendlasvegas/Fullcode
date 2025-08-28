@@ -2,15 +2,13 @@
 # SelfCheck.py
 # Idle slideshow on HDMI + PriceCheck mode
 # Target display: 1280x1024 (square format)
-# Testing 
 # Price Checker is Good
-# Admin Login Screen Good / Secret button Top Left Passwords good
+# Admin Login Screen Good / Secret button Top Left Passwords good === this needs to be updated
 # Starting to test cart functions
 # Manual Entry Added and working with image pull up
-# Setting up Pay Now options
-# Venmo mode and reciept working
-# Setting up Stripe Credit card (Pooling method)
-# 8/26/25 upload to git hub 19:00
+# Setting up Pay Now options, Venmo and Stripe good
+# reciept working
+# 8/28/25 upload to git hub 11:20
 
 import os
 import random
@@ -2775,10 +2773,11 @@ class CartMode:
             if self.manual_qty_var.get() < 10:
                 self.manual_qty_var.set(self.manual_qty_var.get() + 1)
                 
-        down_btn = tk.Button(qty_frame, text="▼", font=("Arial", 16), command=decrease_qty)
+        # Changed to simple + and - symbols
+        down_btn = tk.Button(qty_frame, text="-", font=("Arial", 16, "bold"), command=decrease_qty)
         down_btn.pack(side=tk.LEFT, padx=5)
         
-        up_btn = tk.Button(qty_frame, text="▲", font=("Arial", 16), command=increase_qty)
+        up_btn = tk.Button(qty_frame, text="+", font=("Arial", 16, "bold"), command=increase_qty)
         up_btn.pack(side=tk.LEFT, padx=5)
         
         # Image display
@@ -2812,6 +2811,7 @@ class CartMode:
         
         # Store the current UPC for later use
         self.current_manual_upc = upc
+
 
     def _manual_entry_add(self):
         """Add manually entered item to cart."""
@@ -5445,4 +5445,3 @@ class App:
 
 if __name__ == "__main__":
     App().run()
-
