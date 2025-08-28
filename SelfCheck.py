@@ -8,7 +8,7 @@
 # Manual Entry Added and working with image pull up
 # Setting up Pay Now options, Venmo and Stripe good
 # reciept working
-# 8/28/25 upload to git hub 11:20
+# 8/28/25 upload to git hub 11:30
 
 import os
 import random
@@ -2467,6 +2467,7 @@ class CartMode:
         self._update_totals()
         return True
 
+
     def _edit_item(self, upc):
         """Show edit options for an item."""
         if upc not in self.cart_items:
@@ -2477,67 +2478,131 @@ class CartMode:
         # Create edit popup
         edit_popup = tk.Toplevel(self.root)
         edit_popup.title("Edit Item")
-        edit_popup.geometry("300x200")
+        edit_popup.geometry("400x400")  # Increased height for better layout
         edit_popup.configure(bg="white")
         
-        # Center the popup
+        # Center the popup relative to the main window
+        window_width = 400
+        window_height = 400
+        position_x = self.root.winfo_x() + (self.root.winfo_width() // 2) - (window_width // 2)
+        position_y = self.root.winfo_y() + (self.root.winfo_height() // 2) - (window_height // 2)
+        edit_popup.geometry(f"{window_width}x{window_height}+{position_x}+{position_y}")
+        
+        # Make the popup transient for the main window
         edit_popup.transient(self.root)
-        edit_popup.grab_set()
         
-        # Item name
-        name_label = tk.Label(edit_popup, text=item["name"], 
-                             font=("Arial", 14, "bold"), bg="white")
-        name_label.pack(pady=10)
+        # Main container frame
+        main_frame = tk.Frame(edit_popup, bg="white")
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
         
-        # Quantity controls
-        qty_frame = tk.Frame(edit_popup, bg="white")
-        qty_frame.pack(pady=10)
+        # Item name with wrapping
+        name_label = tk.Label(main_frame, text=item["name"], 
+                             font=("Arial", 16, "bold"), bg="white",
+                             wraplength=360, justify=tk.LEFT)
+        name_label.pack(pady=(0, 15), anchor=tk.W)
         
-        tk.Label(qty_frame, text="Quantity:", font=("Arial", 12), bg="white").pack(side=tk.LEFT)
+        # Price info
+        price_label = tk.Label(main_frame, text=f"Price: ${item['price']:.2f}", 
+                              font=("Arial", 14), bg="white")
+        price_label.pack(pady=(0, 5), anchor=tk.W)
         
-        minus_btn = tk.Button(qty_frame, text="-", font=("Arial", 14), 
-                             command=lambda: self._change_quantity(upc, -1, edit_popup))
+        # Quantity controls with clear visual feedback
+        qty_frame = tk.Frame(main_frame, bg="white")
+        qty_frame.pack(pady=20)
+        
+        qty_label = tk.Label(qty_frame, text="Quantity:", font=("Arial", 14, "bold"), bg="white")
+        qty_label.pack(side=tk.LEFT, padx=(0, 10))
+        
+        # Create a StringVar to track changes
+        qty_var = tk.StringVar(value=str(item["qty"]))
+        
+        def update_qty_display():
+            qty_label_display.config(text=qty_var.get())
+        
+        def change_qty(change):
+            new_qty = max(1, min(10, int(qty_var.get()) + change))
+            qty_var.set(str(new_qty))
+            update_qty_display()
+        
+        # Minus button with better styling
+        minus_btn = tk.Button(qty_frame, text="-", font=("Arial", 16, "bold"), 
+                             bg="#e74c3c", fg="white", width=2,
+                             command=lambda: change_qty(-1))
         minus_btn.pack(side=tk.LEFT, padx=5)
         
-        qty_var = tk.StringVar(value=str(item["qty"]))
-        qty_label = tk.Label(qty_frame, textvariable=qty_var, font=("Arial", 14), bg="white")
-        qty_label.pack(side=tk.LEFT, padx=10)
+        # Quantity display
+        qty_label_display = tk.Label(qty_frame, text=str(item["qty"]), 
+                                   font=("Arial", 16, "bold"), bg="white", width=2)
+        qty_label_display.pack(side=tk.LEFT, padx=10)
         
-        plus_btn = tk.Button(qty_frame, text="+", font=("Arial", 14), 
-                            command=lambda: self._change_quantity(upc, 1, edit_popup))
+        # Plus button with better styling
+        plus_btn = tk.Button(qty_frame, text="+", font=("Arial", 16, "bold"), 
+                            bg="#2ecc71", fg="white", width=2,
+                            command=lambda: change_qty(1))
         plus_btn.pack(side=tk.LEFT, padx=5)
         
-        # Remove button
-        remove_btn = tk.Button(edit_popup, text="Remove Item", font=("Arial", 12), 
-                              bg="#e74c3c", fg="white",
-                              command=lambda: self._remove_item_from_edit(upc, edit_popup))
-        remove_btn.pack(pady=10)
+        # Current total
+        total_frame = tk.Frame(main_frame, bg="white")
+        total_frame.pack(pady=10, fill=tk.X)
         
-        # Close button
-        close_btn = tk.Button(edit_popup, text="Close", font=("Arial", 12), 
-                             command=edit_popup.destroy)
-        close_btn.pack(pady=5)
-
-    def _change_quantity(self, upc, change, popup):
-        """Change the quantity of an item."""
-        if upc in self.cart_items:
-            new_qty = self.cart_items[upc]["qty"] + change
-            if new_qty <= 0:
-                del self.cart_items[upc]
-                popup.destroy()
-            else:
-                self.cart_items[upc]["qty"] = new_qty
-            
-            self._update_receipt()
-            self._update_totals()
-
-    def _remove_item_from_edit(self, upc, popup):
+        total_label = tk.Label(total_frame, 
+                              text=f"Item Total: ${item['price'] * item['qty']:.2f}", 
+                              font=("Arial", 14), bg="white")
+        total_label.pack(side=tk.LEFT)
+        
+        # Update total when quantity changes
+        def update_total(*args):
+            try:
+                qty = int(qty_var.get())
+                total_label.config(text=f"Item Total: ${item['price'] * qty:.2f}")
+            except ValueError:
+                pass
+        
+        qty_var.trace_add("write", update_total)
+        
+        # Buttons frame
+        btn_frame = tk.Frame(main_frame, bg="white")
+        btn_frame.pack(pady=20, side=tk.BOTTOM, fill=tk.X)
+        
+        # Remove button
+        remove_btn = tk.Button(btn_frame, text="Remove Item", font=("Arial", 14), 
+                              bg="#e74c3c", fg="white", padx=10,
+                              command=lambda: self._remove_item(upc, edit_popup))
+        remove_btn.pack(side=tk.LEFT, padx=5, fill=tk.X, expand=True)
+        
+        # Update & Exit button
+        update_btn = tk.Button(btn_frame, text="Update & Exit", font=("Arial", 14), 
+                              bg="#3498db", fg="white", padx=10,
+                              command=lambda: self._update_item_qty(upc, int(qty_var.get()), edit_popup))
+        update_btn.pack(side=tk.LEFT, padx=5, fill=tk.X, expand=True)
+        
+        # Update the window before attempting to grab focus
+        edit_popup.update_idletasks()
+        
+        # Try to grab focus after the window is updated
+        try:
+            edit_popup.grab_set()
+        except Exception as e:
+            logging.error(f"Could not grab focus: {e}")
+    
+    def _remove_item(self, upc, popup):
         """Remove an item from the cart."""
         if upc in self.cart_items:
             del self.cart_items[upc]
             popup.destroy()
             self._update_receipt()
             self._update_totals()
+    
+    def _update_item_qty(self, upc, new_qty, popup):
+        """Update the quantity of an item."""
+        if upc in self.cart_items:
+            # Ensure quantity is within limits
+            new_qty = max(1, min(10, new_qty))
+            self.cart_items[upc]["qty"] = new_qty
+            popup.destroy()
+            self._update_receipt()
+            self._update_totals()
+
 
     def _show_manual_entry(self):
         """Show manual entry popup with numeric keypad."""
