@@ -9,7 +9,8 @@
 # Manual Entry Added and working with image pull up
 # Setting up Pay Now options, Venmo and Stripe good
 # reciept working
-# 8/28/25 upload to git hub 12:00
+# CashApp Working
+# 8/28/25 upload to git hub 14:00
 
 import os
 import random
@@ -565,8 +566,8 @@ class IdleMode:
         y_offset = (WINDOW_H - target_height) // 2
         bg.paste(resized, (x_offset, y_offset))
         
-        logging.info(f"Forced letterboxing - Image: {target_width}x{target_height}, " +
-                    f"Letterbox top/bottom: {y_offset}px, left/right: {x_offset}px")
+        #logging.info(f"Forced letterboxing - Image: {target_width}x{target_height}, " +
+                    #f"Letterbox top/bottom: {y_offset}px, left/right: {x_offset}px")
         
         return bg
 
@@ -3222,6 +3223,7 @@ class CartMode:
                                     height=2, width=10)
                 venmo_btn.pack(side=tk.LEFT, padx=10)
     
+
         # Cash App button
         cashapp_path = payment_images_dir / "cashapp.png"
         if cashapp_path.exists():
@@ -3231,10 +3233,10 @@ class CartMode:
                     img = img.resize((200, 80), Image.LANCZOS)
                     cashapp_img = ImageTk.PhotoImage(img)
                 
-                    # Create button with image
+                    # Create button with image - call the dedicated Cash App method directly
                     cashapp_btn = tk.Button(mobile_frame, 
                                           image=cashapp_img, 
-                                          command=lambda: self._process_payment("Cash App"),
+                                          command=lambda: self._process_cashapp_payment(total),
                                           bd=0)
                     cashapp_btn.image = cashapp_img  # Keep reference
                     cashapp_btn.pack(side=tk.LEFT, padx=10)
@@ -3244,10 +3246,11 @@ class CartMode:
                 cashapp_btn = tk.Button(mobile_frame, 
                                       text="Cash App", 
                                       font=("Arial", 16), 
-                                      command=lambda: self._process_payment("Cash App"),
+                                      command=lambda: self._process_cashapp_payment(total),
                                       bg="#00D632", fg="white",
                                       height=2, width=10)
                 cashapp_btn.pack(side=tk.LEFT, padx=10)
+
     
         # Button frame for Return and Cancel buttons
         button_frame = tk.Frame(self.payment_popup, bg="white")
@@ -3294,6 +3297,10 @@ class CartMode:
 
     def _process_payment(self, method):
         """Process payment with selected method."""
+        # Debug logging
+        logging.info(f"_process_payment called with method: {method}")
+        logging.info(f"Method type: {type(method)}, Method repr: {repr(method)}")
+        
         # Calculate the total
         subtotal = sum(item["price"] * item["qty"] for item in self.cart_items.values())
         taxable_subtotal = sum(
@@ -3302,35 +3309,236 @@ class CartMode:
         )
         tax_amount = taxable_subtotal * (self.tax_rate / 100)
         total = subtotal + tax_amount
-    
+        
         # Log the payment attempt
         logging.info(f"Processing payment of ${total:.2f} with {method}")
 
-        # Set payment method for receipt printing
+        # Store the payment method for receipt printing
         if method.lower() == "stripe":
             self.current_payment_method = "Credit Card"
         else:
             self.current_payment_method = method
-    
-        if method.lower() == "venmo":
+        
+        # Debug each condition
+        logging.info(f"Checking method == 'Venmo': {method == 'Venmo'}")
+        logging.info(f"Checking method == 'Cash App': {method == 'Cash App'}")
+        logging.info(f"Checking method == 'Stripe': {method == 'Stripe'}")
+        
+        # Use exact string comparison for method to ensure correct matching
+        if method == "Venmo":
+            logging.info("Venmo condition matched")
             # Show QR code for Venmo payment
             self._show_venmo_qr_code(total)
-        elif method.lower() == "stripe":
+        elif method == "Cash App":
+            logging.info("Cash App condition matched")
+            # Show QR code for Cash App payment
+            self._show_cashapp_qr_code(total)
+        elif method == "Stripe":
+            logging.info("Stripe condition matched")
             # Show QR code for Stripe payment
             self._show_stripe_qr_code(total)
         else:
+            logging.info(f"No condition matched for method: {method}")
             # For other payment methods (temporary)
             self._close_payment_popup()
-        
+            
             # Log the transaction
             self._log_successful_transaction(self.current_payment_method, total)
-        
+            
             # Show thank you popup
             self._show_thank_you_popup()
 
 
+#***CashApp***
+    
+    def _process_cashapp_payment(self, total):
+        """Process Cash App payment with QR code."""
+        logging.info(f"Processing Cash App payment for ${total:.2f}")
 
+        # Set payment method for receipt printing - explicitly set to CashApp
+        self.current_payment_method = "CashApp"
+        logging.info(f"Set payment method to: {self.current_payment_method}")
+        
+        # Close the current payment popup
+        if hasattr(self, 'payment_popup') and self.payment_popup:
+            self.payment_popup.destroy()
+        
+        # Create a new popup for the QR code
+        self.payment_popup = tk.Frame(self.root, bg="white", bd=3, relief=tk.RAISED)
+        self.payment_popup.place(relx=0.5, rely=0.5, width=600, height=700, anchor=tk.CENTER)
+        
+        # Title
+        title_label = tk.Label(self.payment_popup, 
+                             text="Pay with Cash App", 
+                             font=("Arial", 24, "bold"), 
+                             bg="white")
+        title_label.pack(pady=(20, 10))
+        
+        try:
+            # Generate QR code and get transaction ID
+            qr_img, transaction_id = self._generate_cashapp_qr_code(total)
+            
+            # Store transaction ID for reference
+            self.current_transaction_id = transaction_id
+            
+            # Amount and transaction ID
+            details_frame = tk.Frame(self.payment_popup, bg="white")
+            details_frame.pack(pady=(0, 10))
+            
+            amount_label = tk.Label(details_frame, 
+                                  text=f"Amount: ${total:.2f}", 
+                                  font=("Arial", 18), 
+                                  bg="white")
+            amount_label.pack(pady=5)
+            
+            # Resize QR for display
+            qr_img = qr_img.resize((300, 300), Image.LANCZOS)
+            
+            # Convert to PhotoImage
+            qr_photo = ImageTk.PhotoImage(qr_img)
+            
+            # Display QR code
+            qr_label = tk.Label(self.payment_popup, image=qr_photo, bg="white")
+            qr_label.image = qr_photo  # Keep a reference
+            qr_label.pack(pady=10)
+            
+            # Instructions
+            instructions = (
+                "1. Open your phone's camera app\n"
+                "2. Scan this QR code\n"
+                "3. Follow the link to the Cash App\n"
+                "4. Complete payment in Cash App\n"
+                "5. After payment, click 'Record Payment' below\n"
+                "   and enter the last 4 digits of your transaction ID"
+            )
+            
+            instructions_label = tk.Label(self.payment_popup, 
+                                        text=instructions, 
+                                        font=("Arial", 14), 
+                                        bg="white",
+                                        justify=tk.LEFT)
+            instructions_label.pack(pady=10)
+            
+        except Exception as e:
+            logging.error(f"Error generating Cash App QR code: {e}")
+            import traceback
+            logging.error(traceback.format_exc())
+            
+            # Show error message instead of QR code
+            error_label = tk.Label(self.payment_popup, 
+                                 text=f"Error generating QR code:\n{str(e)}", 
+                                 font=("Arial", 16), 
+                                 bg="white",
+                                 fg="#e74c3c")  # Red color
+            error_label.pack(pady=20)
+        
+        # Button frame
+        button_frame = tk.Frame(self.payment_popup, bg="white")
+        button_frame.pack(pady=(20, 20), fill=tk.X, padx=20)
+        
+        # Record Payment button
+        record_btn = tk.Button(button_frame, 
+                             text="Record Payment", 
+                             font=("Arial", 16), 
+                             command=self._show_transaction_id_entry,
+                             bg="#27ae60", fg="white",
+                             height=1)
+        record_btn.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
+        
+        # Return to Cart button
+        return_btn = tk.Button(button_frame, 
+                             text="Return to Cart", 
+                             font=("Arial", 16), 
+                             command=self._close_payment_popup,
+                             bg="#3498db", fg="white",
+                             height=1)
+        return_btn.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
+        
+        # Cancel Order button
+        cancel_btn = tk.Button(button_frame, 
+                             text="Cancel Order", 
+                             font=("Arial", 16), 
+                             command=self._cancel_from_payment,
+                             bg="#e74c3c", fg="white",
+                             height=1)
+        cancel_btn.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
+        
+        # Start timeout for payment popup - 60 seconds
+        self._start_payment_timeout(timeout_seconds=60)
 
+    def _generate_cashapp_qr_code(self, total):
+        """Generate a Cash App QR code for payment."""
+        import qrcode
+        import urllib.parse
+        
+        # Generate a unique transaction ID
+        if not hasattr(self, 'current_transaction_id'):
+            self.current_transaction_id = self._generate_transaction_id()
+        
+        # Format the amount with 2 decimal places
+        formatted_total = "{:.2f}".format(total)
+        
+        # Get Cash App username
+        cashapp_username = self.get_cashapp_username()
+
+        # Create a detailed note with machine ID and transaction ID
+        note = f"Payment #{self.current_transaction_id} - Machine: {self.machine_id}"    
+        
+        # Create a detailed note with machine ID and transaction ID
+        note = f"Payment #{self.current_transaction_id} - Machine: {self.machine_id}"
+        
+        # Create the Cash App URL - use URL encoding for the note
+        encoded_note = urllib.parse.quote(note)
+        
+        # Cash App uses $ prefix for cashtags
+        if not cashapp_username.startswith('$'):
+            cashapp_username = f"${cashapp_username}"
+        
+        # Create Cash App URL
+        cashapp_url = f"https://cash.app/{cashapp_username}/{formatted_total}"
+        
+        # Add note as a parameter if supported
+        cashapp_url += f"?note={encoded_note}"
+        
+        logging.info(f"Generated Cash App payment URL: {cashapp_url}")
+        
+        # Create QR code for the Cash App URL
+        qr = qrcode.QRCode(
+            version=1,
+            error_correction=qrcode.constants.ERROR_CORRECT_L,
+            box_size=10,
+            border=4,
+        )
+        qr.add_data(cashapp_url)
+        qr.make(fit=True)
+        
+        # Create an image from the QR Code
+        img = qr.make_image(fill_color="black", back_color="white")
+        
+        # Return the PIL Image and transaction ID
+        return img, self.current_transaction_id
+
+    def get_cashapp_username(self):
+        """Get Cash App username from CashAppName.txt."""
+        cashapp_user_path = Path.home() / "SelfCheck" / "Cred" / "CashAppName.txt"
+        
+        if not cashapp_user_path.exists():
+            logging.error("CashAppName.txt not found")
+            return "YourCashAppName"  # Default fallback
+        
+        try:
+            with open(cashapp_user_path, 'r') as f:
+                username = f.read().strip()
+                if username:
+                    return username
+                else:
+                    logging.error("CashAppName.txt is empty")
+                    return "YourCashAppName"  # Default fallback
+        except IOError as e:
+            logging.error(f"Error reading CashAppName.txt: {e}")
+            return "YourCashAppName"  # Default fallback
+
+    #***Stripe***
     def _show_stripe_qr_code(self, total):
         """Show QR code for Stripe credit card payment."""
         # Close the current payment popup
@@ -4318,14 +4526,15 @@ class CartMode:
         tax_amount = taxable_subtotal * (self.tax_rate / 100)
         total = subtotal + tax_amount
         
-        # Store the payment method for receipt printing
-        self.current_payment_method = "Venmo"
+        # Log the current payment method for debugging
+        logging.info(f"Current payment method before logging transaction: {self.current_payment_method}")
         
         # Log the transaction with the entered ID
-        self._log_successful_transaction("Venmo", total, entered_id)
+        self._log_successful_transaction(self.current_payment_method, total, entered_id)
         
         # Show thank you popup
         self._show_thank_you_popup()
+
 
     def _show_thank_you_popup(self):
         """Show thank you popup with receipt options."""
@@ -4409,21 +4618,18 @@ class CartMode:
             # Try to print receipt
             success = self.print_receipt(payment_method, total)
             
-            if success:
-                messagebox.showinfo("Receipt", "Receipt printed successfully.")
-            else:
-                # If printing fails, show a text-based receipt
-                response = messagebox.askquestion("Printer Error", 
-                                               "Failed to print receipt. Would you like to view it on screen instead?")
-                if response == 'yes':
-                    self._show_text_receipt(payment_method, total)
-        
+            # Skip success popup and go directly to thank you complete
+            self._thank_you_complete()
+            
         elif option == "email":
             # Future implementation
             messagebox.showinfo("Receipt", "Email receipt option selected.\nThis feature will be implemented soon.")
-        
-        # Always complete the thank you process and return to idle mode
-        self._thank_you_complete()
+            # Always complete the thank you process and return to idle mode
+            self._thank_you_complete()
+        else:
+            # Always complete the thank you process and return to idle mode
+            self._thank_you_complete()
+
 
     def _thank_you_complete(self):
         """Complete the thank you process and return to idle mode."""
@@ -4537,6 +4743,7 @@ class CartMode:
 
     def print_receipt(self, payment_method, total):
         """Print a receipt using direct device access."""
+        logging.info(f"Printing receipt with payment method: {payment_method}")
         try:
             # Calculate values needed for receipt
             subtotal = sum(item["price"] * item["qty"] for item in self.cart_items.values())
