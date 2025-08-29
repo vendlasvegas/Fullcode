@@ -13,7 +13,8 @@
 # Inventory Synced to Inv tab
 # Transactions synced
 # Email Receipt 
-# 8/29/25 upload to git hub 11:30
+# Working on Admin Functions
+# 8/29/25 upload to git hub 13:15
 
 import os
 import random
@@ -1572,7 +1573,7 @@ class AdminMode:
         self.update_in_progress = False
         self.last_activity_ts = time.time()
         self.timeout_after = None
-        self.web_view = None
+        self.current_menu = "main"  # Track current menu: "main", "credentials", "wireless"
         
         # Create login screen
         self.login_screen = None  # Will be created in start()
@@ -1587,33 +1588,69 @@ class AdminMode:
         logging.info(f"Touch in Admin mode at ({x}, {y})")
         self._on_activity()
         
-        # Check for button areas
-        # Update credentials button
-        if 80 <= x <= 780 and 296 <= y <= 366:
-            self.update_credentials()
-            
-        # Update location files button
-        elif 80 <= x <= 780 and 396 <= y <= 466:
-            self.update_location_files()
-            
-        # WiFi settings button
-        elif 80 <= x <= 780 and 496 <= y <= 566:
-            self.open_wifi_settings()
-            
-        # Load inventory portal button
-        elif 80 <= x <= 780 and 596 <= y <= 666:
-            self.load_inventory_portal()
-            
-        # Exit button
-        elif 80 <= x <= 380 and 696 <= y <= 766:
-            if hasattr(self, "on_exit"):
-                self.on_exit()
+        # Check which menu we're in
+        if self.current_menu == "main":
+            # Main menu button areas
+            # Credentials button
+            if 80 <= x <= 780 and 300 <= y <= 370:
+                self.current_menu = "credentials"
+                self._render_credentials_menu()
+                
+            # Wireless button
+            elif 80 <= x <= 780 and 400 <= y <= 470:
+                self.current_menu = "wireless"
+                self._render_wireless_menu()
+                
+            # Exit button
+            elif 80 <= x <= 380 and 500 <= y <= 570:
+                if hasattr(self, "on_exit"):
+                    self.on_exit()
+        
+        elif self.current_menu == "credentials":
+            # Credentials submenu button areas
+            # Update credentials button
+            if 80 <= x <= 780 and 300 <= y <= 370:
+                self.update_credentials()
+                
+            # Update location files button
+            elif 80 <= x <= 780 and 400 <= y <= 470:
+                self.update_location_files()
+                
+            # Back button
+            elif 80 <= x <= 380 and 500 <= y <= 570:
+                self.current_menu = "main"
+                self._render_menu()
+        
+        elif self.current_menu == "wireless":
+            # Wireless submenu button areas
+            # WiFi settings button
+            if 80 <= x <= 780 and 300 <= y <= 370:
+                self.open_wifi_settings()
+                
+            # Local IP button
+            elif 80 <= x <= 780 and 400 <= y <= 470:
+                self.show_local_ip()
+                
+            # Bluetooth button
+            elif 80 <= x <= 780 and 500 <= y <= 570:
+                self.open_bluetooth_settings()
+                
+            # Back button
+            elif 80 <= x <= 380 and 600 <= y <= 670:
+                self.current_menu = "main"
+                self._render_menu()
         
         # Back button (in status screens)
         elif 80 <= x <= 480 and 500 <= y <= 570:
             # Only active in status screens
             if self.update_in_progress == False and hasattr(self, "back_to_menu"):
-                self._render_menu()
+                if self.current_menu == "main":
+                    self._render_menu()
+                elif self.current_menu == "credentials":
+                    self._render_credentials_menu()
+                elif self.current_menu == "wireless":
+                    self._render_wireless_menu()
+
     
     def _on_activity(self, event=None):
         """Reset inactivity timer on any user activity."""
@@ -1634,7 +1671,7 @@ class AdminMode:
         self.login_screen = AdminLoginScreen(self.root)
         self.login_screen.on_login_success = self._on_login_success
         self.login_screen.on_login_failed = self._on_login_failed
-        self.login_screen.on_cancel = self._on_login_cancel
+        self.login_screen.on_login_cancel = self._on_login_cancel
         
         # Show login screen
         self.login_screen.show()
@@ -1647,11 +1684,6 @@ class AdminMode:
         # Hide login screen if it exists
         if self.login_screen:
             self.login_screen.hide()
-        
-        # Close web view if open
-        if self.web_view:
-            self.web_view.destroy()
-            self.web_view = None
         
         # Cancel timeout timer
         if self.timeout_after:
@@ -1667,6 +1699,9 @@ class AdminMode:
         
         # Reset activity timestamp
         self.last_activity_ts = time.time()
+        
+        # Reset to main menu
+        self.current_menu = "main"
         
         # Show admin interface
         self.label.place(x=0, y=0, width=WINDOW_W, height=WINDOW_H)
@@ -1724,7 +1759,7 @@ class AdminMode:
         return bg
         
     def _render_menu(self):
-        """Render the admin menu with safety checks."""
+        """Render the main admin menu with safety checks."""
         if not hasattr(self, 'base_bg') or self.base_bg is None:
             logging.error("Cannot render menu: base_bg is None")
             self.base_bg = Image.new("RGB", (WINDOW_W, WINDOW_H), (255, 255, 255))
@@ -1736,13 +1771,11 @@ class AdminMode:
             # Menu options - with touch-friendly buttons
             option_font = load_ttf(40)  # Increased for 1280x1024
             
-            # Moved down by ~1 inch (96 pixels)
+            # Main menu buttons
             buttons = [
-                {"text": "Update Credentials", "y": 300, "color": (0,120,200)},
-                {"text": "Update Location Files", "y": 400, "color": (0,150,100)},
-                {"text": "WiFi Settings", "y": 500, "color": (100,100,200)},
-                {"text": "Load Inventory Portal", "y": 600, "color": (150,100,150)},
-                {"text": "Exit Admin Mode", "y": 700, "color": (200,60,60)}
+                {"text": "Credentials", "y": 300, "color": (0,120,200)},
+                {"text": "Wireless", "y": 400, "color": (0,150,100)},
+                {"text": "Exit Admin Mode", "y": 500, "color": (200,60,60)}
             ]
             
             for btn in buttons:
@@ -1766,6 +1799,104 @@ class AdminMode:
             logging.error(f"Error rendering admin menu: {e}")
             import traceback
             logging.error(traceback.format_exc())
+
+    def _render_credentials_menu(self):
+        """Render the credentials submenu."""
+        if not hasattr(self, 'base_bg') or self.base_bg is None:
+            logging.error("Cannot render credentials menu: base_bg is None")
+            self.base_bg = Image.new("RGB", (WINDOW_W, WINDOW_H), (255, 255, 255))
+        
+        try:
+            frame = self.base_bg.copy()
+            d = ImageDraw.Draw(frame)
+            
+            # Add title
+            title_font = load_ttf(48)
+            title_text = "Credentials Menu"
+            tw, th = d.textbbox((0,0), title_text, font=title_font)[2:]
+            d.text(((WINDOW_W - tw)//2, 100), title_text, font=title_font, fill=(0,0,0))
+            
+            # Menu options - with touch-friendly buttons
+            option_font = load_ttf(40)
+            
+            # Credentials submenu buttons
+            buttons = [
+                {"text": "Update Credentials", "y": 300, "color": (0,120,200)},
+                {"text": "Update Location Files", "y": 400, "color": (0,150,100)},
+                {"text": "Back to Main Menu", "y": 500, "color": (100,100,200)}
+            ]
+            
+            for btn in buttons:
+                button_x, button_y = 100, btn["y"]
+                text_w, text_h = d.textbbox((0,0), btn["text"], font=option_font)[2:]
+                
+                # Draw button
+                d.rectangle([button_x-20, button_y-10, button_x+text_w+40, button_y+text_h+10], 
+                           fill=btn["color"], outline=(0,0,0), width=2)
+                d.text((button_x, button_y), btn["text"], font=option_font, fill=(255,255,255))
+
+            self.tk_img = ImageTk.PhotoImage(frame)
+            self.label.configure(image=self.tk_img)
+            self.label.lift()
+            
+            # Reset the back_to_menu flag
+            if hasattr(self, 'back_to_menu'):
+                delattr(self, 'back_to_menu')
+                
+        except Exception as e:
+            logging.error(f"Error rendering credentials menu: {e}")
+            import traceback
+            logging.error(traceback.format_exc())
+
+    def _render_wireless_menu(self):
+        """Render the wireless submenu."""
+        if not hasattr(self, 'base_bg') or self.base_bg is None:
+            logging.error("Cannot render wireless menu: base_bg is None")
+            self.base_bg = Image.new("RGB", (WINDOW_W, WINDOW_H), (255, 255, 255))
+        
+        try:
+            frame = self.base_bg.copy()
+            d = ImageDraw.Draw(frame)
+            
+            # Add title
+            title_font = load_ttf(48)
+            title_text = "Wireless Menu"
+            tw, th = d.textbbox((0,0), title_text, font=title_font)[2:]
+            d.text(((WINDOW_W - tw)//2, 100), title_text, font=title_font, fill=(0,0,0))
+            
+            # Menu options - with touch-friendly buttons
+            option_font = load_ttf(40)
+            
+            # Wireless submenu buttons
+            buttons = [
+                {"text": "WiFi Settings", "y": 300, "color": (0,120,200)},
+                {"text": "Local IP", "y": 400, "color": (0,150,100)},
+                {"text": "Bluetooth", "y": 500, "color": (100,100,200)},
+                {"text": "Back to Main Menu", "y": 600, "color": (150,100,150)}
+            ]
+            
+            for btn in buttons:
+                button_x, button_y = 100, btn["y"]
+                text_w, text_h = d.textbbox((0,0), btn["text"], font=option_font)[2:]
+                
+                # Draw button
+                d.rectangle([button_x-20, button_y-10, button_x+text_w+40, button_y+text_h+10], 
+                           fill=btn["color"], outline=(0,0,0), width=2)
+                d.text((button_x, button_y), btn["text"], font=option_font, fill=(255,255,255))
+
+            self.tk_img = ImageTk.PhotoImage(frame)
+            self.label.configure(image=self.tk_img)
+            self.label.lift()
+            
+            # Reset the back_to_menu flag
+            if hasattr(self, 'back_to_menu'):
+                delattr(self, 'back_to_menu')
+                
+        except Exception as e:
+            logging.error(f"Error rendering wireless menu: {e}")
+            import traceback
+            logging.error(traceback.format_exc())
+
 
     def _render_status(self, message, is_error=False):
         """Render status message with safety checks."""
@@ -1808,7 +1939,8 @@ class AdminMode:
             elapsed = current_time - self.last_activity_ts
             logging.debug(f"Admin timeout check: {elapsed:.1f}s elapsed")
             
-            if elapsed >= (ADMIN_TIMEOUT_MS/1000.0):
+            # Changed from 90 seconds to 5 minutes (300 seconds)
+            if elapsed >= 300.0:
                 logging.info(f"Admin mode timeout after {elapsed:.1f}s - returning to Idle")
                 if hasattr(self, "on_timeout"):
                     self.on_timeout()
@@ -1816,6 +1948,420 @@ class AdminMode:
             self.timeout_after = self.root.after(1000, check_timeout)
             
         self.timeout_after = self.root.after(1000, check_timeout)
+
+    def show_local_ip(self):
+        """Show the local IP address."""
+        if self.update_in_progress:
+            return
+            
+        self.update_in_progress = True
+        
+        try:
+            # Get IP addresses
+            ip_info = self._get_ip_addresses()
+            
+            # Create popup frame
+            ip_frame = tk.Frame(self.root, bg="#2c3e50")
+            ip_frame.place(x=0, y=0, width=WINDOW_W, height=WINDOW_H)
+            
+            # Title
+            title_label = tk.Label(ip_frame, text="Network Information", 
+                                  font=("Arial", 36, "bold"), bg="#2c3e50", fg="white")
+            title_label.pack(pady=(50, 30))
+            
+            # IP information
+            info_frame = tk.Frame(ip_frame, bg="#2c3e50")
+            info_frame.pack(pady=20, fill=tk.BOTH, expand=True)
+            
+            # Create a canvas with scrollbar for IP info
+            canvas = tk.Canvas(info_frame, bg="#2c3e50", highlightthickness=0)
+            scrollbar = tk.Scrollbar(info_frame, orient="vertical", command=canvas.yview)
+            scrollable_frame = tk.Frame(canvas, bg="#2c3e50")
+            
+            scrollable_frame.bind(
+                "<Configure>",
+                lambda e: canvas.configure(
+                    scrollregion=canvas.bbox("all")
+                )
+            )
+            
+            canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+            canvas.configure(yscrollcommand=scrollbar.set)
+            
+            canvas.pack(side="left", fill="both", expand=True)
+            scrollbar.pack(side="right", fill="y")
+            
+            # Add IP information to scrollable frame
+            for interface, addresses in ip_info.items():
+                # Interface header
+                interface_label = tk.Label(scrollable_frame, text=f"Interface: {interface}", 
+                                         font=("Arial", 18, "bold"), bg="#2c3e50", fg="white")
+                interface_label.pack(anchor="w", padx=50, pady=(10, 5))
+                
+                # IP addresses
+                for addr_type, addr in addresses.items():
+                    addr_label = tk.Label(scrollable_frame, text=f"{addr_type}: {addr}", 
+                                        font=("Arial", 16), bg="#2c3e50", fg="white")
+                    addr_label.pack(anchor="w", padx=70, pady=2)
+            
+            # Back button
+            back_button = tk.Button(ip_frame, text="Back", font=("Arial", 18),
+                                   bg="#e74c3c", fg="white", width=10,
+                                   command=lambda: self._close_ip_info(ip_frame))
+            back_button.pack(pady=30)
+            
+        except Exception as e:
+            logging.error(f"Failed to show IP information: {e}")
+            self._render_status(f"Error showing IP information: {str(e)}", is_error=True)
+            
+        finally:
+            self.update_in_progress = False
+    
+    def _get_ip_addresses(self):
+        """Get IP addresses for all network interfaces."""
+        ip_info = {}
+        
+        try:
+            # Get all interfaces
+            interfaces = subprocess.check_output("ls /sys/class/net", shell=True).decode().strip().split()
+            
+            for interface in interfaces:
+                # Skip loopback interface
+                if interface == "lo":
+                    continue
+                    
+                ip_info[interface] = {}
+                
+                # Get IPv4 address
+                try:
+                    ipv4 = subprocess.check_output(f"ip -4 addr show {interface} | grep -oP '(?<=inet\\s)\\d+(\\.\\d+){{3}}'", shell=True).decode().strip()
+                    if ipv4:
+                        ip_info[interface]["IPv4"] = ipv4
+                except:
+                    ip_info[interface]["IPv4"] = "Not available"
+                
+                # Get IPv6 address
+                try:
+                    ipv6 = subprocess.check_output(f"ip -6 addr show {interface} | grep -oP '(?<=inet6\\s)[0-9a-f:]+' | head -n 1", shell=True).decode().strip()
+                    if ipv6:
+                        ip_info[interface]["IPv6"] = ipv6
+                except:
+                    ip_info[interface]["IPv6"] = "Not available"
+                
+                # Get MAC address
+                try:
+                    mac = subprocess.check_output(f"cat /sys/class/net/{interface}/address", shell=True).decode().strip()
+                    if mac:
+                        ip_info[interface]["MAC"] = mac
+                except:
+                    ip_info[interface]["MAC"] = "Not available"
+                
+                # Get link status
+                try:
+                    status = subprocess.check_output(f"cat /sys/class/net/{interface}/operstate", shell=True).decode().strip()
+                    ip_info[interface]["Status"] = status
+                except:
+                    ip_info[interface]["Status"] = "Unknown"
+                
+                # For WiFi interfaces, get SSID
+                if interface.startswith("wl"):
+                    try:
+                        ssid = subprocess.check_output(f"iwgetid {interface} -r", shell=True).decode().strip()
+                        if ssid:
+                            ip_info[interface]["SSID"] = ssid
+                    except:
+                        pass
+        
+        except Exception as e:
+            logging.error(f"Error getting IP addresses: {e}")
+            ip_info["Error"] = {"Message": str(e)}
+        
+        return ip_info
+    
+    def _close_ip_info(self, ip_frame):
+        """Close IP information popup."""
+        ip_frame.destroy()
+        self._render_wireless_menu()
+    
+    def open_bluetooth_settings(self):
+        """Open Bluetooth settings."""
+        if self.update_in_progress:
+            return
+            
+        self.update_in_progress = True
+        
+        try:
+            # Create Bluetooth settings frame
+            bt_frame = tk.Frame(self.root, bg="#2c3e50")
+            bt_frame.place(x=0, y=0, width=WINDOW_W, height=WINDOW_H)
+            
+            # Title
+            title_label = tk.Label(bt_frame, text="Bluetooth Settings", 
+                                  font=("Arial", 36, "bold"), bg="#2c3e50", fg="white")
+            title_label.pack(pady=(30, 20))
+            
+            # Main content frame with two columns
+            content_frame = tk.Frame(bt_frame, bg="#2c3e50")
+            content_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
+            content_frame.columnconfigure(0, weight=1)
+            content_frame.columnconfigure(1, weight=1)
+            
+            # Left column - Available devices
+            left_frame = tk.Frame(content_frame, bg="#2c3e50", bd=2, relief=tk.GROOVE)
+            left_frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
+            
+            available_label = tk.Label(left_frame, text="Available Devices", 
+                                     font=("Arial", 18, "bold"), bg="#2c3e50", fg="white")
+            available_label.pack(pady=10)
+            
+            # Listbox for available devices
+            available_frame = tk.Frame(left_frame, bg="#2c3e50")
+            available_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+            
+            available_listbox = tk.Listbox(available_frame, font=("Arial", 14), height=10)
+            available_scrollbar = tk.Scrollbar(available_frame, orient=tk.VERTICAL)
+            available_listbox.config(yscrollcommand=available_scrollbar.set)
+            available_scrollbar.config(command=available_listbox.yview)
+            
+            available_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+            available_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+            
+            # Buttons for available devices
+            available_buttons = tk.Frame(left_frame, bg="#2c3e50")
+            available_buttons.pack(fill=tk.X, pady=10)
+            
+            scan_button = tk.Button(available_buttons, text="Scan", font=("Arial", 14),
+                                  bg="#3498db", fg="white", width=10,
+                                  command=lambda: self._scan_bluetooth(available_listbox))
+            scan_button.pack(side=tk.LEFT, padx=5, expand=True)
+            
+            pair_button = tk.Button(available_buttons, text="Pair", font=("Arial", 14),
+                                  bg="#2ecc71", fg="white", width=10,
+                                  command=lambda: self._pair_bluetooth(available_listbox))
+            pair_button.pack(side=tk.LEFT, padx=5, expand=True)
+            
+            # Right column - Paired devices
+            right_frame = tk.Frame(content_frame, bg="#2c3e50", bd=2, relief=tk.GROOVE)
+            right_frame.grid(row=0, column=1, sticky="nsew", padx=10, pady=10)
+            
+            paired_label = tk.Label(right_frame, text="Paired Devices", 
+                                  font=("Arial", 18, "bold"), bg="#2c3e50", fg="white")
+            paired_label.pack(pady=10)
+            
+            # Listbox for paired devices
+            paired_frame = tk.Frame(right_frame, bg="#2c3e50")
+            paired_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+            
+            paired_listbox = tk.Listbox(paired_frame, font=("Arial", 14), height=10)
+            paired_scrollbar = tk.Scrollbar(paired_frame, orient=tk.VERTICAL)
+            paired_listbox.config(yscrollcommand=paired_scrollbar.set)
+            paired_scrollbar.config(command=paired_listbox.yview)
+            
+            paired_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+            paired_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+            
+            # Buttons for paired devices
+            paired_buttons = tk.Frame(right_frame, bg="#2c3e50")
+            paired_buttons.pack(fill=tk.X, pady=10)
+            
+            refresh_button = tk.Button(paired_buttons, text="Refresh", font=("Arial", 14),
+                                     bg="#3498db", fg="white", width=10,
+                                     command=lambda: self._refresh_paired_devices(paired_listbox))
+            refresh_button.pack(side=tk.LEFT, padx=5, expand=True)
+            
+            forget_button = tk.Button(paired_buttons, text="Forget", font=("Arial", 14),
+                                    bg="#e74c3c", fg="white", width=10,
+                                    command=lambda: self._forget_bluetooth(paired_listbox))
+            forget_button.pack(side=tk.LEFT, padx=5, expand=True)
+            
+            # Status area
+            status_frame = tk.Frame(bt_frame, bg="#2c3e50", height=100)
+            status_frame.pack(fill=tk.X, pady=10)
+            
+            self.bt_status_label = tk.Label(status_frame, text="Ready", 
+                                          font=("Arial", 14), bg="#2c3e50", fg="white")
+            self.bt_status_label.pack(pady=10)
+            
+            # Back button
+            back_button = tk.Button(bt_frame, text="Back", font=("Arial", 18),
+                                   bg="#e74c3c", fg="white", width=10,
+                                   command=lambda: self._close_bluetooth_settings(bt_frame))
+            back_button.pack(pady=20)
+            
+            # Initial population of lists
+            self._scan_bluetooth(available_listbox)
+            self._refresh_paired_devices(paired_listbox)
+            
+        except Exception as e:
+            logging.error(f"Failed to open Bluetooth settings: {e}")
+            self._render_status(f"Error opening Bluetooth settings: {str(e)}", is_error=True)
+            
+        finally:
+            self.update_in_progress = False
+    
+    def _scan_bluetooth(self, listbox):
+        """Scan for available Bluetooth devices."""
+        try:
+            # Clear listbox
+            listbox.delete(0, tk.END)
+            
+            # Update status
+            if hasattr(self, 'bt_status_label'):
+                self.bt_status_label.config(text="Scanning for devices...")
+            
+            # Put Bluetooth adapter in discoverable mode
+            subprocess.run("sudo hciconfig hci0 piscan", shell=True)
+            
+            # Scan for devices
+            output = subprocess.check_output("sudo timeout 10s hcitool scan", shell=True).decode()
+            
+            # Parse output
+            devices = []
+            for line in output.splitlines():
+                if "Scanning" in line:
+                    continue
+                parts = line.strip().split("\t")
+                if len(parts) >= 2:
+                    addr = parts[0].strip()
+                    name = parts[1].strip() if len(parts) > 1 else "Unknown"
+                    devices.append((addr, name))
+            
+            # Add to listbox
+            for addr, name in devices:
+                listbox.insert(tk.END, f"{name} ({addr})")
+            
+            # Update status
+            if hasattr(self, 'bt_status_label'):
+                self.bt_status_label.config(text=f"Found {len(devices)} devices")
+            
+        except Exception as e:
+            logging.error(f"Error scanning for Bluetooth devices: {e}")
+            if hasattr(self, 'bt_status_label'):
+                self.bt_status_label.config(text=f"Error: {str(e)}")
+    
+    def _refresh_paired_devices(self, listbox):
+        """Refresh list of paired Bluetooth devices."""
+        try:
+            # Clear listbox
+            listbox.delete(0, tk.END)
+            
+            # Update status
+            if hasattr(self, 'bt_status_label'):
+                self.bt_status_label.config(text="Getting paired devices...")
+            
+            # Get paired devices
+            output = subprocess.check_output("bluetoothctl paired-devices", shell=True).decode()
+            
+            # Parse output
+            devices = []
+            for line in output.splitlines():
+                parts = line.strip().split(" ", 2)
+                if len(parts) >= 3:
+                    addr = parts[1].strip()
+                    name = parts[2].strip()
+                    devices.append((addr, name))
+            
+            # Add to listbox
+            for addr, name in devices:
+                listbox.insert(tk.END, f"{name} ({addr})")
+            
+            # Update status
+            if hasattr(self, 'bt_status_label'):
+                self.bt_status_label.config(text=f"Found {len(devices)} paired devices")
+            
+        except Exception as e:
+            logging.error(f"Error getting paired Bluetooth devices: {e}")
+            if hasattr(self, 'bt_status_label'):
+                self.bt_status_label.config(text=f"Error: {str(e)}")
+    
+    def _pair_bluetooth(self, listbox):
+        """Pair with selected Bluetooth device."""
+        try:
+            # Get selected device
+            selection = listbox.curselection()
+            if not selection:
+                if hasattr(self, 'bt_status_label'):
+                    self.bt_status_label.config(text="No device selected")
+                return
+            
+            device_text = listbox.get(selection[0])
+            
+            # Extract address
+            import re
+            match = re.search(r'\((.*?)\)', device_text)
+            if not match:
+                if hasattr(self, 'bt_status_label'):
+                    self.bt_status_label.config(text="Invalid device format")
+                return
+            
+            addr = match.group(1)
+            
+            # Update status
+            if hasattr(self, 'bt_status_label'):
+                self.bt_status_label.config(text=f"Pairing with {addr}...")
+            
+            # Pair with device
+            # Note: This is a simplified approach. Real pairing might require PIN confirmation
+            subprocess.run(f"echo 'pair {addr}' | bluetoothctl", shell=True)
+            
+            # Update status
+            if hasattr(self, 'bt_status_label'):
+                self.bt_status_label.config(text=f"Paired with {addr}")
+            
+            # Refresh paired devices list
+            self._refresh_paired_devices(listbox)
+            
+        except Exception as e:
+            logging.error(f"Error pairing Bluetooth device: {e}")
+            if hasattr(self, 'bt_status_label'):
+                self.bt_status_label.config(text=f"Error: {str(e)}")
+    
+    def _forget_bluetooth(self, listbox):
+        """Forget selected paired Bluetooth device."""
+        try:
+            # Get selected device
+            selection = listbox.curselection()
+            if not selection:
+                if hasattr(self, 'bt_status_label'):
+                    self.bt_status_label.config(text="No device selected")
+                return
+            
+            device_text = listbox.get(selection[0])
+            
+            # Extract address
+            import re
+            match = re.search(r'\((.*?)\)', device_text)
+            if not match:
+                if hasattr(self, 'bt_status_label'):
+                    self.bt_status_label.config(text="Invalid device format")
+                return
+            
+            addr = match.group(1)
+            
+            # Update status
+            if hasattr(self, 'bt_status_label'):
+                self.bt_status_label.config(text=f"Removing {addr}...")
+            
+            # Remove device
+            subprocess.run(f"echo 'remove {addr}' | bluetoothctl", shell=True)
+            
+            # Update status
+            if hasattr(self, 'bt_status_label'):
+                self.bt_status_label.config(text=f"Removed {addr}")
+            
+            # Refresh paired devices list
+            self._refresh_paired_devices(listbox)
+            
+        except Exception as e:
+            logging.error(f"Error removing Bluetooth device: {e}")
+            if hasattr(self, 'bt_status_label'):
+                self.bt_status_label.config(text=f"Error: {str(e)}")
+    
+    def _close_bluetooth_settings(self, bt_frame):
+        """Close Bluetooth settings."""
+        bt_frame.destroy()
+        self._render_wireless_menu()
+    
 
     def update_credentials(self):
         """Update credential files from Google Sheet."""
@@ -2097,9 +2643,9 @@ network={{
             self._render_status(f"Error connecting to WiFi: {str(e)}", is_error=True)
     
     def _close_wifi_settings(self, wifi_frame):
-        """Close WiFi settings and return to admin menu."""
+        """Close WiFi settings and return to wireless menu."""
         wifi_frame.destroy()
-        self._render_menu()
+        self._render_wireless_menu()
     
     def _key_press(self, entry, key):
         """Handle key press on virtual keyboard."""
@@ -2117,55 +2663,7 @@ network={{
     def _clear_field(self, entry):
         """Handle clear on virtual keyboard."""
         entry.delete(0, tk.END)
-    
-    def load_inventory_portal(self):
-        """Load inventory portal from URL in spreadsheet."""
-        if self.update_in_progress:
-            return
-            
-        self.update_in_progress = True
-        self._render_status("Loading inventory portal...")
-        
-        try:
-            # Connect to Google Sheet
-            scopes = [
-                "https://www.googleapis.com/auth/spreadsheets.readonly",
-                "https://www.googleapis.com/auth/drive.readonly",
-                "https://www.googleapis.com/auth/spreadsheets",
-            ]
-            creds = Credentials.from_service_account_file(str(GS_CRED_PATH), scopes=scopes)
-            gc = gspread.authorize(creds)
-            
-            # Get portal URL
-            sheet = gc.open(GS_SHEET_NAME).worksheet(GS_CRED_TAB)
-            portal_url = sheet.acell('B21').value
-            
-            if not portal_url:
-                self._render_status("Inventory portal URL not found", is_error=True)
-                return
-                
-            # Create web view frame
-            self.web_view = tk.Toplevel(self.root)
-            self.web_view.attributes("-fullscreen", True)
-            self.web_view.title("Inventory Portal")
-            
-            # Try to use a web browser widget if available
-            try:
-                import webview
-                webview.create_window("Inventory Portal", portal_url)
-                webview.start()
-            except ImportError:
-                # Fallback to system browser
-                import webbrowser
-                webbrowser.open(portal_url)
-                self._render_status("Opened in system browser")
-            
-        except Exception as e:
-            logging.error(f"Failed to load inventory portal: {e}")
-            self._render_status(f"Error loading portal: {str(e)}", is_error=True)
-            
-        finally:
-            self.update_in_progress = False
+
 
 
 # ==============================
