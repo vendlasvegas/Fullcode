@@ -168,7 +168,7 @@ def rssi_to_bars(rssi):
 # ==============================
 
 class IdleMode:
-    """Fullscreen slideshow with weather, time, and hidden admin button."""
+    """Fullscreen slideshow with weather, time, and selection screen."""
     def __init__(self, root: tk.Tk):
         self.root = root
         # Main image display
@@ -185,9 +185,6 @@ class IdleMode:
         # Weather display
         self.weather_label = tk.Label(root, text="", font=("Arial", 24), fg="white", bg="black")
         
-        # Hidden admin button (invisible but clickable) - increased size by 50%
-        self.admin_button = tk.Label(root, text="", bg="black")
-        
         # Variables for long press detection
         self.press_start_time = 0
         self.long_press_timer = None
@@ -198,14 +195,14 @@ class IdleMode:
         self.selection_label = tk.Label(root, bg="black")
         self.cart_button = tk.Label(root, bg="black")
         self.pc_button = tk.Label(root, bg="black")
+        self.admin_button = tk.Label(root, bg="black")  # Logo button for admin access
         self.selection_timeout = None
         
         # Load button images
         self.cart_img = None
         self.pc_img = None
+        self.logo_img = None
         self._load_button_images()
-
-        
         
         # Add touch support to all elements
         self.label.bind("<Button-1>", self._on_touch)
@@ -217,10 +214,6 @@ class IdleMode:
         self.selection_label.bind("<Button-1>", self._on_selection_background_click)
         self.cart_button.bind("<Button-1>", self._on_cart_button_click)
         self.pc_button.bind("<Button-1>", self._on_pc_button_click)
-        
-        # Admin button bindings for long press
-        self.admin_button.bind("<Button-1>", self._on_admin_button_press)
-        self.admin_button.bind("<ButtonRelease-1>", self._on_admin_button_release)
         
         self.tk_img = None
         self.slide_after = None
@@ -234,6 +227,194 @@ class IdleMode:
         self.weather_last_update = 0
         self.zipcode = None
         self.weather_api_key = None
+
+
+
+    # Add these methods to the IdleMode class
+    def _load_button_images(self):
+        """Load button images."""
+        try:
+            # Load cart button image
+            cart_path = Path.home() / "SelfCheck" / "SysPics" / "CartButton.png"
+            if cart_path.exists():
+                with Image.open(cart_path) as img:
+                    # Resize to 50% of original size
+                    w, h = img.size
+                    img = img.resize((w//2, h//2), Image.LANCZOS)
+                    self.cart_img = ImageTk.PhotoImage(img)
+            else:
+                logging.error(f"Cart button image not found: {cart_path}")
+                
+            # Load price check button image
+            pc_path = Path.home() / "SelfCheck" / "SysPics" / "PCButton.jpeg"
+            if pc_path.exists():
+                with Image.open(pc_path) as img:
+                    # Resize to 50% of original size
+                    w, h = img.size
+                    img = img.resize((w//2, h//2), Image.LANCZOS)
+                    self.pc_img = ImageTk.PhotoImage(img)
+            else:
+                logging.error(f"Price check button image not found: {pc_path}")
+                
+            # Load logo image for admin button
+            logo_path = Path.home() / "SelfCheck" / "SysPics" / "Logo.png"
+            if logo_path.exists():
+                with Image.open(logo_path) as img:
+                    # Resize to a reasonable size for the admin button
+                    img = img.resize((100, 100), Image.LANCZOS)
+                    self.logo_img = ImageTk.PhotoImage(img)
+            else:
+                logging.error(f"Logo image not found: {logo_path}")
+                
+        except Exception as e:
+            logging.error(f"Error loading button images: {e}")
+    
+    def _show_selection_screen(self):
+        """Show selection screen with cart and price check buttons."""
+        # Cancel slide show
+        if self.slide_after:
+            self.root.after_cancel(self.slide_after)
+            self.slide_after = None
+            
+        # Hide overlays
+        self.bottom_text.place_forget()
+        self.time_label.place_forget()
+        self.weather_label.place_forget()
+        
+        # Load default background
+        default_bg_path = Path.home() / "SelfCheck" / "SysPics" / "Default.png"
+        if default_bg_path.exists():
+            try:
+                with Image.open(default_bg_path) as img:
+                    if img.mode in ("RGBA", "P"):
+                        img = img.convert("RGB")
+                    bg = self._letterbox(img)
+                    self.tk_img = ImageTk.PhotoImage(bg)
+                    self.selection_label.configure(image=self.tk_img)
+            except Exception as e:
+                logging.error(f"Error loading default background: {e}")
+                # Fallback to black background
+                self.selection_label.configure(bg="black")
+        else:
+            logging.error(f"Default background image not found: {default_bg_path}")
+            self.selection_label.configure(bg="black")
+            
+        # Place selection screen elements
+        self.selection_label.place(x=0, y=0, width=WINDOW_W, height=WINDOW_H)
+        
+        # Place buttons if images loaded successfully
+        if self.cart_img:
+            self.cart_button.configure(image=self.cart_img)
+            # Position at middle height, left side
+            cart_w = self.cart_img.width()
+            cart_h = self.cart_img.height()
+            self.cart_button.place(x=WINDOW_W//4 - cart_w//2, y=WINDOW_H//2 - cart_h//2)
+            
+        if self.pc_img:
+            self.pc_button.configure(image=self.pc_img)
+            # Position at middle height, right side
+            pc_w = self.pc_img.width()
+            pc_h = self.pc_img.height()
+            self.pc_button.place(x=3*WINDOW_W//4 - pc_w//2, y=WINDOW_H//2 - pc_h//2)
+            
+        # Place logo button in bottom right corner
+        if self.logo_img:
+            self.admin_button.configure(image=self.logo_img)
+            logo_w = self.logo_img.width()
+            logo_h = self.logo_img.height()
+            self.admin_button.place(x=WINDOW_W - logo_w - 20, y=WINDOW_H - logo_h - 20)
+            
+            # Add long press detection
+            self.admin_button.bind("<Button-1>", self._on_admin_button_press)
+            self.admin_button.bind("<ButtonRelease-1>", self._on_admin_button_release)
+        else:
+            # Fallback if logo image not found
+            self.admin_button.configure(text="Admin", bg="#3498db", fg="white", 
+                                      font=("Arial", 12))
+            self.admin_button.place(x=WINDOW_W - 80, y=WINDOW_H - 40, width=60, height=30)
+            
+            # Add long press detection
+            self.admin_button.bind("<Button-1>", self._on_admin_button_press)
+            self.admin_button.bind("<ButtonRelease-1>", self._on_admin_button_release)
+            
+        # Lift all elements
+        self.selection_label.lift()
+        self.cart_button.lift()
+        self.pc_button.lift()
+        self.admin_button.lift()
+        
+        self.selection_active = True
+        
+        # Set timeout to return to idle mode after 30 seconds
+        self.selection_timeout = self.root.after(30000, self._hide_selection_screen)
+    
+    def _on_admin_button_press(self, event):
+        """Start timer for long press detection."""
+        if not self.is_active:
+            return
+            
+        self.press_start_time = time.time()
+        # Cancel any existing timer
+        if self.long_press_timer:
+            self.root.after_cancel(self.long_press_timer)
+        
+        # Start a new timer for long press detection
+        self.long_press_timer = self.root.after(self.long_press_duration, self._check_long_press)
+    
+    def _on_admin_button_release(self, event):
+        """Cancel long press detection on button release."""
+        if self.long_press_timer:
+            self.root.after_cancel(self.long_press_timer)
+            self.long_press_timer = None
+    
+    def _check_long_press(self):
+        """Check if button has been pressed long enough."""
+        self.long_press_timer = None
+        # If we got here, the button was held long enough
+        logging.info("Admin button long-pressed, entering Admin mode")
+        if hasattr(self, "on_wifi_tap"):
+            self.on_wifi_tap()
+            
+        # Cancel selection screen timeout
+        if self.selection_timeout:
+            self.root.after_cancel(self.selection_timeout)
+            self.selection_timeout = None
+
+
+ 
+
+    def _update_overlays(self):
+        """Update text overlays"""
+        if not self.is_active:
+            return
+            
+        # Position bottom text
+        self.bottom_text.place(x=WINDOW_W//2, y=WINDOW_H-50, anchor="center")
+        
+        # Update and position time
+        current_time = datetime.now().strftime("%I:%M %p")
+        self.time_label.config(text=current_time)
+        self.time_label.place(x=WINDOW_W-100, y=30, anchor="center")
+        
+        # Update and position weather
+        if self.weather_data:
+            try:
+                temp = self.weather_data.get('main', {}).get('temp', 'N/A')
+                city = self.weather_data.get('name', 'Unknown')
+                # Use the word "degrees" instead of the symbol
+                weather_text = f"{city} {int(temp)} degrees F"
+                self.weather_label.config(text=weather_text)
+                self.weather_label.place(x=WINDOW_W//2, y=30, anchor="center")
+            except Exception as e:
+                logging.error(f"Error displaying weather: {e}")
+        
+        # Ensure overlays stay on top
+        self._lift_overlays()
+        
+        # Schedule next update only if still active
+        if self.is_active:
+            self.overlay_timer = self.root.after(1000, self._update_overlays)
+
         
     def _on_admin_button_press(self, event):
         """Start timer for long press detection."""
@@ -312,44 +493,7 @@ class IdleMode:
         self._show_selection_screen()
 
 
-    def _load_button_images(self):
-        """Load button images and resize them to 50%."""
-        try:
-            # Load cart button image
-            cart_path = Path.home() / "SelfCheck" / "SysPics" / "CartButton.png"
-            if cart_path.exists():
-                with Image.open(cart_path) as img:
-                    # Resize to 50% of original size
-                    w, h = img.size
-                    img = img.resize((w//2, h//2), Image.LANCZOS)
-                    self.cart_img = ImageTk.PhotoImage(img)
-            else:
-                logging.error(f"Cart button image not found: {cart_path}")
-                
-            # Load price check button image
-            pc_path = Path.home() / "SelfCheck" / "SysPics" / "PCButton.jpeg"
-            if pc_path.exists():
-                with Image.open(pc_path) as img:
-                    # Resize to 50% of original size
-                    w, h = img.size
-                    img = img.resize((w//2, h//2), Image.LANCZOS)
-                    self.pc_img = ImageTk.PhotoImage(img)
-            else:
-                logging.error(f"Price check button image not found: {pc_path}")
-                
-        except Exception as e:
-            logging.error(f"Error loading button images: {e}")
-
-    def _on_admin_button_click(self, event):
-        # Special handler for admin button
-        if not self.is_active:
-            return
-            
-        logging.info("Admin button clicked, entering Admin mode")
-        if hasattr(self, "on_wifi_tap"):
-            self.on_wifi_tap()
-        return
-        
+         
     def _on_selection_background_click(self, event):
         # Clicking on the background does nothing
         pass
@@ -423,64 +567,6 @@ class IdleMode:
         
         self.label.place_forget()
         
-    def _show_selection_screen(self):
-        """Show selection screen with cart and price check buttons."""
-        # Cancel slide show
-        if self.slide_after:
-            self.root.after_cancel(self.slide_after)
-            self.slide_after = None
-            
-        # Hide overlays
-        self.bottom_text.place_forget()
-        self.time_label.place_forget()
-        self.weather_label.place_forget()
-        self.admin_button.place_forget()
-        
-        # Load default background
-        default_bg_path = Path.home() / "SelfCheck" / "SysPics" / "Default.png"
-        if default_bg_path.exists():
-            try:
-                with Image.open(default_bg_path) as img:
-                    if img.mode in ("RGBA", "P"):
-                        img = img.convert("RGB")
-                    bg = self._letterbox(img)
-                    self.tk_img = ImageTk.PhotoImage(bg)
-                    self.selection_label.configure(image=self.tk_img)
-            except Exception as e:
-                logging.error(f"Error loading default background: {e}")
-                # Fallback to black background
-                self.selection_label.configure(bg="black")
-        else:
-            logging.error(f"Default background image not found: {default_bg_path}")
-            self.selection_label.configure(bg="black")
-            
-        # Place selection screen elements
-        self.selection_label.place(x=0, y=0, width=WINDOW_W, height=WINDOW_H)
-        
-        # Place buttons if images loaded successfully
-        if self.cart_img:
-            self.cart_button.configure(image=self.cart_img)
-            # Position at middle height, left side
-            cart_w = self.cart_img.width()
-            cart_h = self.cart_img.height()
-            self.cart_button.place(x=WINDOW_W//4 - cart_w//2, y=WINDOW_H//2 - cart_h//2)
-            
-        if self.pc_img:
-            self.pc_button.configure(image=self.pc_img)
-            # Position at middle height, right side
-            pc_w = self.pc_img.width()
-            pc_h = self.pc_img.height()
-            self.pc_button.place(x=3*WINDOW_W//4 - pc_w//2, y=WINDOW_H//2 - pc_h//2)
-            
-        # Lift all elements
-        self.selection_label.lift()
-        self.cart_button.lift()
-        self.pc_button.lift()
-        
-        self.selection_active = True
-        
-        # Set timeout to return to idle mode after 30 seconds
-        self.selection_timeout = self.root.after(30000, self._hide_selection_screen)
         
     def _hide_selection_screen(self):
         """Hide selection screen and return to idle slideshow."""
@@ -574,6 +660,50 @@ class IdleMode:
         
         return bg
 
+    def _render_menu(self):
+        """Render the admin menu with safety checks."""
+        if not hasattr(self, 'base_bg') or self.base_bg is None:
+            logging.error("Cannot render menu: base_bg is None")
+            self.base_bg = Image.new("RGB", (WINDOW_W, WINDOW_H), (255, 255, 255))
+        
+        try:
+            frame = self.base_bg.copy()
+            d = ImageDraw.Draw(frame)
+            
+            # Menu options - with touch-friendly buttons
+            option_font = load_ttf(40)  # Increased for 1280x1024
+            
+            # Moved down by ~1 inch (96 pixels)
+            buttons = [
+                {"text": "Update Credentials", "y": 300, "color": (0,120,200)},
+                {"text": "Update Location Files", "y": 400, "color": (0,150,100)},
+                {"text": "WiFi Settings", "y": 500, "color": (100,100,200)},
+                {"text": "Load Inventory Portal", "y": 600, "color": (150,100,150)},
+                {"text": "Exit Admin Mode", "y": 700, "color": (200,60,60)}
+            ]
+            
+            for btn in buttons:
+                button_x, button_y = 100, btn["y"]
+                text_w, text_h = d.textbbox((0,0), btn["text"], font=option_font)[2:]
+                
+                # Draw button
+                d.rectangle([button_x-20, button_y-10, button_x+text_w+40, button_y+text_h+10], 
+                           fill=btn["color"], outline=(0,0,0), width=2)
+                d.text((button_x, button_y), btn["text"], font=option_font, fill=(255,255,255))
+
+            self.tk_img = ImageTk.PhotoImage(frame)
+            self.label.configure(image=self.tk_img)
+            self.label.lift()
+            
+            # Reset the back_to_menu flag
+            if hasattr(self, 'back_to_menu'):
+                delattr(self, 'back_to_menu')
+                
+        except Exception as e:
+            logging.error(f"Error rendering admin menu: {e}")
+            import traceback
+            logging.error(traceback.format_exc())    
+
     def _show_next(self):
         if not self.is_active:
             return
@@ -605,40 +735,7 @@ class IdleMode:
             # Schedule next slide
             self.slide_after = self.root.after(SLIDE_MS, self._show_next)
 
-    def _update_overlays(self):
-        """Update text overlays"""
-        if not self.is_active:
-            return
-            
-        # Position bottom text
-        self.bottom_text.place(x=WINDOW_W//2, y=WINDOW_H-50, anchor="center")
-        
-        # Update and position time
-        current_time = datetime.now().strftime("%I:%M %p")
-        self.time_label.config(text=current_time)
-        self.time_label.place(x=WINDOW_W-100, y=30, anchor="center")
-        
-        # Update and position weather
-        if self.weather_data:
-            try:
-                temp = self.weather_data.get('main', {}).get('temp', 'N/A')
-                city = self.weather_data.get('name', 'Unknown')
-                weather_text = f"{city} {int(temp)}Â°F"
-                self.weather_label.config(text=weather_text)
-                self.weather_label.place(x=WINDOW_W//2, y=30, anchor="center")
-            except Exception as e:
-                logging.error(f"Error displaying weather: {e}")
-        
-        # Position hidden admin button in top-left corner
-        # Reduced to 25% of original size (from 100x100 to 25x25)
-        self.admin_button.place(x=0, y=0, width=25, height=25)
-        
-        # Ensure overlays stay on top
-        self._lift_overlays()
-        
-        # Schedule next update only if still active
-        if self.is_active:
-            self.overlay_timer = self.root.after(1000, self._update_overlays)
+
         
     def _lift_overlays(self):
         """Ensure all overlay elements stay on top"""
@@ -1485,12 +1582,11 @@ class AdminMode:
         self.label.bind("<Motion>", self._on_activity)
 
     def _on_touch(self, event):
-        # Touch handler for Admin mode
+        """Touch handler for Admin mode"""
         x, y = event.x, event.y
         logging.info(f"Touch in Admin mode at ({x}, {y})")
         self._on_activity()
         
-        # Moved down by ~1 inch (96 pixels)
         # Check for button areas
         # Update credentials button
         if 80 <= x <= 780 and 296 <= y <= 366:
@@ -1520,6 +1616,7 @@ class AdminMode:
                 self._render_menu()
     
     def _on_activity(self, event=None):
+        """Reset inactivity timer on any user activity."""
         # Reset inactivity timer
         self.last_activity_ts = time.time()
 
@@ -1542,31 +1639,6 @@ class AdminMode:
         # Show login screen
         self.login_screen.show()
 
-    def _on_login_success(self):
-        # Hide login screen
-        self.login_screen.hide()
-        
-        # Reset activity timestamp
-        self.last_activity_ts = time.time()
-        
-        # Show admin interface
-        self.label.place(x=0, y=0, width=WINDOW_W, height=WINDOW_H)
-        self.label.lift()
-
-        self.base_bg = self._load_bg()
-        self._render_menu()
-        
-        # Start inactivity timer
-        self._arm_timeout()
-
-    def _on_login_failed(self):
-        if hasattr(self, "on_exit"):
-            self.on_exit()
-            
-    def _on_login_cancel(self):
-        if hasattr(self, "on_exit"):
-            self.on_exit()
-
     def stop(self):
         logging.info("Admin: Stopping mode")
         # Hide admin interface
@@ -1586,19 +1658,63 @@ class AdminMode:
             self.root.after_cancel(self.timeout_after)
             self.timeout_after = None
 
+    def _on_login_success(self):
+        """Handle successful login to admin mode."""
+        logging.info("Admin login successful")
+        
+        # Hide login screen
+        self.login_screen.hide()
+        
+        # Reset activity timestamp
+        self.last_activity_ts = time.time()
+        
+        # Show admin interface
+        self.label.place(x=0, y=0, width=WINDOW_W, height=WINDOW_H)
+        self.label.lift()
+
+        # Load background image
+        self.base_bg = self._load_bg()
+        
+        # Render the menu
+        self._render_menu()
+        
+        # Start inactivity timer
+        self._arm_timeout()
+
+    def _on_login_failed(self):
+        """Handle login failure."""
+        logging.info("Admin login failed")
+        if hasattr(self, "on_exit"):
+            self.on_exit()
+            
+    def _on_login_cancel(self):
+        """Handle login cancellation."""
+        logging.info("Admin login cancelled")
+        if hasattr(self, "on_exit"):
+            self.on_exit()
+
     def _load_bg(self):
-        if ADMIN_BG_PATH.exists():
-            try:
+        """Load background image with better error handling."""
+        try:
+            if ADMIN_BG_PATH.exists():
+                logging.info(f"Loading admin background from: {ADMIN_BG_PATH}")
                 with Image.open(ADMIN_BG_PATH) as im:
                     if im.mode in ("RGBA", "P"):
                         im = im.convert("RGB")
                     return self._letterbox(im)
-            except Exception as e:
-                logging.error("Admin: Failed to load background: %s", e)
-        # fallback white
+            else:
+                logging.error(f"Admin background image not found: {ADMIN_BG_PATH}")
+        except Exception as e:
+            logging.error(f"Admin: Failed to load background: {e}")
+            import traceback
+            logging.error(traceback.format_exc())
+        
+        # Return a fallback white background
+        logging.info("Using fallback white background for admin mode")
         return Image.new("RGB", (WINDOW_W, WINDOW_H), (255, 255, 255))
 
     def _letterbox(self, im: Image.Image):
+        """Force letterboxing by scaling to fit screen."""
         iw, ih = im.size
         scale = min(WINDOW_W/iw, WINDOW_H/ih)
         nw, nh = int(iw*scale), int(ih*scale)
@@ -1606,37 +1722,58 @@ class AdminMode:
         bg = Image.new("RGB", (WINDOW_W, WINDOW_H), (255,255,255))
         bg.paste(resized, ((WINDOW_W-nw)//2, (WINDOW_H-nh)//2))
         return bg
-
+        
     def _render_menu(self):
-        frame = self.base_bg.copy()
-        d = ImageDraw.Draw(frame)
+        """Render the admin menu with safety checks."""
+        if not hasattr(self, 'base_bg') or self.base_bg is None:
+            logging.error("Cannot render menu: base_bg is None")
+            self.base_bg = Image.new("RGB", (WINDOW_W, WINDOW_H), (255, 255, 255))
         
-        # Menu options - with touch-friendly buttons
-        option_font = load_ttf(40)  # Increased for 1280x1024
-        
-        # Moved down by ~1 inch (96 pixels)
-        buttons = [
-            {"text": "Update Credentials", "y": 300, "color": (0,120,200)},
-            {"text": "Update Location Files", "y": 400, "color": (0,150,100)},
-            {"text": "WiFi Settings", "y": 500, "color": (100,100,200)},
-            {"text": "Load Inventory Portal", "y": 600, "color": (150,100,150)},
-            {"text": "Exit Admin Mode", "y": 700, "color": (200,60,60)}
-        ]
-        
-        for btn in buttons:
-            button_x, button_y = 100, btn["y"]
-            text_w, text_h = d.textbbox((0,0), btn["text"], font=option_font)[2:]
+        try:
+            frame = self.base_bg.copy()
+            d = ImageDraw.Draw(frame)
             
-            # Draw button
-            d.rectangle([button_x-20, button_y-10, button_x+text_w+40, button_y+text_h+10], 
-                       fill=btn["color"], outline=(0,0,0), width=2)
-            d.text((button_x, button_y), btn["text"], font=option_font, fill=(255,255,255))
+            # Menu options - with touch-friendly buttons
+            option_font = load_ttf(40)  # Increased for 1280x1024
+            
+            # Moved down by ~1 inch (96 pixels)
+            buttons = [
+                {"text": "Update Credentials", "y": 300, "color": (0,120,200)},
+                {"text": "Update Location Files", "y": 400, "color": (0,150,100)},
+                {"text": "WiFi Settings", "y": 500, "color": (100,100,200)},
+                {"text": "Load Inventory Portal", "y": 600, "color": (150,100,150)},
+                {"text": "Exit Admin Mode", "y": 700, "color": (200,60,60)}
+            ]
+            
+            for btn in buttons:
+                button_x, button_y = 100, btn["y"]
+                text_w, text_h = d.textbbox((0,0), btn["text"], font=option_font)[2:]
+                
+                # Draw button
+                d.rectangle([button_x-20, button_y-10, button_x+text_w+40, button_y+text_h+10], 
+                           fill=btn["color"], outline=(0,0,0), width=2)
+                d.text((button_x, button_y), btn["text"], font=option_font, fill=(255,255,255))
 
-        self.tk_img = ImageTk.PhotoImage(frame)
-        self.label.configure(image=self.tk_img)
-        self.label.lift()
+            self.tk_img = ImageTk.PhotoImage(frame)
+            self.label.configure(image=self.tk_img)
+            self.label.lift()
+            
+            # Reset the back_to_menu flag
+            if hasattr(self, 'back_to_menu'):
+                delattr(self, 'back_to_menu')
+                
+        except Exception as e:
+            logging.error(f"Error rendering admin menu: {e}")
+            import traceback
+            logging.error(traceback.format_exc())
 
     def _render_status(self, message, is_error=False):
+        """Render status message with safety checks."""
+        if self.base_bg is None:
+            logging.error("Cannot render status: base_bg is None")
+            # Create a fallback background
+            self.base_bg = Image.new("RGB", (WINDOW_W, WINDOW_H), (255, 255, 255))
+            
         frame = self.base_bg.copy()
         d = ImageDraw.Draw(frame)
         
@@ -1660,6 +1797,25 @@ class AdminMode:
         
         # Set flag to indicate we're in a status screen
         self.back_to_menu = True
+
+    def _arm_timeout(self):
+        """Set up inactivity timeout for admin mode."""
+        if self.timeout_after:
+            self.root.after_cancel(self.timeout_after)
+            
+        def check_timeout():
+            current_time = time.time()
+            elapsed = current_time - self.last_activity_ts
+            logging.debug(f"Admin timeout check: {elapsed:.1f}s elapsed")
+            
+            if elapsed >= (ADMIN_TIMEOUT_MS/1000.0):
+                logging.info(f"Admin mode timeout after {elapsed:.1f}s - returning to Idle")
+                if hasattr(self, "on_timeout"):
+                    self.on_timeout()
+                return
+            self.timeout_after = self.root.after(1000, check_timeout)
+            
+        self.timeout_after = self.root.after(1000, check_timeout)
 
     def update_credentials(self):
         """Update credential files from Google Sheet."""
@@ -1830,7 +1986,7 @@ class AdminMode:
             
             password_var = tk.StringVar()
             password_entry = tk.Entry(password_frame, textvariable=password_var,
-                                     font=("Arial", 18), width=30, show="â€¢")
+                                     font=("Arial", 18), width=30, show="*")
             password_entry.pack(padx=50, pady=10, fill=tk.X)
             
             # Buttons
@@ -1862,35 +2018,29 @@ class AdminMode:
             # Create keyboard buttons
             for row_idx, row in enumerate(keys):
                 row_frame = tk.Frame(keyboard_frame, bg="#34495e")
-                row_frame.pack(pady=5)
+                row_frame.pack(fill=tk.X, pady=2)
                 
                 for key in row:
-                    key_button = tk.Button(row_frame, text=key, font=("Arial", 18),
-                                         width=3, height=1, bg="#7f8c8d", fg="white",
-                                         command=lambda k=key: self._key_press(password_entry, k))
-                    key_button.pack(side=tk.LEFT, padx=3)
+                    btn = tk.Button(row_frame, text=key, font=("Arial", 16),
+                                  width=3, height=1, bg="#7f8c8d", fg="white", 
+                                  command=lambda k=key: self._key_press(password_entry, k))
+                    btn.pack(side=tk.LEFT, padx=2)
             
             # Special keys row
             special_frame = tk.Frame(keyboard_frame, bg="#34495e")
-            special_frame.pack(pady=5)
+            special_frame.pack(fill=tk.X, pady=2)
             
-            # Space
-            space_button = tk.Button(special_frame, text="Space", font=("Arial", 18),
-                                   width=20, height=1, bg="#7f8c8d", fg="white",
-                                   command=lambda: self._key_press(password_entry, " "))
-            space_button.pack(side=tk.LEFT, padx=3)
+            # Space key
+            space_btn = tk.Button(special_frame, text="Space", font=("Arial", 16), 
+                                width=20, height=1, bg="#7f8c8d", fg="white",
+                                command=lambda: self._key_press(password_entry, " "))
+            space_btn.pack(side=tk.LEFT, padx=2)
             
-            # Backspace
-            backspace_button = tk.Button(special_frame, text="â†", font=("Arial", 18),
-                                       width=5, height=1, bg="#e67e22", fg="white",
-                                       command=lambda: self._backspace(password_entry))
-            backspace_button.pack(side=tk.LEFT, padx=3)
-            
-            # Clear
-            clear_button = tk.Button(special_frame, text="Clear", font=("Arial", 18),
-                                   width=5, height=1, bg="#e74c3c", fg="white",
-                                   command=lambda: self._clear_field(password_entry))
-            clear_button.pack(side=tk.LEFT, padx=3)
+            # Backspace key
+            backspace_btn = tk.Button(special_frame, text="Backspace", font=("Arial", 16), 
+                                    width=10, height=1, bg="#e67e22", fg="white",
+                                    command=lambda: self._backspace(password_entry))
+            backspace_btn.pack(side=tk.LEFT, padx=2)
             
             # Focus password entry
             password_entry.focus_set()
@@ -2016,25 +2166,7 @@ network={{
             
         finally:
             self.update_in_progress = False
-            
-    def _arm_timeout(self):
-        """Set up inactivity timeout for admin mode."""
-        if self.timeout_after:
-            self.root.after_cancel(self.timeout_after)
-            
-        def check_timeout():
-            current_time = time.time()
-            elapsed = current_time - self.last_activity_ts
-            logging.debug(f"Admin timeout check: {elapsed:.1f}s elapsed")
-            
-            if elapsed >= (ADMIN_TIMEOUT_MS/1000.0):
-                logging.info(f"Admin mode timeout after {elapsed:.1f}s - returning to Idle")
-                if hasattr(self, "on_timeout"):
-                    self.on_timeout()
-                return
-            self.timeout_after = self.root.after(1000, check_timeout)
-            
-        self.timeout_after = self.root.after(1000, check_timeout)
+
 
 # ==============================
 #          Cart Mode
@@ -6379,27 +6511,54 @@ class App:
 
     # Mode switcher
     def set_mode(self, mode_name: str):
-        # stop current
-        if self.mode == "Idle":
-            self.idle.stop()
-        elif self.mode == "PriceCheck":
-            self.price.stop()
-        elif self.mode == "Admin":
-            self.admin.stop()
-        elif self.mode == "Cart":
-            self.cart.stop()
+        """Set the current mode with enhanced safety checks."""
+        logging.info(f"Switching mode from {self.mode} to {mode_name}")
+        
+        # Validate mode_name
+        if mode_name not in ["Idle", "PriceCheck", "Admin", "Cart"]:
+            logging.error(f"Invalid mode requested: {mode_name}")
+            mode_name = "Idle"  # Default to Idle if invalid mode requested
+        
+        # Stop current mode with safety checks
+        try:
+            if self.mode == "Idle":
+                self.idle.stop()
+            elif self.mode == "PriceCheck":
+                self.price.stop()
+            elif self.mode == "Admin":
+                self.admin.stop()
+            elif self.mode == "Cart":
+                self.cart.stop()
+        except Exception as e:
+            logging.error(f"Error stopping mode {self.mode}: {e}")
+            import traceback
+            logging.error(traceback.format_exc())
 
+        # Update mode
         self.mode = mode_name
 
-        # start new
-        if mode_name == "Idle":
-            self.idle.start()
-        elif mode_name == "PriceCheck":
-            self.price.start()
-        elif mode_name == "Admin":
-            self.admin.start()
-        elif mode_name == "Cart":
-            self.cart.start()
+        # Start new mode with safety checks
+        try:
+            if mode_name == "Idle":
+                self.idle.start()
+            elif mode_name == "PriceCheck":
+                self.price.start()
+            elif mode_name == "Admin":
+                self.admin.start()
+            elif mode_name == "Cart":
+                self.cart.start()
+        except Exception as e:
+            logging.error(f"Error starting mode {mode_name}: {e}")
+            import traceback
+            logging.error(traceback.format_exc())
+            # Fall back to Idle mode if starting the requested mode fails
+            if mode_name != "Idle":
+                logging.info("Falling back to Idle mode due to error")
+                self.mode = "Idle"
+                try:
+                    self.idle.start()
+                except Exception as e2:
+                    logging.critical(f"Failed to start fallback Idle mode: {e2}")
 
     def run(self):
         self.set_mode("Idle")
