@@ -12,7 +12,8 @@
 # CashApp Working
 # Inventory Synced to Inv tab
 # Transactions synced
-# 8/28/25 upload to git hub 14:30
+# Email Receipt 
+# 8/29/25 upload to git hub 11:30
 
 import os
 import random
@@ -3800,8 +3801,8 @@ class CartMode:
             self.stripe_reference_id = reference_id
             
             # Get success and cancel URLs
-            success_url = "https://vendlasvegas.com/thanks"
-            cancel_url = "https://vendlasvegas.com/cancel"
+            success_url = "https://www.vendlasvegas.com/thanks"
+            cancel_url = "https://www.vendlasvegas.com/thanks"
             
             # Try to read from URL file if it exists
             if stripe_url_path.exists():
@@ -4624,13 +4625,12 @@ class CartMode:
             self._thank_you_complete()
             
         elif option == "email":
-            # Future implementation
-            messagebox.showinfo("Receipt", "Email receipt option selected.\nThis feature will be implemented soon.")
-            # Always complete the thank you process and return to idle mode
-            self._thank_you_complete()
+            # Show email entry popup with virtual keyboard
+            self._show_email_entry_popup()
         else:
             # Always complete the thank you process and return to idle mode
             self._thank_you_complete()
+
 
     def _log_transaction_details(self):
         """Log detailed transaction information to the Transactions tab in Google Sheet."""
@@ -5060,6 +5060,441 @@ class CartMode:
             import traceback
             logging.error(traceback.format_exc())
             return False
+
+    def _show_email_entry_popup(self):
+        """Show popup for email entry with virtual keyboard."""
+        # Cancel any existing timers
+        if hasattr(self, 'timeout_after') and self.timeout_after:
+            self.root.after_cancel(self.timeout_after)
+            self.timeout_after = None
+            
+        if hasattr(self, 'email_timeout_timer') and self.email_timeout_timer:
+            self.root.after_cancel(self.email_timeout_timer)
+            self.email_timeout_timer = None
+        
+        # Create a dark overlay
+        overlay = tk.Frame(self.root, bg='#000000')
+        overlay.place(x=0, y=0, width=WINDOW_W, height=WINDOW_H)
+        
+        # Create the popup frame - use full screen for better visibility
+        email_popup = tk.Frame(self.root, bg="white", bd=2, relief=tk.RAISED)
+        email_popup.place(x=0, y=0, width=WINDOW_W, height=WINDOW_H)
+        
+        # Title at the top
+        title_label = tk.Label(email_popup, text="Enter Email Address", 
+                              font=("Arial", 28, "bold"), bg="white")
+        title_label.pack(pady=(20, 20))
+        
+        # Email entry field - make it very large and prominent
+        self.email_var = tk.StringVar()
+        email_entry = tk.Entry(email_popup, textvariable=self.email_var, 
+                              font=("Arial", 28), width=30, justify=tk.CENTER)
+        email_entry.pack(pady=(0, 30), ipady=10)  # Add internal padding for taller entry
+        email_entry.focus_set()
+        
+        # Create a frame for the keyboard
+        keyboard_container = tk.Frame(email_popup, bg="white")
+        keyboard_container.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
+        
+        # Create rows for the keyboard - standard layout
+        # Number row
+        num_row = tk.Frame(keyboard_container, bg="white")
+        num_row.pack(fill=tk.X, pady=5)
+        
+        for key in ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '=']:
+            btn = tk.Button(num_row, text=key, font=("Arial", 24), 
+                          width=3, height=1, bg="#34495e", fg="white",
+                          command=lambda k=key: self._email_key_press(k))
+            btn.pack(side=tk.LEFT, padx=5, pady=5)
+        
+        # QWERTY row
+        qwerty_row = tk.Frame(keyboard_container, bg="white")
+        qwerty_row.pack(fill=tk.X, pady=5)
+        
+        for key in ['q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p', '@']:
+            btn = tk.Button(qwerty_row, text=key, font=("Arial", 24), 
+                          width=3, height=1, bg="#34495e", fg="white",
+                          command=lambda k=key: self._email_key_press(k))
+            btn.pack(side=tk.LEFT, padx=5, pady=5)
+        
+        # ASDF row
+        asdf_row = tk.Frame(keyboard_container, bg="white")
+        asdf_row.pack(fill=tk.X, pady=5)
+        
+        # Add some padding at the start for proper keyboard layout
+        tk.Label(asdf_row, text="", width=1, bg="white").pack(side=tk.LEFT)
+        
+        for key in ['a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', '.', '_']:
+            btn = tk.Button(asdf_row, text=key, font=("Arial", 24), 
+                          width=3, height=1, bg="#34495e", fg="white",
+                          command=lambda k=key: self._email_key_press(k))
+            btn.pack(side=tk.LEFT, padx=5, pady=5)
+        
+        # ZXCV row
+        zxcv_row = tk.Frame(keyboard_container, bg="white")
+        zxcv_row.pack(fill=tk.X, pady=5)
+        
+        # Add more padding at the start for proper keyboard layout
+        tk.Label(zxcv_row, text="", width=2, bg="white").pack(side=tk.LEFT)
+        
+        for key in ['z', 'x', 'c', 'v', 'b', 'n', 'm']:
+            btn = tk.Button(zxcv_row, text=key, font=("Arial", 24), 
+                          width=3, height=1, bg="#34495e", fg="white",
+                          command=lambda k=key: self._email_key_press(k))
+            btn.pack(side=tk.LEFT, padx=5, pady=5)
+        
+        # Special keys row
+        special_row = tk.Frame(keyboard_container, bg="white")
+        special_row.pack(fill=tk.X, pady=10)
+        
+        # Shift key
+        shift_btn = tk.Button(special_row, text="Shift", font=("Arial", 24), 
+                            width=6, height=1, bg="#9b59b6", fg="white",
+                            command=self._email_toggle_shift)
+        shift_btn.pack(side=tk.LEFT, padx=5, pady=5)
+        
+        # Space key
+        space_btn = tk.Button(special_row, text="Space", font=("Arial", 24), 
+                            width=12, height=1, bg="#7f8c8d", fg="white",
+                            command=lambda: self._email_key_press(" "))
+        space_btn.pack(side=tk.LEFT, padx=5, pady=5)
+        
+        # Backspace key
+        backspace_btn = tk.Button(special_row, text="Backspace", font=("Arial", 24), 
+                                width=10, height=1, bg="#e67e22", fg="white",
+                                command=self._email_backspace)
+        backspace_btn.pack(side=tk.LEFT, padx=5, pady=5)
+        
+        # Domain shortcuts row
+        domain_row = tk.Frame(keyboard_container, bg="white")
+        domain_row.pack(fill=tk.X, pady=10)
+        
+        domains = ["@gmail.com", "@yahoo.com", "@hotmail.com", ".com"]
+        for domain in domains:
+            domain_btn = tk.Button(domain_row, text=domain, font=("Arial", 20),
+                                 bg="#3498db", fg="white", height=1,
+                                 command=lambda d=domain: self._email_key_press(d))
+            domain_btn.pack(side=tk.LEFT, padx=5, pady=5, fill=tk.X, expand=True)
+        
+        # Buttons row
+        button_row = tk.Frame(keyboard_container, bg="white")
+        button_row.pack(fill=tk.X, pady=(20, 10))
+        
+        # Cancel button
+        cancel_btn = tk.Button(button_row, text="Cancel", font=("Arial", 24),
+                             bg="#e74c3c", fg="white", height=2,
+                             command=lambda: self._cancel_email_entry(overlay, email_popup))
+        cancel_btn.pack(side=tk.LEFT, padx=10, pady=10, fill=tk.X, expand=True)
+        
+        # Submit button
+        submit_btn = tk.Button(button_row, text="Submit", font=("Arial", 24, "bold"),
+                             bg="#27ae60", fg="white", height=2,
+                             command=lambda: self._send_receipt_email(self.email_var.get(), overlay, email_popup))
+        submit_btn.pack(side=tk.LEFT, padx=10, pady=10, fill=tk.X, expand=True)
+        
+        # Store references to popup elements
+        self.email_entry_popup = email_popup
+        self.email_entry_overlay = overlay
+        self.email_keyboard_btns = []  # Will store keyboard buttons for shift toggle
+        
+        # Set up a much longer timeout (3 minutes = 180 seconds)
+        self.email_last_activity = time.time()
+        self._start_email_entry_timeout(180)  # 3 minutes timeout
+        
+        # Store shift state
+        self.email_shift_on = False
+    
+    def _email_key_press(self, key):
+        """Handle key press on email keyboard."""
+        current = self.email_var.get()
+        self.email_var.set(current + key)
+        # Reset activity timestamp
+        self.email_last_activity = time.time()
+    
+    def _email_backspace(self):
+        """Handle backspace on email keyboard."""
+        current = self.email_var.get()
+        self.email_var.set(current[:-1])
+        # Reset activity timestamp
+        self.email_last_activity = time.time()
+    
+    def _email_toggle_shift(self):
+        """Toggle shift state for email keyboard."""
+        self.email_shift_on = not self.email_shift_on
+        # Reset activity timestamp
+        self.email_last_activity = time.time()
+        
+        # TODO: Implement actual shift functionality if needed
+        # This would require storing references to all letter buttons
+        # and updating their text when shift is toggled
+    
+    def _start_email_entry_timeout(self, seconds=180):
+        """Start a timeout for the email entry popup."""
+        # Store the timeout timer reference
+        self.email_timeout_timer = None
+        
+        def check_timeout():
+            current_time = time.time()
+            elapsed = current_time - self.email_last_activity
+            
+            # If timeout seconds have passed with no activity
+            if elapsed >= seconds:
+                logging.info(f"Email entry timeout after {seconds} seconds of inactivity")
+                # Close the email entry popup
+                if hasattr(self, 'email_entry_popup') and self.email_entry_popup:
+                    self.email_entry_popup.destroy()
+                if hasattr(self, 'email_entry_overlay') and self.email_entry_overlay:
+                    self.email_entry_overlay.destroy()
+                
+                # Return to idle mode
+                self._thank_you_complete()
+                return
+            
+            # Check again in 1 second
+            self.email_timeout_timer = self.root.after(1000, check_timeout)
+        
+        # Start the timeout check
+        self.email_timeout_timer = self.root.after(1000, check_timeout)
+
+        
+    def _cancel_email_entry(self, overlay, popup):
+        """Cancel email entry and return to thank you screen."""
+        # Cancel the email timeout timer
+        if hasattr(self, 'email_timeout_timer') and self.email_timeout_timer:
+            self.root.after_cancel(self.email_timeout_timer)
+            self.email_timeout_timer = None
+            
+        # Destroy popup elements
+        overlay.destroy()
+        popup.destroy()
+        
+        # Restart regular timeout timer
+        self._arm_timeout()
+
+
+    def _cancel_email_entry(self, overlay, popup):
+        """Cancel email entry and return to thank you screen."""
+        overlay.destroy()
+        popup.destroy()
+        
+    def _send_receipt_email(self, email_address, overlay, popup):
+        """Send receipt to the provided email address."""
+        # Cancel the email timeout timer
+        if hasattr(self, 'email_timeout_timer') and self.email_timeout_timer:
+            self.root.after_cancel(self.email_timeout_timer)
+            self.email_timeout_timer = None
+            
+        if not email_address or '@' not in email_address or '.' not in email_address:
+            # Invalid email - just close and return to idle mode without showing error
+            logging.warning(f"Invalid email address entered: {email_address}")
+            
+            # Close popup
+            overlay.destroy()
+            popup.destroy()
+            
+            # Complete the thank you process and return to idle mode
+            self._thank_you_complete()
+            return
+            
+        # Calculate the total for the subject line
+        subtotal = sum(item["price"] * item["qty"] for item in self.cart_items.values())
+        taxable_subtotal = sum(
+            item["price"] * item["qty"] 
+            for item in self.cart_items.values() if item["taxable"]
+        )
+        tax_amount = taxable_subtotal * (self.tax_rate / 100)
+        total = subtotal + tax_amount
+        
+        # Format receipt content
+        receipt_text = self._format_receipt_email(total)
+        
+        # Send email
+        subject = f"Vend Las Vegas Receipt (${total:.2f})"
+        
+        try:
+            # Attempt to send email
+            self._send_email(email_address, subject, receipt_text)
+            logging.info(f"Receipt email sent to {email_address}")
+        except Exception as e:
+            # Log error but don't show popup
+            logging.error(f"Failed to send email to {email_address}: {e}")
+            
+            # Save receipt to file as fallback
+            self._save_receipt_to_file(email_address, receipt_text)
+        
+        # Close popup regardless of email success/failure
+        overlay.destroy()
+        popup.destroy()
+        
+        # Always complete the thank you process and return to idle mode
+        self._thank_you_complete()
+
+    def _load_email_setting(self, filename, default_value):
+        """Load an email setting from a file in the Cred directory."""
+        file_path = Path.home() / "SelfCheck" / "Cred" / filename
+        try:
+            if file_path.exists():
+                with open(file_path, 'r') as f:
+                    value = f.read().strip()
+                    return value if value else default_value
+            else:
+                # Create file with default value if it doesn't exist
+                file_path.parent.mkdir(parents=True, exist_ok=True)
+                with open(file_path, 'w') as f:
+                    f.write(default_value)
+                return default_value
+        except Exception as e:
+            logging.error(f"Error loading email setting from {filename}: {e}")
+            return default_value
+
+    def _send_email(self, recipient, subject, body):
+        """Send email using SMTP with settings from configuration files."""
+        import smtplib
+        from email.mime.text import MIMEText
+        from email.mime.multipart import MIMEMultipart
+        
+        # Load email configuration from files
+        smtp_server = self._load_email_setting("EmailServer.txt", "smtpout.secureserver.net")
+        smtp_port = int(self._load_email_setting("EmailPort.txt", "587"))
+        sender_email = self._load_email_setting("EmailSender.txt", "tyson@vendlasvegas.com")
+        display_name = self._load_email_setting("EmailDisplayName.txt", "Vend Las Vegas No-Reply")
+        reply_to = self._load_email_setting("EmailReplyTo.txt", "NoReply@vendlasvegas.com")
+        
+        # Load password
+        password = self._load_email_setting("EmailPassword.txt", "")
+        if not password:
+            logging.error("Email password not set in EmailPassword.txt")
+            raise ValueError("Email password not configured")
+        
+        # Create message
+        message = MIMEMultipart()
+        message["From"] = f"{display_name} <{sender_email}>"
+        message["To"] = recipient
+        message["Subject"] = subject
+        message["Reply-To"] = reply_to
+        message.attach(MIMEText(body, "plain"))
+        
+        try:
+            # Connect to server and send
+            server = smtplib.SMTP(smtp_server, smtp_port)
+            server.starttls()
+            server.login(sender_email, password)
+            server.send_message(message)
+            server.quit()
+            return True
+        except Exception as e:
+            logging.error(f"Failed to send email with primary settings: {e}")
+            # Try alternative port with SSL if using standard port
+            if smtp_port == 587:
+                try:
+                    logging.info("Trying alternative port 465 with SSL")
+                    server = smtplib.SMTP_SSL(smtp_server, 465)
+                    server.login(sender_email, password)
+                    server.send_message(message)
+                    server.quit()
+                    return True
+                except Exception as e2:
+                    logging.error(f"Failed to send email with alternative settings: {e2}")
+                    raise
+            else:
+                raise
+
+
+    def _format_receipt_email(self, total):
+        """Format receipt content for email."""
+        # Calculate values needed for receipt
+        subtotal = sum(item["price"] * item["qty"] for item in self.cart_items.values())
+        taxable_subtotal = sum(
+            item["price"] * item["qty"] 
+            for item in self.cart_items.values() if item["taxable"]
+        )
+        tax_amount = taxable_subtotal * (self.tax_rate / 100)
+        total_items = sum(item["qty"] for item in self.cart_items.values())
+        
+        # Format the receipt content
+        receipt = []
+        receipt.append(f"{self.business_name}")
+        receipt.append(f"{self.location}")
+        receipt.append("")
+        receipt.append(f"Machine: {self.machine_id}")
+        receipt.append(f"Transaction: {self.transaction_id}")
+        receipt.append(f"Date: {datetime.now().strftime('%m/%d/%Y %H:%M:%S')}")
+        receipt.append("-" * 40)
+        
+        # Items
+        for upc, item in self.cart_items.items():
+            name = item["name"]
+            price = item["price"]
+            qty = item["qty"]
+            item_total = price * qty
+            
+            receipt.append(f"{name}")
+            receipt.append(f"  {qty} @ ${price:.2f} = ${item_total:.2f}")
+        
+        receipt.append("-" * 40)
+        receipt.append(f"Items: {total_items}")
+        receipt.append(f"Subtotal: ${subtotal:.2f}")
+        receipt.append(f"Tax ({self.tax_rate}%): ${tax_amount:.2f}")
+        receipt.append(f"Total: ${total:.2f}")
+        receipt.append(f"Paid: {self.current_payment_method}")
+        receipt.append("-" * 40)
+        receipt.append("Thank you for shopping with us!")
+        
+        return "\n".join(receipt)
+
+    def _send_email(self, recipient, subject, body):
+        """Send email using SMTP with GoDaddy."""
+        import smtplib
+        from email.mime.text import MIMEText
+        from email.mime.multipart import MIMEMultipart
+        
+        # Email configuration for GoDaddy
+        sender_email = "tyson@vendlasvegas.com"  # Your actual email
+        display_name = "Vend Las Vegas No-Reply"  # Display name shown to recipient
+        reply_to = "NoReply@vendlasvegas.com"     # Reply-to address
+        smtp_server = "smtpout.secureserver.net"  # GoDaddy SMTP server
+        smtp_port = 587                           # GoDaddy SMTP port with TLS
+        
+        # Load password from secure file
+        email_creds_path = Path.home() / "SelfCheck" / "Cred" / "EmailPassword.txt"
+        try:
+            with open(email_creds_path, 'r') as f:
+                password = f.read().strip()
+        except Exception as e:
+            logging.error(f"Failed to load email password: {e}")
+            raise
+        
+        # Create message
+        message = MIMEMultipart()
+        message["From"] = f"{display_name} <{sender_email}>"
+        message["To"] = recipient
+        message["Subject"] = subject
+        message["Reply-To"] = reply_to
+        message.attach(MIMEText(body, "plain"))
+        
+        try:
+            # Connect to server and send
+            server = smtplib.SMTP(smtp_server, smtp_port)
+            server.starttls()
+            server.login(sender_email, password)
+            server.send_message(message)
+            server.quit()
+            return True
+        except Exception as e:
+            logging.error(f"Failed to send email: {e}")
+            # Try alternative port with SSL
+            try:
+                logging.info("Trying alternative port with SSL")
+                server = smtplib.SMTP_SSL(smtp_server, 465)
+                server.login(sender_email, password)
+                server.send_message(message)
+                server.quit()
+                return True
+            except Exception as e2:
+                logging.error(f"Failed to send email with alternative settings: {e2}")
+                raise
+
+    
 
     def _start_payment_timeout(self, timeout_seconds=45):
         """Start timeout for payment popup."""
