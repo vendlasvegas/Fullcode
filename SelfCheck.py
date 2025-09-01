@@ -14,7 +14,7 @@
 # Transactions synced
 # Email Receipt 
 # Working on Admin Functions
-# 8/29/25 upload to git hub 13:15
+# 9/1/25 upload to git hub 14:00
 
 import os
 import random
@@ -258,7 +258,7 @@ class IdleMode:
                 logging.error(f"Price check button image not found: {pc_path}")
                 
             # Load logo image for admin button
-            logo_path = Path.home() / "SelfCheck" / "SysPics" / "Logo.png"
+            logo_path = Path.home() / "SelfCheck" / "SysPics" / "AdminButton.png"
             if logo_path.exists():
                 with Image.open(logo_path) as img:
                     # Resize to a reasonable size for the admin button
@@ -597,8 +597,8 @@ class IdleMode:
             creds = Credentials.from_service_account_file(str(GS_CRED_PATH), scopes=scopes)
             gc = gspread.authorize(creds)
             sheet = gc.open(GS_SHEET_NAME).worksheet(GS_CRED_TAB)
-            self.zipcode = sheet.acell('B24').value
-            self.weather_api_key = sheet.acell('B25').value
+            self.zipcode = sheet.acell('B29').value
+            self.weather_api_key = sheet.acell('B33').value
             logging.info(f"Loaded zipcode: {self.zipcode}, API key available: {bool(self.weather_api_key)}")
         except Exception as e:
             logging.error(f"Failed to load weather config: {e}")
@@ -2392,18 +2392,18 @@ class AdminMode:
             with open(CRED_DIR / "Cloudflared_Host", 'w') as f:
                 f.write(cloudflared_host or "")
 
-            # Update GoogleFolderID.txt from cell B12
-            folder_id = sheet.acell('B12').value
+            # Update GoogleFolderID.txt from cell B13
+            folder_id = sheet.acell('B13').value
             with open(CRED_DIR / "GoogleFolderID.txt", 'w') as f:
                 f.write(folder_id or "")
 
-            # Update MachineID.txt from cell B16
-            machine_id = sheet.acell('B16').value
+            # Update MachineID.txt from cell B25
+            machine_id = sheet.acell('B25').value
             with open(CRED_DIR / "MachineID.txt", 'w') as f:
                 f.write(machine_id or "")
 
-            # Update GoogleCredEmail.txt from cell B10
-            cred_email = sheet.acell('B10').value
+            # Update GoogleCredEmail.txt from cell B12
+            cred_email = sheet.acell('B12').value
             with open(CRED_DIR / "GoogleCredEmail.txt", 'w') as f:
                 f.write(cred_email or "")
 
@@ -2440,8 +2440,8 @@ class AdminMode:
             
             # 1. Update weather zipcode
             cred_tab = sheet.worksheet(GS_CRED_TAB)
-            zipcode = cred_tab.acell('B24').value
-            weather_api_key = cred_tab.acell('B25').value
+            zipcode = cred_tab.acell('B29').value
+            weather_api_key = cred_tab.acell('B33').value
             
             # Save zipcode and API key
             with open(CRED_DIR / "WeatherZipcode.txt", 'w') as f:
@@ -6523,7 +6523,7 @@ class CartMode:
             # First, update the tax rate from the spreadsheet
             try:
                 sheet = gc.open(GS_SHEET_NAME).worksheet(GS_CRED_TAB)
-                tax_rate_str = sheet.acell('B27').value
+                tax_rate_str = sheet.acell('B32').value
                 
                 # Parse tax rate (remove % sign if present)
                 if tax_rate_str:
@@ -6539,7 +6539,7 @@ class CartMode:
                     # Update the instance variable
                     self.tax_rate = tax_rate
                 else:
-                    logging.warning("Tax rate not found in spreadsheet cell B27")
+                    logging.warning("Tax rate not found in spreadsheet cell B32")
             except Exception as e:
                 logging.error(f"Failed to update tax rate from spreadsheet: {e}")
             
@@ -7086,9 +7086,9 @@ class App:
             creds = Credentials.from_service_account_file(str(GS_CRED_PATH), scopes=scopes)
             gc = gspread.authorize(creds)
             
-            # Get tax rate from Credentials tab, cell B27
+            # Get tax rate from Credentials tab, cell B32
             sheet = gc.open(GS_SHEET_NAME).worksheet(GS_CRED_TAB)
-            tax_rate_str = sheet.acell('B27').value
+            tax_rate_str = sheet.acell('B32').value
             
             # Parse tax rate (remove % sign if present)
             if tax_rate_str:
