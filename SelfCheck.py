@@ -14,7 +14,7 @@
 # Transactions synced
 # Email Receipt 
 # Working on Admin Functions
-# 9/1/25 upload to git hub 14:00
+# 9/2/25 upload to git hub 12:45
 
 import os
 import random
@@ -32,6 +32,7 @@ import csv
 import uuid
 import http.server
 import stripe
+import re  # For regex in _format_receipt_for_sms
 
 
 import tkinter as tk
@@ -5174,9 +5175,9 @@ class CartMode:
         # Close any existing popups
         self._close_all_payment_popups()
         
-        # Create thank you popup
+        # Create thank you popup - make it larger to accommodate the additional button
         self.thank_you_popup = tk.Frame(self.root, bg="white", bd=3, relief=tk.RAISED)
-        self.thank_you_popup.place(relx=0.5, rely=0.5, width=500, height=400, anchor=tk.CENTER)
+        self.thank_you_popup.place(relx=0.5, rely=0.5, width=600, height=450, anchor=tk.CENTER)
         
         # Title
         title_label = tk.Label(self.thank_you_popup, 
@@ -5190,14 +5191,22 @@ class CartMode:
                                text="Would you like a receipt?", 
                                font=("Arial", 20), 
                                bg="white")
-        receipt_label.pack(pady=(0, 40))
+        receipt_label.pack(pady=(0, 30))
         
         # Button frame
         button_frame = tk.Frame(self.thank_you_popup, bg="white")
         button_frame.pack(pady=20, fill=tk.X, padx=40)
         
-        # Print button - make it more prominent
-        print_btn = tk.Button(button_frame, 
+        # Top row frame
+        top_row = tk.Frame(button_frame, bg="white")
+        top_row.pack(fill=tk.X, pady=(0, 10))
+        
+        # Bottom row frame
+        bottom_row = tk.Frame(button_frame, bg="white")
+        bottom_row.pack(fill=tk.X)
+        
+        # Print button - make it more prominent (top left)
+        print_btn = tk.Button(top_row, 
                             text="Print", 
                             font=("Arial", 18, "bold"), 
                             bg="#3498db", fg="white",
@@ -5205,8 +5214,8 @@ class CartMode:
                             width=8, height=2)
         print_btn.pack(side=tk.LEFT, padx=10, expand=True)
         
-        # Email button
-        email_btn = tk.Button(button_frame, 
+        # Email button (top right)
+        email_btn = tk.Button(top_row, 
                             text="Email", 
                             font=("Arial", 18), 
                             bg="#2ecc71", fg="white",
@@ -5214,17 +5223,28 @@ class CartMode:
                             width=8, height=2)
         email_btn.pack(side=tk.LEFT, padx=10, expand=True)
         
-        # None button
-        none_btn = tk.Button(button_frame, 
+        # Text receipt button (bottom left)
+        text_btn = tk.Button(bottom_row, 
+                           text="Text", 
+                           font=("Arial", 18), 
+                           bg="#9b59b6", fg="white",
+                           command=lambda: self._receipt_option_selected("text"),
+                           width=8, height=2)
+        text_btn.pack(side=tk.LEFT, padx=10, expand=True)
+        
+        # None button (bottom right)
+        none_btn = tk.Button(bottom_row, 
                            text="None", 
                            font=("Arial", 18), 
                            bg="#7f8c8d", fg="white",
                            command=self._thank_you_complete,
                            width=8, height=2)
         none_btn.pack(side=tk.LEFT, padx=10, expand=True)
+
         
         # Start timeout - 20 seconds
         self.thank_you_timeout = self.root.after(20000, self._thank_you_timeout)
+
 
     def _thank_you_timeout(self):
         """Handle timeout on the thank you screen."""
@@ -5257,9 +5277,15 @@ class CartMode:
         elif option == "email":
             # Show email entry popup with virtual keyboard
             self._show_email_entry_popup()
+            
+        elif option == "text":
+            # Show QR code for text message receipt
+            self._show_receipt_qr()
+            
         else:
             # Always complete the thank you process and return to idle mode
             self._thank_you_complete()
+ 
 
 
     def _log_transaction_details(self):
@@ -5361,6 +5387,13 @@ class CartMode:
             logging.debug("Destroying thank you popup")
             self.thank_you_popup.destroy()
             self.thank_you_popup = None
+
+
+        # Clean up QR frame if it exists
+        if hasattr(self, 'qr_frame') and self.qr_frame:
+            logging.debug("Destroying QR frame")
+            self.qr_frame.destroy()
+            self.qr_frame = None      
         
         # Update inventory quantities in Google Sheet
         self._update_inventory_quantities()
@@ -5536,6 +5569,199 @@ class CartMode:
         close_btn = tk.Button(receipt_popup, text="Close", font=("Arial", 14),
                             command=receipt_popup.destroy)
         close_btn.pack(pady=10)
+
+    def _generate_receipt_qr_code(self, receipt_text):
+        """Generate QR code for receipt that opens in SMS app."""
+        try:
+            import qrcode
+            import urllib.parse
+            
+            # Format the receipt text to fit in SMS
+            sms_receipt = self._format_receipt_for_sms(receipt_text)
+            
+            # Create the SMS URI
+            sms_uri = f"sms:?body={urllib.parse.quote(sms_receipt)}"
+            
+            # Generate QR code
+            qr = qrcode.QRCode(
+                version=1,
+                error_correction=qrcode.constants.ERROR_CORRECT_L,
+                box_size=10,
+                border=4,
+            )
+            qr.add_data(sms_uri)
+            qr.make(fit=True)
+            
+            # Create an image from the QR Code
+            qr_img = qr.make_image(fill_color="black", back_color="white")
+            
+            # Save the QR code to a temporary file
+            temp_dir = Path.home() / "SelfCheck" / "temp"
+            temp_dir.mkdir(parents=True, exist_ok=True)
+            
+            qr_path = temp_dir / "receipt_qr.png"
+            qr_img.save(qr_path)
+            
+            return qr_path
+            
+        except Exception as e:
+            logging.error(f"Failed to generate receipt QR code: {e}")
+            import traceback
+            logging.error(traceback.format_exc())
+            return None
+
+    def _format_receipt_for_sms(self, receipt_text):
+        """Format receipt text to be suitable for SMS."""
+        # Extract the important parts of the receipt
+        lines = receipt_text.split('\n')
+        
+        # Keep header (store name)
+        header = lines[0] if lines else "Receipt"
+        
+        # Get date/time
+        date_line = next((line for line in lines if "Date:" in line), 
+                        f"Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        
+        # Get items and prices
+        items = []
+        total_line = ""
+        
+        for line in lines:
+            # Look for item lines (typically have a price at the end)
+            if re.search(r'\$\d+\.\d{2}$', line) and "Total:" not in line:
+                # Simplify item lines to save characters
+                simplified = re.sub(r'\s{2,}', ' ', line.strip())
+                items.append(simplified)
+            
+            # Capture the total line
+            if "Total:" in line:
+                total_line = line.strip()
+        
+        # Construct a compact SMS receipt
+        sms_receipt = f"{header}\n{date_line}\n\n"
+        
+        # Add items (limit if too many)
+        max_items = 10  # Adjust based on typical SMS length limits
+        if len(items) > max_items:
+            sms_receipt += "\n".join(items[:max_items])
+            sms_receipt += f"\n...and {len(items) - max_items} more items"
+        else:
+            sms_receipt += "\n".join(items)
+        
+        # Add total
+        if total_line:
+            sms_receipt += f"\n\n{total_line}"
+        
+        # Add a footer
+        sms_receipt += "\n\nThank you for shopping with us!"
+        
+        return sms_receipt
+
+
+    
+    def _format_receipt(self, total):
+        """Format receipt content for display or printing."""
+        # Calculate values needed for receipt
+        subtotal = sum(item["price"] * item["qty"] for item in self.cart_items.values())
+        taxable_subtotal = sum(
+            item["price"] * item["qty"] 
+            for item in self.cart_items.values() if item["taxable"]
+        )
+        tax_amount = taxable_subtotal * (self.tax_rate / 100)
+        total_items = sum(item["qty"] for item in self.cart_items.values())
+        
+        # Format the receipt content
+        receipt_text = f"{self.business_name}\n"
+        receipt_text += f"{self.location}\n\n"
+        receipt_text += f"Machine: {self.machine_id}\n"
+        receipt_text += f"Transaction: {self.transaction_id}\n"
+        receipt_text += f"Date: {datetime.now().strftime('%m/%d/%Y %H:%M:%S')}\n"
+        receipt_text += "-" * 40 + "\n"
+        
+        # Items
+        for upc, item in self.cart_items.items():
+            name = item["name"]
+            price = item["price"]
+            qty = item["qty"]
+            item_total = price * qty
+            
+            # Format item line - truncate long names
+            if len(name) > 30:
+                name = name[:27] + "..."
+            
+            receipt_text += f"{name}\n"
+            receipt_text += f"  {qty} @ ${price:.2f} = ${item_total:.2f}\n"
+        
+        receipt_text += "-" * 40 + "\n"
+        receipt_text += f"Items: {total_items}\n"
+        receipt_text += f"Subtotal: ${subtotal:.2f}\n"
+        receipt_text += f"Tax ({self.tax_rate}%): ${tax_amount:.2f}\n"
+        receipt_text += f"Total: ${total:.2f}\n"
+        receipt_text += f"Paid: {getattr(self, 'current_payment_method', 'Unknown')}\n"
+        receipt_text += "-" * 40 + "\n"
+        receipt_text += "Thank you for shopping with us!\n"
+        
+        return receipt_text
+
+
+    
+    def _show_receipt_qr(self):
+        """Show QR code for receipt that can be scanned to send via SMS."""
+        # Format receipt content
+        subtotal = sum(item["price"] * item["qty"] for item in self.cart_items.values())
+        taxable_subtotal = sum(
+            item["price"] * item["qty"] 
+            for item in self.cart_items.values() if item["taxable"]
+        )
+        tax_amount = taxable_subtotal * (self.tax_rate / 100)
+        total = subtotal + tax_amount
+        
+        # Format receipt
+        receipt_text = self._format_receipt(total)
+        
+        # Generate the QR code
+        qr_path = self._generate_receipt_qr_code(receipt_text)
+        
+        if not qr_path or not Path(qr_path).exists():
+            logging.error("Failed to generate receipt QR code")
+            return
+
+        
+        # Create a popup to display the QR code
+        qr_frame = tk.Frame(self.root, bg="#2c3e50")
+        qr_frame.place(x=0, y=0, width=WINDOW_W, height=WINDOW_H)
+        
+        # Add title
+        title_label = tk.Label(qr_frame, text="Text Receipt", 
+                              font=("Arial", 36, "bold"), bg="#2c3e50", fg="white")
+        title_label.pack(pady=(50, 20))
+        
+        # Add instructions
+        instructions = tk.Label(qr_frame, text="Scan this QR code with your phone's camera\nto send the receipt via text message",
+                              font=("Arial", 24), bg="#2c3e50", fg="white", justify=tk.CENTER)
+        instructions.pack(pady=(0, 30))
+        
+        # Display QR code
+        try:
+            qr_img = Image.open(qr_path)
+            qr_img = qr_img.resize((400, 400), Image.LANCZOS)
+            qr_photo = ImageTk.PhotoImage(qr_img)
+            
+            qr_label = tk.Label(qr_frame, image=qr_photo, bg="#2c3e50")
+            qr_label.image = qr_photo  # Keep a reference to prevent garbage collection
+            qr_label.pack(pady=20)
+        except Exception as e:
+            logging.error(f"Failed to display QR code: {e}")
+            error_label = tk.Label(qr_frame, text="Error displaying QR code", 
+                                  fg="red", bg="#2c3e50", font=("Arial", 24))
+            error_label.pack(pady=20)
+        
+        # Store reference to the frame
+        self.qr_frame = qr_frame
+        
+        # Set timeout to return to idle mode after 30 seconds
+        self.root.after(30000, self._thank_you_complete)
+    
 
     def print_receipt(self, payment_method, total):
         """Print a receipt using direct device access."""
