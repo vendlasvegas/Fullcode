@@ -1614,7 +1614,7 @@ class AdminMode:
                     self.on_exit()
                     
             # System Restart button
-            elif 80 <= x <= 780 and 600 <= y <= 670:
+            elif 80 <= x <= 780 and 800 <= y <= 870:
                 self._system_restart()
         
         elif self.current_menu == "credentials":
@@ -1661,6 +1661,40 @@ class AdminMode:
                     self._render_credentials_menu()
                 elif self.current_menu == "wireless":
                     self._render_wireless_menu()
+
+
+
+            
+    def _system_restart(self):
+        """Handle system restart button click."""
+        # Show confirmation dialog
+        from tkinter import messagebox
+        if messagebox.askyesno("System Restart", "Are you sure you want to restart the system?"):
+            logging.info("System restart initiated by admin")
+        
+            # Clean up resources
+            if hasattr(self, 'timeout_after') and self.timeout_after:
+                self.root.after_cancel(self.timeout_after)
+                self.timeout_after = None
+        
+            # Notify parent app to shut down
+            if hasattr(self, "on_system_restart"):
+                self.on_system_restart()
+            else:
+                # Fallback if callback not set
+                try:
+                    # Clean up GPIO
+                    import RPi.GPIO as GPIO
+                    GPIO.cleanup()
+                
+                    # Destroy root window
+                    self.root.destroy()
+                
+                    # Exit program
+                    import sys
+                    sys.exit(0)
+                except Exception as e:
+                    logging.error(f"Error during system restart: {e}")
 
     
     def _on_activity(self, event=None):
@@ -1788,6 +1822,11 @@ class AdminMode:
                 {"text": "Wireless", "y": 400, "color": (0,150,100)},
                 {"text": "Exit Admin Mode", "y": 500, "color": (200,60,60)}
             ]
+
+            # Add logging to check buttons
+            logging.info(f"Rendering admin menu with {len(buttons)} buttons")
+            for i, btn in enumerate(buttons):
+                logging.info(f"Button {i+1}: {btn['text']} at y={btn['y']}")
             
             for btn in buttons:
                 button_x, button_y = 100, btn["y"]
@@ -2373,36 +2412,37 @@ class AdminMode:
         bt_frame.destroy()
         self._render_wireless_menu()
 
-    def _system_restart(self):
-        """Handle system restart button click."""
-        # Show confirmation dialog
-        from tkinter import messagebox
-        if messagebox.askyesno("System Restart", "Are you sure you want to restart the system?"):
-            logging.info("System restart initiated by admin")
-            
-            # Clean up resources
-            if hasattr(self, 'timeout_after') and self.timeout_after:
-                self.root.after_cancel(self.timeout_after)
-                self.timeout_after = None
-            
-            # Notify parent app to shut down
-            if hasattr(self, "on_system_restart"):
-                self.on_system_restart()
-            else:
-                # Fallback if callback not set
-                try:
-                    # Clean up GPIO
-                    import RPi.GPIO as GPIO
-                    GPIO.cleanup()
-                    
-                    # Destroy root window
-                    self.root.destroy()
-                    
-                    # Exit program
-                    import sys
-                    sys.exit(0)
-                except Exception as e:
-                    logging.error(f"Error during system restart: {e}")    
+def _system_restart(self):
+    """Handle system restart button click."""
+    # Show confirmation dialog
+    from tkinter import messagebox
+    if messagebox.askyesno("System Restart", "Are you sure you want to restart the system?"):
+        logging.info("System restart initiated by admin")
+        
+        # Clean up resources
+        if hasattr(self, 'timeout_after') and self.timeout_after:
+            self.root.after_cancel(self.timeout_after)
+            self.timeout_after = None
+        
+        # Notify parent app to shut down
+        if hasattr(self, "on_system_restart"):
+            self.on_system_restart()
+        else:
+            # Fallback if callback not set
+            try:
+                # Clean up GPIO
+                import RPi.GPIO as GPIO
+                GPIO.cleanup()
+                
+                # Destroy root window
+                self.root.destroy()
+                
+                # Exit program
+                import sys
+                sys.exit(0)
+            except Exception as e:
+                logging.error(f"Error during system restart: {e}")
+
     
 
     def update_credentials(self):
