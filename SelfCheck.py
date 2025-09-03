@@ -14,7 +14,7 @@
 # Transactions synced
 # Email Receipt 
 # Working on Admin Functions
-# 9/2/25 upload to git hub 12:45
+# 9/3/25 upload to git hub 15:00
 
 import os
 import random
@@ -681,8 +681,10 @@ class IdleMode:
                 {"text": "Update Location Files", "y": 400, "color": (0,150,100)},
                 {"text": "WiFi Settings", "y": 500, "color": (100,100,200)},
                 {"text": "Load Inventory Portal", "y": 600, "color": (150,100,150)},
-                {"text": "Exit Admin Mode", "y": 700, "color": (200,60,60)}
+                {"text": "Exit Admin Mode", "y": 700, "color": (200,60,60)},  # Added comma here
+                {"text": "System Restart", "y": 800, "color": (150,30,30)}    # Changed y-value to 800
             ]
+
             
             for btn in buttons:
                 button_x, button_y = 100, btn["y"]
@@ -1285,7 +1287,6 @@ class PriceCheckMode:
 # ==============================
 #          Admin Login Screen
 # ==============================
-
 class AdminLoginScreen:
     """Login screen for Admin mode with virtual keyboard."""
     def __init__(self, root: tk.Tk):
@@ -1298,6 +1299,7 @@ class AdminLoginScreen:
         self.password_var = tk.StringVar()
         self.current_field = None
         self.login_in_progress = False
+
 
         # Create login UI
         self._create_login_ui()
@@ -1543,8 +1545,10 @@ class AdminLoginScreen:
             self.on_login_failed()
 
     def _cancel(self):
-        if hasattr(self, "on_cancel"):
-            self.on_cancel()
+        """Cancel login and return to idle mode."""
+        if hasattr(self, "on_login_cancel"):
+            self.on_login_cancel()
+
 
     def show(self):
         self.frame.lift()
@@ -1583,6 +1587,8 @@ class AdminMode:
         self.label.bind("<Button-1>", self._on_touch)
         self.label.bind("<Motion>", self._on_activity)
 
+
+
     def _on_touch(self, event):
         """Touch handler for Admin mode"""
         x, y = event.x, event.y
@@ -1603,9 +1609,13 @@ class AdminMode:
                 self._render_wireless_menu()
                 
             # Exit button
-            elif 80 <= x <= 380 and 500 <= y <= 570:
+            elif 80 <= x <= 780 and 500 <= y <= 570:
                 if hasattr(self, "on_exit"):
                     self.on_exit()
+                    
+            # System Restart button
+            elif 80 <= x <= 780 and 600 <= y <= 670:
+                self._system_restart()
         
         elif self.current_menu == "credentials":
             # Credentials submenu button areas
@@ -2362,6 +2372,37 @@ class AdminMode:
         """Close Bluetooth settings."""
         bt_frame.destroy()
         self._render_wireless_menu()
+
+    def _system_restart(self):
+        """Handle system restart button click."""
+        # Show confirmation dialog
+        from tkinter import messagebox
+        if messagebox.askyesno("System Restart", "Are you sure you want to restart the system?"):
+            logging.info("System restart initiated by admin")
+            
+            # Clean up resources
+            if hasattr(self, 'timeout_after') and self.timeout_after:
+                self.root.after_cancel(self.timeout_after)
+                self.timeout_after = None
+            
+            # Notify parent app to shut down
+            if hasattr(self, "on_system_restart"):
+                self.on_system_restart()
+            else:
+                # Fallback if callback not set
+                try:
+                    # Clean up GPIO
+                    import RPi.GPIO as GPIO
+                    GPIO.cleanup()
+                    
+                    # Destroy root window
+                    self.root.destroy()
+                    
+                    # Exit program
+                    import sys
+                    sys.exit(0)
+                except Exception as e:
+                    logging.error(f"Error during system restart: {e}")    
     
 
     def update_credentials(self):
@@ -7071,6 +7112,8 @@ class App:
         self.root.configure(bg="black")
         self.root.bind("<Escape>", lambda e: self.shutdown())
 
+  
+
         # Initialize Google Drive service
         self.drive_service = None
         self.sheets_service = None
@@ -7121,6 +7164,7 @@ class App:
         # Hook admin mode timeouts and events
         self.admin.on_exit = lambda: self.set_mode("Idle")
         self.admin.on_timeout = lambda: self.set_mode("Idle")
+        self.admin.on_system_restart = self.shutdown
 
         # Hook touch actions with proper method names
         self.idle.on_touch_action = lambda: self.set_mode("PriceCheck")
