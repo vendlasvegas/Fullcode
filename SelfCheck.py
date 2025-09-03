@@ -662,51 +662,8 @@ class IdleMode:
         
         return bg
 
-    def _render_menu(self):
-        """Render the admin menu with safety checks."""
-        if not hasattr(self, 'base_bg') or self.base_bg is None:
-            logging.error("Cannot render menu: base_bg is None")
-            self.base_bg = Image.new("RGB", (WINDOW_W, WINDOW_H), (255, 255, 255))
-        
-        try:
-            frame = self.base_bg.copy()
-            d = ImageDraw.Draw(frame)
-            
-            # Menu options - with touch-friendly buttons
-            option_font = load_ttf(40)  # Increased for 1280x1024
-            
-            # Moved down by ~1 inch (96 pixels)
-            buttons = [
-                {"text": "Update Credentials", "y": 300, "color": (0,120,200)},
-                {"text": "Update Location Files", "y": 400, "color": (0,150,100)},
-                {"text": "WiFi Settings", "y": 500, "color": (100,100,200)},
-                {"text": "Load Inventory Portal", "y": 600, "color": (150,100,150)},
-                {"text": "Exit Admin Mode", "y": 700, "color": (200,60,60)},  # Added comma here
-                {"text": "System Restart", "y": 800, "color": (150,30,30)}    # Changed y-value to 800
-            ]
 
-            
-            for btn in buttons:
-                button_x, button_y = 100, btn["y"]
-                text_w, text_h = d.textbbox((0,0), btn["text"], font=option_font)[2:]
                 
-                # Draw button
-                d.rectangle([button_x-20, button_y-10, button_x+text_w+40, button_y+text_h+10], 
-                           fill=btn["color"], outline=(0,0,0), width=2)
-                d.text((button_x, button_y), btn["text"], font=option_font, fill=(255,255,255))
-
-            self.tk_img = ImageTk.PhotoImage(frame)
-            self.label.configure(image=self.tk_img)
-            self.label.lift()
-            
-            # Reset the back_to_menu flag
-            if hasattr(self, 'back_to_menu'):
-                delattr(self, 'back_to_menu')
-                
-        except Exception as e:
-            logging.error(f"Error rendering admin menu: {e}")
-            import traceback
-            logging.error(traceback.format_exc())    
 
     def _show_next(self):
         if not self.is_active:
@@ -1613,9 +1570,10 @@ class AdminMode:
                 if hasattr(self, "on_exit"):
                     self.on_exit()
                     
-            # System Restart button
-            elif 80 <= x <= 780 and 800 <= y <= 870:
+            # System Restart button - updated y position to match the button definition
+            elif 80 <= x <= 780 and 600 <= y <= 670:
                 self._system_restart()
+
         
         elif self.current_menu == "credentials":
             # Credentials submenu button areas
@@ -1805,6 +1763,9 @@ class AdminMode:
         
     def _render_menu(self):
         """Render the main admin menu with safety checks."""
+        print("DEBUG: Executing second _render_menu method (line 1813)")
+        logging.info("DEBUG: Executing second _render_menu method (line 1813)")
+        
         if not hasattr(self, 'base_bg') or self.base_bg is None:
             logging.error("Cannot render menu: base_bg is None")
             self.base_bg = Image.new("RGB", (WINDOW_W, WINDOW_H), (255, 255, 255))
@@ -1820,7 +1781,8 @@ class AdminMode:
             buttons = [
                 {"text": "Credentials", "y": 300, "color": (0,120,200)},
                 {"text": "Wireless", "y": 400, "color": (0,150,100)},
-                {"text": "Exit Admin Mode", "y": 500, "color": (200,60,60)}
+                {"text": "Exit Admin Mode", "y": 500, "color": (200,60,60)},
+                {"text": "System Restart", "y": 600, "color": (150,30,30)}  # Added System Restart button
             ]
 
             # Add logging to check buttons
@@ -1849,6 +1811,7 @@ class AdminMode:
             logging.error(f"Error rendering admin menu: {e}")
             import traceback
             logging.error(traceback.format_exc())
+
 
     def _render_credentials_menu(self):
         """Render the credentials submenu."""
