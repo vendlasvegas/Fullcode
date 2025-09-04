@@ -1,6 +1,3 @@
-// InventoryApp.html
-// Upload 9/4/25 11:00
-
 <!DOCTYPE html>
 <html>
 <head>
@@ -153,6 +150,8 @@
     .nav-container {
       display: flex;
       margin-bottom: 20px;
+      position: relative;
+      z-index: 100;
     }
     .nav-categories {
       width: 200px;
@@ -161,10 +160,14 @@
     }
     .nav-category {
       padding: 10px;
-      cursor: pointer;
+      cursor: pointer !important;
       border-radius: 4px;
       margin-bottom: 5px;
       transition: all 0.3s;
+      position: relative;
+      z-index: 20;
+      user-select: none;
+      pointer-events: auto !important;
     }
     .nav-category:hover {
       background-color: rgba(255, 215, 0, 0.1);
@@ -173,21 +176,6 @@
       background-color: rgba(255, 215, 0, 0.2);
       font-weight: bold;
     }
-
-    /* Add these to your existing CSS */
-    .nav-category, .nav-tab {
-      cursor: pointer !important;
-      user-select: none;
-      position: relative;
-      z-index: 20;
-}
-
-    /* Make sure there are no overlapping elements blocking clicks */
-    .nav-container {
-      position: relative;
-      z-index: 100;
-}
-
     .nav-tabs {
       flex: 1;
       display: flex;
@@ -197,12 +185,16 @@
     }
     .nav-tab {
       padding: 10px 15px;
-      cursor: pointer;
+      cursor: pointer !important;
       border-radius: 4px;
       margin-right: 5px;
       margin-bottom: 5px;
       color: var(--text-secondary);
       transition: all 0.3s;
+      position: relative;
+      z-index: 20;
+      user-select: none;
+      pointer-events: auto !important;
     }
     .nav-tab:hover {
       background-color: rgba(255, 215, 0, 0.1);
@@ -284,8 +276,6 @@
       display: none !important;
     }
 
-
-    
     /* Loading Styles */
     .loading-overlay {
       position: absolute;
@@ -346,35 +336,33 @@
     }
 
     /* Turnover Status Colors */
-.very-slow {
-  background-color: rgba(255, 0, 0, 0.1) !important;
-}
-.slow {
-  background-color: rgba(255, 165, 0, 0.1) !important;
-}
-.optimal {
-  background-color: rgba(0, 128, 0, 0.1) !important;
-}
-.fast {
-  background-color: rgba(0, 0, 255, 0.1) !important;
-}
+    .very-slow {
+      background-color: rgba(255, 0, 0, 0.1) !important;
+    }
+    .slow {
+      background-color: rgba(255, 165, 0, 0.1) !important;
+    }
+    .optimal {
+      background-color: rgba(0, 128, 0, 0.1) !important;
+    }
+    .fast {
+      background-color: rgba(0, 0, 255, 0.1) !important;
+    }
 
-/* Chart container */
-.chart-container {
-  background-color: var(--card-color);
-  border-radius: 8px;
-  padding: 15px;
-  margin-bottom: 20px;
-  border: 1px solid var(--border-color);
-}
-.chart-container h3 {
-  margin-top: 0;
-  margin-bottom: 15px;
-  color: var(--primary-color);
-  font-size: 16px;
-}
-
-
+    /* Chart container */
+    .chart-container {
+      background-color: var(--card-color);
+      border-radius: 8px;
+      padding: 15px;
+      margin-bottom: 20px;
+      border: 1px solid var(--border-color);
+    }
+    .chart-container h3 {
+      margin-top: 0;
+      margin-bottom: 15px;
+      color: var(--primary-color);
+      font-size: 16px;
+    }
     
     /* Modal Styles */
     .modal {
@@ -486,48 +474,47 @@
     }
 
     /* Expiration Status Colors */
-.expired {
-  background-color: rgba(139, 0, 0, 0.2) !important;
-  color: #ff6666;
-}
-.expiring-7days {
-  background-color: rgba(255, 0, 0, 0.2) !important;
-  color: #ff8080;
-}
-.expiring-30days {
-  background-color: rgba(255, 165, 0, 0.2) !important;
-  color: #ffaa00;
-}
-.expiring-90days {
-  background-color: rgba(255, 255, 0, 0.2) !important;
-  color: #cccc00;
-}
+    .expired {
+      background-color: rgba(139, 0, 0, 0.2) !important;
+      color: #ff6666;
+    }
+    .expiring-7days {
+      background-color: rgba(255, 0, 0, 0.2) !important;
+      color: #ff8080;
+    }
+    .expiring-30days {
+      background-color: rgba(255, 165, 0, 0.2) !important;
+      color: #ffaa00;
+    }
+    .expiring-90days {
+      background-color: rgba(255, 255, 0, 0.2) !important;
+      color: #cccc00;
+    }
 
-/* Checkbox styling */
-.item-checkbox {
-  width: 18px !important;
-  height: 18px !important;
-  margin-right: 10px;
-}
+    /* Checkbox styling */
+    .item-checkbox {
+      width: 18px !important;
+      height: 18px !important;
+      margin-right: 10px;
+    }
 
-/* Summary cards for expiration */
-.summary-card.expired {
-  background-color: rgba(139, 0, 0, 0.2);
-  border-left: 4px solid #8b0000;
-}
-.summary-card.expiring-7days {
-  background-color: rgba(255, 0, 0, 0.2);
-  border-left: 4px solid #ff0000;
-}
-.summary-card.expiring-30days {
-  background-color: rgba(255, 165, 0, 0.2);
-  border-left: 4px solid #ffa500;
-}
-.summary-card.expiring-90days {
-  background-color: rgba(255, 255, 0, 0.2);
-  border-left: 4px solid #ffff00;
-}
-
+    /* Summary cards for expiration */
+    .summary-card.expired {
+      background-color: rgba(139, 0, 0, 0.2);
+      border-left: 4px solid #8b0000;
+    }
+    .summary-card.expiring-7days {
+      background-color: rgba(255, 0, 0, 0.2);
+      border-left: 4px solid #ff0000;
+    }
+    .summary-card.expiring-30days {
+      background-color: rgba(255, 165, 0, 0.2);
+      border-left: 4px solid #ffa500;
+    }
+    .summary-card.expiring-90days {
+      background-color: rgba(255, 255, 0, 0.2);
+      border-left: 4px solid #ffff00;
+    }
   </style>
 </head>
 <body>
@@ -570,46 +557,68 @@
         </div>
       </div>
 
-      <!-- Navigation - MOVED INSIDE main-portal -->
-      <div class="nav-container">
-        <div class="nav-categories">
-          <div class="nav-category active" data-category="inventory">Inventory Management</div>
-          <div class="nav-category" data-category="financial">Financial Reports</div>
-          <div class="nav-category" data-category="customer">Customer Behavior</div>
-          <div class="nav-category" data-category="analytics">Advanced Analytics</div>
-          <div class="nav-category" data-category="admin">Admin Functions</div>
-        </div>
-        
-        <div class="nav-tabs">
-          <!-- Inventory Management -->
-          <div class="nav-tab active" data-category="inventory" data-page="item-entry">Item Entry</div>
-          <div class="nav-tab" data-category="inventory" data-page="inventory-status">Inventory Status</div>
-          <div class="nav-tab" data-category="inventory" data-page="inventory-turnover">Inventory Turnover</div>
-          <div class="nav-tab" data-category="inventory" data-page="expiration-tracking">Expiration Tracking</div>
+      <!-- Navigation - UPDATED with direct onclick handlers -->
+<div class="nav-container">
+  <div class="nav-categories">
+    <div class="nav-category active" data-category="inventory">Inventory Management</div>
+    <div class="nav-category" data-category="financial">Financial Reports</div>
+    <div class="nav-category" data-category="customer">Customer Behavior</div>
+    <div class="nav-category" data-category="analytics">Advanced Analytics</div>
+    <div class="nav-category" data-category="admin">Admin Functions</div>
+  </div>
+  
+  <div class="nav-tabs">
+    <!-- Inventory Management -->
+    <div class="nav-tab active" data-category="inventory" data-page="item-entry">Item Entry</div>
+    <div class="nav-tab" data-category="inventory" data-page="inventory-status">Inventory Status</div>
+    <div class="nav-tab" data-category="inventory" data-page="inventory-turnover">Inventory Turnover</div>
+    <div class="nav-tab" data-category="inventory" data-page="expiration-tracking">Expiration Tracking</div>
+    
+    <!-- Financial Reports -->
+    <div class="nav-tab hidden" data-category="financial" data-page="sales-report">Sales Report</div>
+    <div class="nav-tab hidden" data-category="financial" data-page="product-report">Product Performance</div>
+    <div class="nav-tab hidden" data-category="financial" data-page="profit-margin">Profit Margin</div>
+    <div class="nav-tab hidden" data-category="financial" data-page="cost-analysis">Cost Analysis</div>
+    <div class="nav-tab hidden" data-category="financial" data-page="revenue-forecast">Revenue Forecast</div>
+    
+    <!-- Customer Behavior -->
+    <div class="nav-tab hidden" data-category="customer" data-page="peak-hours">Peak Hours</div>
+    <div class="nav-tab hidden" data-category="customer" data-page="product-pairing">Product Pairing</div>
+    
+    <!-- Advanced Analytics -->
+    <div class="nav-tab hidden" data-category="analytics" data-page="seasonal-trends">Seasonal Trends</div>
+    <div class="nav-tab hidden" data-category="analytics" data-page="price-sensitivity">Price Sensitivity</div>
+    
+    <!-- Admin Functions -->
+    <div class="nav-tab hidden" data-category="admin" data-page="user-management">User Management</div>
+    <div class="nav-tab hidden" data-category="admin" data-page="credentials">Credentials</div>
+    <div class="nav-tab hidden" data-category="admin" data-page="discounts">Discounts</div>
+  </div>
+</div>
+
           
           <!-- Financial Reports -->
-          <div class="nav-tab hidden" data-category="financial" data-page="sales-report">Sales Report</div>
-          <div class="nav-tab hidden" data-category="financial" data-page="product-report">Product Performance</div>
-          <div class="nav-tab hidden" data-category="financial" data-page="profit-margin">Profit Margin</div>
-          <div class="nav-tab hidden" data-category="financial" data-page="cost-analysis">Cost Analysis</div>
-          <div class="nav-tab hidden" data-category="financial" data-page="revenue-forecast">Revenue Forecast</div>
+          <div class="nav-tab hidden" data-category="financial" data-page="sales-report" onclick="switchTab('financial', 'sales-report')">Sales Report</div>
+          <div class="nav-tab hidden" data-category="financial" data-page="product-report" onclick="switchTab('financial', 'product-report')">Product Performance</div>
+          <div class="nav-tab hidden" data-category="financial" data-page="profit-margin" onclick="switchTab('financial', 'profit-margin')">Profit Margin</div>
+          <div class="nav-tab hidden" data-category="financial" data-page="cost-analysis" onclick="switchTab('financial', 'cost-analysis')">Cost Analysis</div>
+          <div class="nav-tab hidden" data-category="financial" data-page="revenue-forecast" onclick="switchTab('financial', 'revenue-forecast')">Revenue Forecast</div>
           
           <!-- Customer Behavior -->
-          <div class="nav-tab hidden" data-category="customer" data-page="peak-hours">Peak Hours</div>
-          <div class="nav-tab hidden" data-category="customer" data-page="product-pairing">Product Pairing</div>
+          <div class="nav-tab hidden" data-category="customer" data-page="peak-hours" onclick="switchTab('customer', 'peak-hours')">Peak Hours</div>
+          <div class="nav-tab hidden" data-category="customer" data-page="product-pairing" onclick="switchTab('customer', 'product-pairing')">Product Pairing</div>
           
           <!-- Advanced Analytics -->
-          <div class="nav-tab hidden" data-category="analytics" data-page="seasonal-trends">Seasonal Trends</div>
-          <div class="nav-tab hidden" data-category="analytics" data-page="price-sensitivity">Price Sensitivity</div>
+          <div class="nav-tab hidden" data-category="analytics" data-page="seasonal-trends" onclick="switchTab('analytics', 'seasonal-trends')">Seasonal Trends</div>
+          <div class="nav-tab hidden" data-category="analytics" data-page="price-sensitivity" onclick="switchTab('analytics', 'price-sensitivity')">Price Sensitivity</div>
           
           <!-- Admin Functions -->
-          <div class="nav-tab hidden" data-category="admin" data-page="user-management">User Management</div>
-          <div class="nav-tab hidden" data-category="admin" data-page="credentials">Credentials</div>
-          <div class="nav-tab hidden" data-category="admin" data-page="discounts">Discounts</div>
+          <div class="nav-tab hidden" data-category="admin" data-page="user-management" onclick="switchTab('admin', 'user-management')">User Management</div>
+          <div class="nav-tab hidden" data-category="admin" data-page="credentials" onclick="switchTab('admin', 'credentials')">Credentials</div>
+          <div class="nav-tab hidden" data-category="admin" data-page="discounts" onclick="switchTab('admin', 'discounts')">Discounts</div>
         </div>
       </div>
-      
-      <!-- Item Entry Page -->
+            <!-- Item Entry Page -->
       <div id="item-entry-page" class="page active">
         <div class="row">
           <div class="col" style="flex: 2;">
@@ -826,11 +835,11 @@
                   <th>Brand</th>
                   <th>Name</th>
                   <th>Category</th>
-                  <th>Beginning Inventory</th>
-                  <th>Ending Inventory</th>
+                  <th>Beginning</th>
+                  <th>Ending</th>
                   <th>Units Sold</th>
-                  <th>Turnover Ratio</th>
-                  <th>Days in Inventory</th>
+                  <th>Turnover</th>
+                  <th>Days</th>
                   <th>Status</th>
                 </tr>
               </thead>
@@ -1007,7 +1016,6 @@
           </div>
         </div>
       </div>
-      
       <!-- Product Performance Report Page -->
       <div id="product-report-page" class="page">
         <h2>Product Performance Report</h2>
@@ -1117,6 +1125,129 @@
         <div class="btn-group" style="margin-top: 30px;">
           <button onclick="saveCredentials()" id="save-credentials-btn" class="hidden">Save Changes</button>
           <button onclick="loadCredentialsWithAuth()" class="btn-secondary hidden" id="refresh-credentials-btn">Refresh</button>
+        </div>
+      </div>
+
+      <!-- Discounts Page -->
+      <div id="discounts-page" class="page">
+        <div class="card">
+          <h2>Discount Management</h2>
+
+          <button onclick="forceHideDiscountsLoading()" style="position: absolute; top: 10px; right: 10px; z-index: 9999;">
+            Hide Loading
+          </button>
+          
+          <div class="row">
+            <div class="col">
+              <label for="discount-code">Discount Code</label>
+              <input type="text" id="discount-code" placeholder="Enter discount code">
+            </div>
+            <div class="col">
+              <label for="discount-type">Discount Type</label>
+              <select id="discount-type">
+                <option value="Coupon">Coupon</option>
+                <option value="Promo Code">Promo Code</option>
+                <option value="Customer">Customer</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+          </div>
+          
+          <div class="row">
+            <div class="col">
+              <label for="discount-once">One-time Use</label>
+              <input type="checkbox" id="discount-once">
+            </div>
+            <div class="col">
+              <label for="discount-expiration">Expiration Date</label>
+              <input type="date" id="discount-expiration">
+            </div>
+          </div>
+          
+          <div class="row">
+            <div class="col">
+              <label for="discount-dollar">Dollar Amount ($)</label>
+              <div style="position: relative;">
+                <span class="currency-display">$</span>
+                <input type="number" id="discount-dollar" step="0.01" class="currency-input">
+              </div>
+            </div>
+            <div class="col">
+              <label for="discount-percent">Percentage (%)</label>
+              <input type="number" id="discount-percent" min="0" max="100">
+            </div>
+            <div class="col">
+              <label for="discount-total">Apply to Total</label>
+              <input type="checkbox" id="discount-total">
+            </div>
+          </div>
+          
+          <div class="row">
+            <div class="col">
+              <label for="discount-category">Category Restriction</label>
+              <select id="discount-category">
+                <option value="">No Restriction</option>
+                <!-- Categories will be populated dynamically -->
+              </select>
+            </div>
+          </div>
+          
+          <div class="row">
+            <div class="col">
+              <label>Item Restrictions</label>
+              <div class="row">
+                <div class="col">
+                  <input type="text" id="discount-item1" placeholder="Item 1">
+                </div>
+                <div class="col">
+                  <input type="text" id="discount-item2" placeholder="Item 2">
+                </div>
+              </div>
+              <div class="row" style="margin-top: 10px;">
+                <div class="col">
+                  <input type="text" id="discount-item3" placeholder="Item 3">
+                </div>
+                <div class="col">
+                  <input type="text" id="discount-item4" placeholder="Item 4">
+                </div>
+                <div class="col">
+                  <input type="text" id="discount-item5" placeholder="Item 5">
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div class="btn-group" style="margin-top: 20px;">
+            <button onclick="saveDiscount()" class="btn-primary">Save Discount</button>
+            <button onclick="clearDiscountForm()" class="btn-secondary">Clear Form</button>
+          </div>
+          
+          <h3 style="margin-top: 30px;">Existing Discounts</h3>
+          <div id="discounts-loading" class="loading-overlay">
+            <div class="spinner"></div>
+            <div class="loading-text">Loading discounts...</div>
+          </div>
+          
+          <div style="overflow-x: auto;">
+            <table class="report-table" id="discounts-table">
+              <thead>
+                <tr>
+                  <th>Code</th>
+                  <th>Type</th>
+                  <th>One-time</th>
+                  <th>Expiration</th>
+                  <th>Amount</th>
+                  <th>Percent</th>
+                  <th>Total</th>
+                  <th>Category</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="discounts-body">
+                <!-- Discounts will be added here -->
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>
@@ -1229,317 +1360,36 @@
     
     <div id="status"></div>
   </div>
-<!-- Discounts Page -->
-<div id="discounts-page" class="page">
-  <div class="card">
-    <h2>Discount Management</h2>
-
-    <button onclick="forceHideDiscountsLoading()" style="position: absolute; top: 10px; right: 10px; z-index: 9999;">
-  Hide Loading
-</button>
-
-    
-    <div class="row">
-      <div class="col">
-        <label for="discount-code">Discount Code</label>
-        <input type="text" id="discount-code" placeholder="Enter discount code">
-      </div>
-      <div class="col">
-        <label for="discount-type">Discount Type</label>
-        <select id="discount-type">
-          <option value="Coupon">Coupon</option>
-          <option value="Promo Code">Promo Code</option>
-          <option value="Customer">Customer</option>
-          <option value="Other">Other</option>
-        </select>
-      </div>
-    </div>
-    
-    <div class="row">
-      <div class="col">
-        <label for="discount-once">One-time Use</label>
-        <input type="checkbox" id="discount-once">
-      </div>
-      <div class="col">
-        <label for="discount-expiration">Expiration Date</label>
-        <input type="date" id="discount-expiration">
-      </div>
-    </div>
-    
-    <div class="row">
-      <div class="col">
-        <label for="discount-dollar">Dollar Amount ($)</label>
-        <div style="position: relative;">
-          <span class="currency-display">$</span>
-          <input type="number" id="discount-dollar" step="0.01" class="currency-input">
-        </div>
-      </div>
-      <div class="col">
-        <label for="discount-percent">Percentage (%)</label>
-        <input type="number" id="discount-percent" min="0" max="100">
-      </div>
-      <div class="col">
-        <label for="discount-total">Apply to Total</label>
-        <input type="checkbox" id="discount-total">
-      </div>
-    </div>
-    
-    <div class="row">
-      <div class="col">
-        <label for="discount-category">Category Restriction</label>
-        <select id="discount-category">
-          <option value="">No Restriction</option>
-          <!-- Categories will be populated dynamically -->
-        </select>
-      </div>
-    </div>
-    
-    <div class="row">
-      <div class="col">
-        <label>Item Restrictions</label>
-        <div class="row">
-          <div class="col">
-            <input type="text" id="discount-item1" placeholder="Item 1">
-          </div>
-          <div class="col">
-            <input type="text" id="discount-item2" placeholder="Item 2">
-          </div>
-        </div>
-        <div class="row" style="margin-top: 10px;">
-          <div class="col">
-            <input type="text" id="discount-item3" placeholder="Item 3">
-          </div>
-          <div class="col">
-            <input type="text" id="discount-item4" placeholder="Item 4">
-          </div>
-          <div class="col">
-            <input type="text" id="discount-item5" placeholder="Item 5">
-          </div>
-        </div>
-      </div>
-    </div>
-    
-    <div class="btn-group" style="margin-top: 20px;">
-      <button onclick="saveDiscount()" class="btn-primary">Save Discount</button>
-      <button onclick="clearDiscountForm()" class="btn-secondary">Clear Form</button>
-    </div>
-    
-    <h3 style="margin-top: 30px;">Existing Discounts</h3>
-    <div id="discounts-loading" class="loading-overlay">
-      <div class="spinner"></div>
-      <div class="loading-text">Loading discounts...</div>
-    </div>
-    
-    <div style="overflow-x: auto;">
-      <table class="report-table" id="discounts-table">
-        <thead>
-          <tr>
-            <th>Code</th>
-            <th>Type</th>
-            <th>One-time</th>
-            <th>Expiration</th>
-            <th>Amount</th>
-            <th>Percent</th>
-            <th>Total</th>
-            <th>Category</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody id="discounts-body">
-          <!-- Discounts will be added here -->
-        </tbody>
-      </table>
-    </div>
-  </div>
-</div>
-
-
-
 
 
 
   <script>
+    // Global error handler
+    window.onerror = function(message, source, lineno, colno, error) {
+      console.error('JavaScript error:', message, 'at', source, 'line', lineno, ':', error);
+      return true;
+    };
 
-// Global error handler
-window.onerror = function(message, source, lineno, colno, error) {
-  console.error('JavaScript error:', message, 'at', source, 'line', lineno, ':', error);
-  return true;
-};
-
-// Replace your existing category navigation code with this:
-document.addEventListener('DOMContentLoaded', function() {
-  // Set up category navigation
-  document.querySelectorAll('.nav-category').forEach(category => {
-    category.addEventListener('click', function() {
-      console.log('Category clicked:', this.getAttribute('data-category'));
+    // --- INITIALIZATION ---
+    document.addEventListener('DOMContentLoaded', function() {
+      // Load Google Charts
+      google.charts.load('current', {'packages':['corechart', 'bar']});
       
-      // Update active category
-      document.querySelectorAll('.nav-category').forEach(c => c.classList.remove('active'));
-      this.classList.add('active');
+      /* Comment out existing navigation event listeners
+      // Set up category navigation
+      document.querySelectorAll('.nav-category').forEach(category => {
+        category.addEventListener('click', function() {
+          // ...
+        });
+      });
       
-      const categoryName = this.getAttribute('data-category');
-      
-      // Hide all tabs
+      // Set up tab navigation
       document.querySelectorAll('.nav-tab').forEach(tab => {
-        tab.classList.add('hidden');
+        tab.addEventListener('click', function() {
+          // ...
+        });
       });
-      
-      // Show tabs for this category
-      document.querySelectorAll(`.nav-tab[data-category="${categoryName}"]`).forEach(tab => {
-        tab.classList.remove('hidden');
-      });
-      
-      // Select first tab in this category
-      const firstTab = document.querySelector(`.nav-tab[data-category="${categoryName}"]`);
-      if (firstTab) {
-        firstTab.click();
-      }
-    });
-  });
-  
-  // Add this function to help debug navigation issues
-function debugNavigation() {
-  console.log('--- Navigation Debug Info ---');
-  
-  // Check categories
-  const categories = document.querySelectorAll('.nav-category');
-  console.log(`Found ${categories.length} categories:`);
-  categories.forEach(cat => {
-    console.log(`- ${cat.textContent} (${cat.getAttribute('data-category')}) ${cat.classList.contains('active') ? '[ACTIVE]' : ''}`);
-  });
-  
-  // Check tabs
-  const tabs = document.querySelectorAll('.nav-tab');
-  console.log(`Found ${tabs.length} tabs:`);
-  tabs.forEach(tab => {
-    const isHidden = tab.classList.contains('hidden');
-    const isActive = tab.classList.contains('active');
-    console.log(`- ${tab.textContent} (${tab.getAttribute('data-category')}/${tab.getAttribute('data-page')}) ${isActive ? '[ACTIVE]' : ''} ${isHidden ? '[HIDDEN]' : ''}`);
-  });
-  
-  // Check pages
-  const pages = document.querySelectorAll('.page');
-  console.log(`Found ${pages.length} pages:`);
-  pages.forEach(page => {
-    const id = page.id;
-    const isActive = page.classList.contains('active');
-    console.log(`- ${id} ${isActive ? '[ACTIVE]' : ''}`);
-  });
-}
-
-// Function to verify page IDs
-function verifyPageIds() {
-  const tabs = document.querySelectorAll('.nav-tab');
-  let hasErrors = false;
-  
-  tabs.forEach(tab => {
-    const pageId = tab.getAttribute('data-page') + '-page';
-    const page = document.getElementById(pageId);
-    
-    if (!page) {
-      console.error(`Missing page element with ID "${pageId}" for tab "${tab.textContent}"`);
-      hasErrors = true;
-    }
-  });
-  
-  if (!hasErrors) {
-    console.log('All page IDs verified successfully!');
-  }
-  
-  return !hasErrors;
-}
-
-  // Set up tab navigation
-  document.querySelectorAll('.nav-tab').forEach(tab => {
-    tab.addEventListener('click', function() {
-      console.log('Tab clicked:', this.getAttribute('data-page'));
-      
-      // Update active tab
-      document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
-      this.classList.add('active');
-      
-      // Update page subtitle
-      document.getElementById('page-subtitle').textContent = this.textContent;
-      
-      // Show corresponding page
-      const pageId = this.getAttribute('data-page') + '-page';
-      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-      
-      const page = document.getElementById(pageId);
-      if (page) {
-        page.classList.add('active');
-        
-        // Special handling for specific pages
-        if (this.getAttribute('data-page') === 'inventory-status') {
-          loadInventoryStatus();
-        } else if (this.getAttribute('data-page') === 'expiration-tracking') {
-          loadExpirationData();
-        } else if (this.getAttribute('data-page') === 'inventory-turnover') {
-          loadTurnoverData();
-        } else if (this.getAttribute('data-page') === 'user-management') {
-          loadUsers();
-        } else if (this.getAttribute('data-page') === 'credentials') {
-          loadCredentials();
-        } else if (this.getAttribute('data-page') === 'discounts') {
-          loadDiscounts();
-        }
-      } else {
-        console.error('Page not found:', pageId);
-      }
-    });
-  });
-});
-
-      
-// Set up tab navigation
-document.querySelectorAll('.nav-tab').forEach(tab => {
-  tab.addEventListener('click', function() {
-    console.log('Tab clicked:', this.getAttribute('data-page'));
-    
-    // Update active tab
-    document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
-    this.classList.add('active');
-    
-    // Update page subtitle
-    document.getElementById('page-subtitle').textContent = this.textContent;
-    
-    // Show corresponding page
-    const pageId = this.getAttribute('data-page') + '-page';
-    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-    
-    const page = document.getElementById(pageId);
-    if (page) {
-      page.classList.add('active');
-      
-      // Special handling for specific pages
-      if (this.getAttribute('data-page') === 'inventory-status') {
-        loadInventoryStatus();
-      } else if (this.getAttribute('data-page') === 'expiration-tracking') {
-        loadExpirationData();
-      } else if (this.getAttribute('data-page') === 'inventory-turnover') {
-        loadTurnoverData();
-      } else if (this.getAttribute('data-page') === 'user-management') {
-        loadUsers();
-      } else if (this.getAttribute('data-page') === 'credentials') {
-        loadCredentials();
-      } else if (this.getAttribute('data-page') === 'discounts') {
-        loadDiscounts();
-      }
-    } else {
-      console.error('Page not found:', pageId);
-    }
-  });
-});
-
-
-    
-    // Special handling for inventory status page
-    if (this.getAttribute('data-page') === 'inventory-status') {
-      loadInventoryStatus();
-    }
-  });
-});
-
+      */
       
       // Set today's date as default for report date fields
       const today = new Date().toISOString().split('T')[0];
@@ -1563,7 +1413,134 @@ document.querySelectorAll('.nav-tab').forEach(tab => {
       
       // Load Google Charts
       google.charts.load('current', {'packages':['corechart', 'bar', 'calendar']});
+      
+      // Verify page IDs
+      verifyPageIds();
     });
+    // Direct navigation functions
+    function switchCategory(categoryName) {
+      console.log('Switching to category:', categoryName);
+      
+      // Update active category
+      document.querySelectorAll('.nav-category').forEach(c => c.classList.remove('active'));
+      document.querySelector(`.nav-category[data-category="${categoryName}"]`).classList.add('active');
+      
+      // Hide all tabs
+      document.querySelectorAll('.nav-tab').forEach(tab => {
+        tab.classList.add('hidden');
+      });
+      
+      // Show tabs for this category
+      document.querySelectorAll(`.nav-tab[data-category="${categoryName}"]`).forEach(tab => {
+        tab.classList.remove('hidden');
+      });
+      
+      // Select first tab in this category
+      const firstTab = document.querySelector(`.nav-tab[data-category="${categoryName}"]`);
+      if (firstTab) {
+        const page = firstTab.getAttribute('data-page');
+        switchTab(categoryName, page);
+      }
+    }
+
+    function switchTab(categoryName, pageName) {
+      console.log('Switching to tab:', categoryName, pageName);
+      
+      // Update active tab
+      document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+      document.querySelector(`.nav-tab[data-category="${categoryName}"][data-page="${pageName}"]`).classList.add('active');
+      
+      // Update page subtitle
+      const tabElement = document.querySelector(`.nav-tab[data-category="${categoryName}"][data-page="${pageName}"]`);
+      document.getElementById('page-subtitle').textContent = tabElement.textContent;
+      
+      // Show corresponding page
+      const pageId = pageName + '-page';
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+      
+      const page = document.getElementById(pageId);
+      if (page) {
+        page.classList.add('active');
+        
+        // Special handling for specific pages
+        if (pageName === 'inventory-status') {
+          loadInventoryStatus();
+        } else if (pageName === 'expiration-tracking') {
+          loadExpirationData();
+        } else if (pageName === 'inventory-turnover') {
+          loadTurnoverData();
+        } else if (pageName === 'user-management') {
+          loadUsers();
+        } else if (pageName === 'credentials') {
+          loadCredentials();
+        } else if (pageName === 'discounts') {
+          loadDiscounts();
+        }
+      } else {
+        console.error('Page not found:', pageId);
+      }
+    }
+    
+    // Debug navigation function
+    function debugNavigation() {
+      console.log('--- Navigation Debug Info ---');
+      
+      // Check categories
+      const categories = document.querySelectorAll('.nav-category');
+      console.log(`Found ${categories.length} categories:`);
+      categories.forEach(cat => {
+        console.log(`- ${cat.textContent} (${cat.getAttribute('data-category')}) ${cat.classList.contains('active') ? '[ACTIVE]' : ''}`);
+      });
+      
+      // Check tabs
+      const tabs = document.querySelectorAll('.nav-tab');
+      console.log(`Found ${tabs.length} tabs:`);
+      tabs.forEach(tab => {
+        const isHidden = tab.classList.contains('hidden');
+        const isActive = tab.classList.contains('active');
+        console.log(`- ${tab.textContent} (${tab.getAttribute('data-category')}/${tab.getAttribute('data-page')}) ${isActive ? '[ACTIVE]' : ''} ${isHidden ? '[HIDDEN]' : ''}`);
+      });
+      
+      // Check pages
+      const pages = document.querySelectorAll('.page');
+      console.log(`Found ${pages.length} pages:`);
+      pages.forEach(page => {
+        const id = page.id;
+        const isActive = page.classList.contains('active');
+        console.log(`- ${id} ${isActive ? '[ACTIVE]' : ''}`);
+      });
+      
+      // Test click on a category
+      console.log('Testing click on Financial Reports category...');
+      try {
+        document.querySelector('.nav-category[data-category="financial"]').click();
+        console.log('Click successful');
+      } catch (e) {
+        console.error('Click failed:', e);
+      }
+    }
+    
+    // Function to verify page IDs
+    function verifyPageIds() {
+      const tabs = document.querySelectorAll('.nav-tab');
+      let hasErrors = false;
+      
+      tabs.forEach(tab => {
+        const pageId = tab.getAttribute('data-page') + '-page';
+        const page = document.getElementById(pageId);
+        
+        if (!page) {
+          console.error(`Missing page element with ID "${pageId}" for tab "${tab.textContent}"`);
+          hasErrors = true;
+        }
+      });
+      
+      if (!hasErrors) {
+        console.log('All page IDs verified successfully!');
+      }
+      
+      return !hasErrors;
+    }
     
     // Function to force hide all loading overlays
     function forceHideLoadingOverlays() {
@@ -1584,6 +1561,14 @@ document.querySelectorAll('.nav-tab').forEach(tab => {
       });
     }
     
+    function forceHideDiscountsLoading() {
+      const loadingOverlay = document.getElementById('discounts-loading');
+      if (loadingOverlay) {
+        loadingOverlay.style.display = 'none';
+        loadingOverlay.classList.add('hidden');
+      }
+    }
+    
     function loadMachineID() {
       google.script.run
         .withSuccessHandler(function(machineID) {
@@ -1596,341 +1581,333 @@ document.querySelectorAll('.nav-tab').forEach(tab => {
         .getMachineID();
     }
 
-
- 
-
-// --- INVENTORY TURNOVER LOGIC ---
-function loadTurnoverData() {
-  // Show loading indicator
-  document.getElementById('turnover-loading').classList.remove('hidden');
-  showStatus('Calculating inventory turnover...', 'info');
-  
-  // Get filter values
-  const period = document.getElementById('turnover-period').value;
-  const category = document.getElementById('turnover-category').value;
-  
-  // Add a safety timeout to hide the loading overlay after 15 seconds
-  setTimeout(function() {
-    document.getElementById('turnover-loading').classList.add('hidden');
-  }, 15000);
-  
-  google.script.run
-    .withSuccessHandler(function(turnoverData) {
-      // Hide loading indicator
-      document.getElementById('turnover-loading').classList.add('hidden');
+    // --- INVENTORY TURNOVER LOGIC ---
+    function loadTurnoverData() {
+      // Show loading indicator
+      document.getElementById('turnover-loading').classList.remove('hidden');
+      showStatus('Calculating inventory turnover...', 'info');
       
-      console.log('Turnover data received:', turnoverData);
+      // Get filter values
+      const period = document.getElementById('turnover-period').value;
+      const category = document.getElementById('turnover-category').value;
+      
+      // Add a safety timeout to hide the loading overlay after 15 seconds
+      setTimeout(function() {
+        document.getElementById('turnover-loading').classList.add('hidden');
+      }, 15000);
+      
+      google.script.run
+        .withSuccessHandler(function(turnoverData) {
+          // Hide loading indicator
+          document.getElementById('turnover-loading').classList.add('hidden');
+          
+          console.log('Turnover data received:', turnoverData);
+          
+          if (!turnoverData) {
+            return showStatus('No data received from server. Please try again.', 'error');
+          }
+          
+          displayTurnoverData(turnoverData, period, category);
+          
+          // Log this action
+          logUserAction('Viewed inventory turnover');
+        })
+        .withFailureHandler(function(error) {
+          // Hide loading indicator
+          document.getElementById('turnover-loading').classList.add('hidden');
+          console.error('Error calculating turnover:', error);
+          showStatus('Error calculating turnover: ' + (error.message || error), 'error');
+        })
+        .getInventoryTurnoverData(period, category);
+    }
+
+    function displayTurnoverData(turnoverData, period, category) {
+      hideStatus();
       
       if (!turnoverData) {
-        return showStatus('No data received from server. Please try again.', 'error');
+        return showStatus('No turnover data received from server.', 'error');
       }
       
-      displayTurnoverData(turnoverData, period, category);
+      if (!turnoverData.success) {
+        return showStatus(turnoverData.message || 'Unknown error calculating turnover.', 'error');
+      }
       
-      // Log this action
-      logUserAction('Viewed inventory turnover');
-    })
-    .withFailureHandler(function(error) {
-      // Hide loading indicator
-      document.getElementById('turnover-loading').classList.add('hidden');
-      console.error('Error calculating turnover:', error);
-      showStatus('Error calculating turnover: ' + (error.message || error), 'error');
-    })
-    .getInventoryTurnoverData(period, category);
-}
-
-function displayTurnoverData(turnoverData, period, category) {
-  hideStatus();
-  
-  if (!turnoverData) {
-    return showStatus('No turnover data received from server.', 'error');
-  }
-  
-  if (!turnoverData.success) {
-    return showStatus(turnoverData.message || 'Unknown error calculating turnover.', 'error');
-  }
-  
-  // Update summary metrics
-  document.getElementById('overall-turnover').textContent = turnoverData.overallTurnover.toFixed(2);
-  document.getElementById('avg-days-in-inventory').textContent = Math.round(turnoverData.avgDaysInInventory);
-  document.getElementById('slow-items-count').textContent = turnoverData.slowItemsCount;
-  document.getElementById('fast-items-count').textContent = turnoverData.fastItemsCount;
-  
-  // Draw charts
-  drawCategoryTurnoverChart(turnoverData.categoryTurnover);
-  drawTopItemsChart(turnoverData.topItems);
-  
-  // Populate turnover table
-  const tableBody = document.getElementById('turnover-body');
-  tableBody.innerHTML = '';
-  
-  if (turnoverData.items && turnoverData.items.length > 0) {
-    turnoverData.items.forEach(item => {
-      const row = document.createElement('tr');
+      // Update summary metrics
+      document.getElementById('overall-turnover').textContent = turnoverData.overallTurnover.toFixed(2);
+      document.getElementById('avg-days-in-inventory').textContent = Math.round(turnoverData.avgDaysInInventory);
+      document.getElementById('slow-items-count').textContent = turnoverData.slowItemsCount;
+      document.getElementById('fast-items-count').textContent = turnoverData.fastItemsCount;
       
-      // Add appropriate class based on turnover status
-      if (item.turnoverRatio < 1) {
-        row.classList.add('very-slow');
-      } else if (item.turnoverRatio < 2) {
-        row.classList.add('slow');
-      } else if (item.turnoverRatio > 6) {
-        row.classList.add('fast');
+      // Draw charts
+      drawCategoryTurnoverChart(turnoverData.categoryTurnover);
+      drawTopItemsChart(turnoverData.topItems);
+      
+      // Populate turnover table
+      const tableBody = document.getElementById('turnover-body');
+      tableBody.innerHTML = '';
+      
+      if (turnoverData.items && turnoverData.items.length > 0) {
+        turnoverData.items.forEach(item => {
+          const row = document.createElement('tr');
+          
+          // Add appropriate class based on turnover status
+          if (item.turnoverRatio < 1) {
+            row.classList.add('very-slow');
+          } else if (item.turnoverRatio < 2) {
+            row.classList.add('slow');
+          } else if (item.turnoverRatio > 6) {
+            row.classList.add('fast');
+          } else {
+            row.classList.add('optimal');
+          }
+          
+          // Format the status text
+          let statusText = '';
+          if (item.turnoverRatio < 1) {
+            statusText = 'VERY SLOW';
+          } else if (item.turnoverRatio < 2) {
+            statusText = 'SLOW';
+          } else if (item.turnoverRatio > 6) {
+            statusText = 'FAST';
+          } else {
+            statusText = 'OPTIMAL';
+          }
+          
+          row.innerHTML = `
+            <td>${item.upc || 'N/A'}</td>
+            <td>${item.brand || 'N/A'}</td>
+            <td>${item.name || 'N/A'}</td>
+            <td>${item.category || 'N/A'}</td>
+            <td>${item.beginningInventory}</td>
+            <td>${item.endingInventory}</td>
+            <td>${item.unitsSold}</td>
+            <td>${item.turnoverRatio.toFixed(2)}</td>
+            <td>${Math.round(item.daysInInventory)}</td>
+            <td>${statusText}</td>
+          `;
+          
+          tableBody.appendChild(row);
+        });
+        
+        showStatus('Turnover data loaded successfully!', 'success');
       } else {
-        row.classList.add('optimal');
+        tableBody.innerHTML = '<tr><td colspan="10" style="text-align: center;">No turnover data available for the selected period.</td></tr>';
+        showStatus('No turnover data available for the selected period.', 'info');
       }
       
-      // Format the status text
-      let statusText = '';
-      if (item.turnoverRatio < 1) {
-        statusText = 'VERY SLOW';
-      } else if (item.turnoverRatio < 2) {
-        statusText = 'SLOW';
-      } else if (item.turnoverRatio > 6) {
-        statusText = 'FAST';
-      } else {
-        statusText = 'OPTIMAL';
+      // Populate category filter if needed
+      if (turnoverData.categories && turnoverData.categories.length > 0) {
+        const categorySelect = document.getElementById('turnover-category');
+        
+        // Save current selection
+        const currentSelection = categorySelect.value;
+        
+        // Clear existing options except the first one
+        while (categorySelect.options.length > 1) {
+          categorySelect.remove(1);
+        }
+        
+        // Add new options
+        turnoverData.categories.forEach(category => {
+          if (category) {
+            const option = document.createElement('option');
+            option.value = category;
+            option.textContent = category;
+            categorySelect.appendChild(option);
+          }
+        });
+        
+        // Restore selection if possible
+        if (currentSelection && Array.from(categorySelect.options).some(opt => opt.value === currentSelection)) {
+          categorySelect.value = currentSelection;
+        }
       }
-      
-      row.innerHTML = `
-        <td>${item.upc || 'N/A'}</td>
-        <td>${item.brand || 'N/A'}</td>
-        <td>${item.name || 'N/A'}</td>
-        <td>${item.category || 'N/A'}</td>
-        <td>${item.beginningInventory}</td>
-        <td>${item.endingInventory}</td>
-        <td>${item.unitsSold}</td>
-        <td>${item.turnoverRatio.toFixed(2)}</td>
-        <td>${Math.round(item.daysInInventory)}</td>
-        <td>${statusText}</td>
-      `;
-      
-      tableBody.appendChild(row);
-    });
-    
-    showStatus('Turnover data loaded successfully!', 'success');
-  } else {
-    tableBody.innerHTML = '<tr><td colspan="10" style="text-align: center;">No turnover data available for the selected period.</td></tr>';
-    showStatus('No turnover data available for the selected period.', 'info');
-  }
-  
-  // Populate category filter if needed
-  if (turnoverData.categories && turnoverData.categories.length > 0) {
-    const categorySelect = document.getElementById('turnover-category');
-    
-    // Save current selection
-    const currentSelection = categorySelect.value;
-    
-    // Clear existing options except the first one
-    while (categorySelect.options.length > 1) {
-      categorySelect.remove(1);
     }
-    
-    // Add new options
-    turnoverData.categories.forEach(category => {
-      if (category) {
-        const option = document.createElement('option');
-        option.value = category;
-        option.textContent = category;
-        categorySelect.appendChild(option);
-      }
-    });
-    
-    // Restore selection if possible
-    if (currentSelection && Array.from(categorySelect.options).some(opt => opt.value === currentSelection)) {
-      categorySelect.value = currentSelection;
+
+    function drawCategoryTurnoverChart(categoryData) {
+      if (!categoryData || categoryData.length === 0) return;
+      
+      const data = new google.visualization.DataTable();
+      data.addColumn('string', 'Category');
+      data.addColumn('number', 'Turnover Ratio');
+      
+      categoryData.forEach(item => {
+        data.addRow([item.category, item.turnoverRatio]);
+      });
+      
+      const options = {
+        title: 'Inventory Turnover by Category',
+        colors: ['#FFD700'],
+        backgroundColor: { fill:'transparent' },
+        titleTextStyle: { color: '#FFD700' },
+        legend: { textStyle: { color: '#ffffff' } },
+        hAxis: { textStyle: { color: '#ffffff' } },
+        vAxis: { textStyle: { color: '#ffffff' }, title: 'Turnover Ratio', titleTextStyle: { color: '#ffffff' } }
+      };
+      
+      const chart = new google.visualization.ColumnChart(document.getElementById('category-turnover-chart'));
+      chart.draw(data, options);
     }
-  }
-}
 
-function drawCategoryTurnoverChart(categoryData) {
-  if (!categoryData || categoryData.length === 0) return;
-  
-  const data = new google.visualization.DataTable();
-  data.addColumn('string', 'Category');
-  data.addColumn('number', 'Turnover Ratio');
-  
-  categoryData.forEach(item => {
-    data.addRow([item.category, item.turnoverRatio]);
-  });
-  
-  const options = {
-    title: 'Inventory Turnover by Category',
-    colors: ['#FFD700'],
-    backgroundColor: { fill:'transparent' },
-    titleTextStyle: { color: '#FFD700' },
-    legend: { textStyle: { color: '#ffffff' } },
-    hAxis: { textStyle: { color: '#ffffff' } },
-    vAxis: { textStyle: { color: '#ffffff' }, title: 'Turnover Ratio', titleTextStyle: { color: '#ffffff' } }
-  };
-  
-  const chart = new google.visualization.ColumnChart(document.getElementById('category-turnover-chart'));
-  chart.draw(data, options);
-}
-
-function drawTopItemsChart(topItems) {
-  if (!topItems || topItems.length === 0) return;
-  
-  const data = new google.visualization.DataTable();
-  data.addColumn('string', 'Product');
-  data.addColumn('number', 'Turnover Ratio');
-  
-  topItems.forEach(item => {
-    data.addRow([item.name, item.turnoverRatio]);
-  });
-  
-  const options = {
-    title: 'Top 10 Items by Turnover',
-    colors: ['#FFD700'],
-    backgroundColor: { fill:'transparent' },
-    titleTextStyle: { color: '#FFD700' },
-    legend: { textStyle: { color: '#ffffff' } },
-    hAxis: { textStyle: { color: '#ffffff' } },
-    vAxis: { textStyle: { color: '#ffffff' }, title: 'Turnover Ratio', titleTextStyle: { color: '#ffffff' } }
-  };
-  
-  const chart = new google.visualization.BarChart(document.getElementById('top-items-chart'));
-  chart.draw(data, options);
-}; //---Line 1662---
-
+    function drawTopItemsChart(topItems) {
+      if (!topItems || topItems.length === 0) return;
+      
+      const data = new google.visualization.DataTable();
+      data.addColumn('string', 'Product');
+      data.addColumn('number', 'Turnover Ratio');
+      
+      topItems.forEach(item => {
+        data.addRow([item.name, item.turnoverRatio]);
+      });
+      
+      const options = {
+        title: 'Top 10 Items by Turnover',
+        colors: ['#FFD700'],
+        backgroundColor: { fill:'transparent' },
+        titleTextStyle: { color: '#FFD700' },
+        legend: { textStyle: { color: '#ffffff' } },
+        hAxis: { textStyle: { color: '#ffffff' } },
+        vAxis: { textStyle: { color: '#ffffff' }, title: 'Turnover Ratio', titleTextStyle: { color: '#ffffff' } }
+      };
+      
+      const chart = new google.visualization.BarChart(document.getElementById('top-items-chart'));
+      chart.draw(data, options);
+    }
    
     // --- INVENTORY STATUS LOGIC ---
-function loadInventoryStatus() {
-  // Show loading indicator
-  document.getElementById('inventory-loading').classList.remove('hidden');
-  showStatus('Loading inventory status...', 'info');
-  
-  google.script.run
-    .withSuccessHandler(function(inventoryData) {
-      // Hide loading indicator
-      document.getElementById('inventory-loading').classList.add('hidden');
+    function loadInventoryStatus() {
+      // Show loading indicator
+      document.getElementById('inventory-loading').classList.remove('hidden');
+      showStatus('Loading inventory status...', 'info');
       
-      console.log('Inventory data received:', inventoryData);
+      google.script.run
+        .withSuccessHandler(function(inventoryData) {
+          // Hide loading indicator
+          document.getElementById('inventory-loading').classList.add('hidden');
+          
+          console.log('Inventory data received:', inventoryData);
+          
+          if (!inventoryData) {
+            return showStatus('No data received from server. Please try again.', 'error');
+          }
+          
+          displayInventoryStatus(inventoryData);
+          
+          // Log this action
+          logUserAction('Viewed inventory status');
+        })
+        .withFailureHandler(function(error) {
+          // Hide loading indicator
+          document.getElementById('inventory-loading').classList.add('hidden');
+          console.error('Error loading inventory status:', error);
+          showStatus('Error loading inventory status: ' + (error.message || error), 'error');
+        })
+        .getInventoryStatus();
+    }
+
+    function exportTurnoverToHTMLPDF() {
+      showStatus("Generating PDF...", 'info');
+      
+      // Get filter values
+      const period = document.getElementById('turnover-period').value;
+      const category = document.getElementById('turnover-category').value;
+      
+      google.script.run
+        .withSuccessHandler(function(pdfUrl) {
+          if (pdfUrl) {
+            window.open(pdfUrl, '_blank');
+            showStatus('PDF generated successfully!', 'success');
+            
+            // Log this action
+            logUserAction('Exported turnover report to PDF');
+          } else {
+            showStatus('Failed to generate PDF.', 'error');
+          }
+        })
+        .withFailureHandler(onFailure)
+        .exportTurnoverReportToHTMLPDF(period, category);
+    }
+
+    function displayInventoryStatus(inventoryData) {
+      hideStatus();
       
       if (!inventoryData) {
-        return showStatus('No data received from server. Please try again.', 'error');
+        return showStatus('No inventory data received from server.', 'error');
       }
       
-      displayInventoryStatus(inventoryData);
+      if (!inventoryData.success) {
+        return showStatus(inventoryData.message || 'Unknown error loading inventory.', 'error');
+      }
+      
+      // Populate inventory table
+      const tableBody = document.getElementById('inventory-body');
+      tableBody.innerHTML = '';
+      
+      if (inventoryData.items && inventoryData.items.length > 0) {
+        inventoryData.items.forEach(item => {
+          const row = document.createElement('tr');
+          row.style.cursor = 'pointer';
+          row.onclick = function() { loadItemInEntryScreen(item.upc); };
+          
+          row.innerHTML = `
+            <td>${item.upc || 'N/A'}</td>
+            <td>${item.brand || 'N/A'}</td>
+            <td>${item.name || 'N/A'}</td>
+            <td>${item.size || 'N/A'}</td>
+            <td>$${(item.price || 0).toFixed(2)}</td>
+            <td>${item.qty || '0'}</td>
+            <td>$${(item.value || 0).toFixed(2)}</td>
+          `;
+          
+          tableBody.appendChild(row);
+        });
+        
+        // Update totals
+        document.getElementById('total-quantity').textContent = inventoryData.totalQuantity;
+        document.getElementById('total-value').textContent = '$' + inventoryData.totalValue.toFixed(2);
+        
+        showStatus('Inventory status loaded successfully!', 'success');
+      } else {
+        tableBody.innerHTML = '<tr><td colspan="7" style="text-align: center;">No inventory items found with positive quantity.</td></tr>';
+        document.getElementById('total-quantity').textContent = '0';
+        document.getElementById('total-value').textContent = '$0.00';
+        showStatus('No inventory items found with positive quantity.', 'info');
+      }
+    }
+
+    function loadItemInEntryScreen(upc) {
+      // Switch to the Item Entry tab
+      document.querySelector('.nav-tab[data-page="item-entry"]').click();
+      
+      // Set the UPC and trigger lookup
+      document.getElementById('upc-input').value = upc;
+      handleLookup();
       
       // Log this action
-      logUserAction('Viewed inventory status');
-    })
-    .withFailureHandler(function(error) {
-      // Hide loading indicator
-      document.getElementById('inventory-loading').classList.add('hidden');
-      console.error('Error loading inventory status:', error);
-      showStatus('Error loading inventory status: ' + (error.message || error), 'error');
-    })
-    .getInventoryStatus();
-}
+      logUserAction(`Loaded item ${upc} from inventory status`);
+    }
 
-function exportTurnoverToHTMLPDF() {
-  showStatus("Generating PDF...", 'info');
-  
-  // Get filter values
-  const period = document.getElementById('turnover-period').value;
-  const category = document.getElementById('turnover-category').value;
-  
-  google.script.run
-    .withSuccessHandler(function(pdfUrl) {
-      if (pdfUrl) {
-        window.open(pdfUrl, '_blank');
-        showStatus('PDF generated successfully!', 'success');
-        
-        // Log this action
-        logUserAction('Exported turnover report to PDF');
-      } else {
-        showStatus('Failed to generate PDF.', 'error');
-      }
-    })
-    .withFailureHandler(onFailure)
-    .exportTurnoverReportToHTMLPDF(period, category);
-}
-
-function displayInventoryStatus(inventoryData) {
-  hideStatus();
-  
-  if (!inventoryData) {
-    return showStatus('No inventory data received from server.', 'error');
-  }
-  
-  if (!inventoryData.success) {
-    return showStatus(inventoryData.message || 'Unknown error loading inventory.', 'error');
-  }
-  
-  // Populate inventory table
-  const tableBody = document.getElementById('inventory-body');
-  tableBody.innerHTML = '';
-  
-  if (inventoryData.items && inventoryData.items.length > 0) {
-    inventoryData.items.forEach(item => {
-      const row = document.createElement('tr');
-      row.style.cursor = 'pointer';
-      row.onclick = function() { loadItemInEntryScreen(item.upc); };
+    function exportInventoryToHTMLPDF() {
+      showStatus('Generating PDF...', 'info');
       
-      row.innerHTML = `
-        <td>${item.upc || 'N/A'}</td>
-        <td>${item.brand || 'N/A'}</td>
-        <td>${item.name || 'N/A'}</td>
-        <td>${item.size || 'N/A'}</td>
-        <td>$${(item.price || 0).toFixed(2)}</td>
-        <td>${item.qty || '0'}</td>
-        <td>$${(item.value || 0).toFixed(2)}</td>
-      `;
-      
-      tableBody.appendChild(row);
-    });
-    
-    // Update totalsclick
-    document.getElementById('total-quantity').textContent = inventoryData.totalQuantity;
-    document.getElementById('total-value').textContent = '$' + inventoryData.totalValue.toFixed(2);
-    
-    showStatus('Inventory status loaded successfully!', 'success');
-  } else {
-    tableBody.innerHTML = '<tr><td colspan="7" style="text-align: center;">No inventory items found with positive quantity.</td></tr>';
-    document.getElementById('total-quantity').textContent = '0';
-    document.getElementById('total-value').textContent = '$0.00';
-    showStatus('No inventory items found with positive quantity.', 'info');
-  }
-}
-
-function loadItemInEntryScreen(upc) {
-  // Switch to the Item Entry tab
-  document.querySelector('.nav-tab[data-page="item-entry"]').click();
-  
-  // Set the UPC and trigger lookup
-  document.getElementById('upc-input').value = upc;
-  handleLookup();
-  
-  // Log this action
-  logUserAction(`Loaded item ${upc} from inventory status`);
-}
-
-function exportInventoryToHTMLPDF() {
-  showStatus('Generating PDF...', 'info');
-  
-  google.script.run
-    .withSuccessHandler(function(pdfUrl) {
-      if (pdfUrl) {
-        window.open(pdfUrl, '_blank');
-        showStatus('PDF generated successfully!', 'success');
-        
-        // Log this action
-        logUserAction('Exported inventory status to PDF');
-      } else {
-        showStatus('Failed to generate PDF.', 'error');
-      }
-    })
-    .withFailureHandler(function(error) {
-      console.error('Error generating PDF:', error);
-      showStatus('Failed to generate PDF: ' + (error.message || error), 'error');
-    })
-    .exportInventoryStatusToHTMLPDF();
-}
-
-
-
-
+      google.script.run
+        .withSuccessHandler(function(pdfUrl) {
+          if (pdfUrl) {
+            window.open(pdfUrl, '_blank');
+            showStatus('PDF generated successfully!', 'success');
+            
+            // Log this action
+            logUserAction('Exported inventory status to PDF');
+          } else {
+            showStatus('Failed to generate PDF.', 'error');
+          }
+        })
+        .withFailureHandler(function(error) {
+          console.error('Error generating PDF:', error);
+          showStatus('Failed to generate PDF: ' + (error.message || error), 'error');
+        })
+        .exportInventoryStatusToHTMLPDF();
+    }
     // --- LOGIN LOGIC ---
     function handleLogin() {
       const username = document.getElementById('username').value;
@@ -2177,267 +2154,265 @@ function exportInventoryToHTMLPDF() {
     }
 
     // --- EXPIRATION TRACKING LOGIC ---
-function loadExpirationData() {
-  // Show loading indicator
-  document.getElementById('expiration-loading').classList.remove('hidden');
-  showStatus('Loading expiration data...', 'info');
-  
-  // Get filter values
-  const expirationFilter = document.getElementById('expiration-filter').value;
-  const categoryFilter = document.getElementById('category-filter').value;
-  
-  google.script.run
-    .withSuccessHandler(function(expirationData) {
-      // Hide loading indicator
-      document.getElementById('expiration-loading').classList.add('hidden');
+    function loadExpirationData() {
+      // Show loading indicator
+      document.getElementById('expiration-loading').classList.remove('hidden');
+      showStatus('Loading expiration data...', 'info');
       
-      console.log('Expiration data received:', expirationData);
+      // Get filter values
+      const expirationFilter = document.getElementById('expiration-filter').value;
+      const categoryFilter = document.getElementById('category-filter').value;
+      
+      google.script.run
+        .withSuccessHandler(function(expirationData) {
+          // Hide loading indicator
+          document.getElementById('expiration-loading').classList.add('hidden');
+          
+          console.log('Expiration data received:', expirationData);
+          
+          if (!expirationData) {
+            return showStatus('No data received from server. Please try again.', 'error');
+          }
+          
+          displayExpirationData(expirationData, expirationFilter, categoryFilter);
+          
+          // Log this action
+          logUserAction('Viewed expiration tracking');
+        })
+        .withFailureHandler(function(error) {
+          // Hide loading indicator
+          document.getElementById('expiration-loading').classList.add('hidden');
+          console.error('Error loading expiration data:', error);
+          showStatus('Error loading expiration data: ' + (error.message || error), 'error');
+        })
+        .getExpirationData();
+    }
+
+    function displayExpirationData(expirationData, expirationFilter, categoryFilter) {
+      hideStatus();
       
       if (!expirationData) {
-        return showStatus('No data received from server. Please try again.', 'error');
+        return showStatus('No expiration data received from server.', 'error');
       }
       
-      displayExpirationData(expirationData, expirationFilter, categoryFilter);
-      
-      // Log this action
-      logUserAction('Viewed expiration tracking');
-    })
-    .withFailureHandler(function(error) {
-      // Hide loading indicator
-      document.getElementById('expiration-loading').classList.add('hidden');
-      console.error('Error loading expiration data:', error);
-      showStatus('Error loading expiration data: ' + (error.message || error), 'error');
-    })
-    .getExpirationData();
-}
-
-function displayExpirationData(expirationData, expirationFilter, categoryFilter) {
-  hideStatus();
-  
-  if (!expirationData) {
-    return showStatus('No expiration data received from server.', 'error');
-  }
-  
-  if (!expirationData.success) {
-    return showStatus(expirationData.message || 'Unknown error loading expiration data.', 'error');
-  }
-  
-  // Update summary counts
-  document.getElementById('expired-count').textContent = expirationData.expiredCount || 0;
-  document.getElementById('expiring-7-count').textContent = expirationData.expiring7Count || 0;
-  document.getElementById('expiring-30-count').textContent = expirationData.expiring30Count || 0;
-  document.getElementById('expiring-90-count').textContent = expirationData.expiring90Count || 0;
-  
-  // Filter items based on selected filters
-  let filteredItems = expirationData.items;
-  
-  // Apply expiration filter
-  if (expirationFilter !== 'all') {
-    switch (expirationFilter) {
-      case 'expired':
-        filteredItems = filteredItems.filter(item => item.daysLeft <= 0);
-        break;
-      case '7days':
-        filteredItems = filteredItems.filter(item => item.daysLeft > 0 && item.daysLeft <= 7);
-        break;
-      case '30days':
-        filteredItems = filteredItems.filter(item => item.daysLeft > 7 && item.daysLeft <= 30);
-        break;
-      case '90days':
-        filteredItems = filteredItems.filter(item => item.daysLeft > 30 && item.daysLeft <= 90);
-        break;
-    }
-  }
-  
-  // Apply category filter
-  if (categoryFilter !== 'all') {
-    filteredItems = filteredItems.filter(item => item.category === categoryFilter);
-  }
-  
-  // Populate expiration table
-  const tableBody = document.getElementById('expiration-body');
-  tableBody.innerHTML = '';
-  
-  if (filteredItems && filteredItems.length > 0) {
-    filteredItems.forEach(item => {
-      const row = document.createElement('tr');
-      
-      // Add appropriate class based on expiration status
-      if (item.daysLeft <= 0) {
-        row.classList.add('expired');
-      } else if (item.daysLeft <= 7) {
-        row.classList.add('expiring-7days');
-      } else if (item.daysLeft <= 30) {
-        row.classList.add('expiring-30days');
-      } else if (item.daysLeft <= 90) {
-        row.classList.add('expiring-90days');
+      if (!expirationData.success) {
+        return showStatus(expirationData.message || 'Unknown error loading expiration data.', 'error');
       }
       
-      // Format the status text
-      let statusText = '';
-      if (item.daysLeft <= 0) {
-        statusText = 'EXPIRED';
-      } else if (item.daysLeft === 1) {
-        statusText = 'EXPIRES TOMORROW';
-      } else {
-        statusText = `EXPIRES IN ${item.daysLeft} DAYS`;
+      // Update summary counts
+      document.getElementById('expired-count').textContent = expirationData.expiredCount || 0;
+      document.getElementById('expiring-7-count').textContent = expirationData.expiring7Count || 0;
+      document.getElementById('expiring-30-count').textContent = expirationData.expiring30Count || 0;
+      document.getElementById('expiring-90-count').textContent = expirationData.expiring90Count || 0;
+      
+      // Filter items based on selected filters
+      let filteredItems = expirationData.items;
+      
+      // Apply expiration filter
+      if (expirationFilter !== 'all') {
+        switch (expirationFilter) {
+          case 'expired':
+            filteredItems = filteredItems.filter(item => item.daysLeft <= 0);
+            break;
+          case '7days':
+            filteredItems = filteredItems.filter(item => item.daysLeft > 0 && item.daysLeft <= 7);
+            break;
+          case '30days':
+            filteredItems = filteredItems.filter(item => item.daysLeft > 7 && item.daysLeft <= 30);
+            break;
+          case '90days':
+            filteredItems = filteredItems.filter(item => item.daysLeft > 30 && item.daysLeft <= 90);
+            break;
+        }
       }
       
-      row.innerHTML = `
-        <td>${item.upc || 'N/A'}</td>
-        <td>${item.brand || 'N/A'}</td>
-        <td>${item.name || 'N/A'}</td>
-        <td>${item.category || 'N/A'}</td>
-        <td>${item.quantity || '0'}</td>
-        <td>${item.expDate || 'N/A'}</td>
-        <td>${item.daysLeft <= 0 ? 'EXPIRED' : item.daysLeft}</td>
-        <td>${statusText}</td>
-        <td>
-          <input type="checkbox" class="item-checkbox" data-upc="${item.upc}" data-name="${item.name}" data-qty="${item.quantity}">
-          <button onclick="loadItemInEntryScreen('${item.upc}')" class="btn-secondary" style="padding: 5px 10px; font-size: 12px;">Edit</button>
-        </td>
-      `;
-      
-      tableBody.appendChild(row);
-    });
-    
-    showStatus('Expiration data loaded successfully!', 'success');
-  } else {
-    tableBody.innerHTML = '<tr><td colspan="9" style="text-align: center;">No items found matching the selected filters.</td></tr>';
-    showStatus('No items found matching the selected filters.', 'info');
-  }
-  
-  // Populate category filter if needed
-  if (expirationData.categories && expirationData.categories.length > 0) {
-    const categorySelect = document.getElementById('category-filter');
-    
-    // Save current selection
-    const currentSelection = categorySelect.value;
-    
-    // Clear existing options except the first one
-    while (categorySelect.options.length > 1) {
-      categorySelect.remove(1);
-    }
-    
-    // Add new options
-    expirationData.categories.forEach(category => {
-      if (category) {
-        const option = document.createElement('option');
-        option.value = category;
-        option.textContent = category;
-        categorySelect.appendChild(option);
+      // Apply category filter
+      if (categoryFilter !== 'all') {
+        filteredItems = filteredItems.filter(item => item.category === categoryFilter);
       }
-    });
-    
-    // Restore selection if possible
-    if (currentSelection && Array.from(categorySelect.options).some(opt => opt.value === currentSelection)) {
-      categorySelect.value = currentSelection;
-    }
-  }
-}
-
-function showMarkLossModal() {
-  // Get selected items
-  const selectedCheckboxes = document.querySelectorAll('.item-checkbox:checked');
-  
-  if (selectedCheckboxes.length === 0) {
-    return showStatus('Please select at least one item to mark as loss.', 'warning');
-  }
-  
-  // Populate the modal with selected items
-  const lossItemsList = document.getElementById('loss-items-list');
-  lossItemsList.innerHTML = '';
-  
-  selectedCheckboxes.forEach(checkbox => {
-    const upc = checkbox.getAttribute('data-upc');
-    const name = checkbox.getAttribute('data-name');
-    const qty = checkbox.getAttribute('data-qty');
-    
-    const itemDiv = document.createElement('div');
-    itemDiv.className = 'loss-item';
-    itemDiv.innerHTML = `
-      <div><strong>${name}</strong> (UPC: ${upc})</div>
-      <div class="row" style="margin-top: 5px; margin-bottom: 15px;">
-        <div class="col">
-          <label for="loss-qty-${upc}">Quantity to Remove:</label>
-          <input type="number" id="loss-qty-${upc}" min="1" max="${qty}" value="${qty}" class="loss-qty" data-upc="${upc}">
-        </div>
-      </div>
-    `;
-    
-    lossItemsList.appendChild(itemDiv);
-  });
-  
-  // Show the modal
-  document.getElementById('mark-loss-modal').style.display = 'block';
-}
-
-function recordLoss() {
-  // Get loss details
-  const reason = document.getElementById('loss-reason').value;
-  const notes = document.getElementById('loss-notes').value;
-  
-  // Get quantities for each item
-  const lossItems = [];
-  document.querySelectorAll('.loss-qty').forEach(input => {
-    lossItems.push({
-      upc: input.getAttribute('data-upc'),
-      quantity: parseInt(input.value) || 0
-    });
-  });
-  
-  if (lossItems.length === 0) {
-    return showStatus('No items selected for loss recording.', 'error');
-  }
-  
-  showStatus('Recording inventory loss...', 'info');
-  
-  google.script.run
-    .withSuccessHandler(function(result) {
-      if (result.success) {
-        showStatus(result.message || 'Inventory loss recorded successfully!', 'success');
-        closeModal('mark-loss-modal');
+      
+      // Populate expiration table
+      const tableBody = document.getElementById('expiration-body');
+      tableBody.innerHTML = '';
+      
+      if (filteredItems && filteredItems.length > 0) {
+        filteredItems.forEach(item => {
+          const row = document.createElement('tr');
+          
+          // Add appropriate class based on expiration status
+          if (item.daysLeft <= 0) {
+            row.classList.add('expired');
+          } else if (item.daysLeft <= 7) {
+            row.classList.add('expiring-7days');
+          } else if (item.daysLeft <= 30) {
+            row.classList.add('expiring-30days');
+          } else if (item.daysLeft <= 90) {
+            row.classList.add('expiring-90days');
+          }
+          
+          // Format the status text
+          let statusText = '';
+          if (item.daysLeft <= 0) {
+            statusText = 'EXPIRED';
+          } else if (item.daysLeft === 1) {
+            statusText = 'EXPIRES TOMORROW';
+          } else {
+            statusText = `EXPIRES IN ${item.daysLeft} DAYS`;
+          }
+          
+          row.innerHTML = `
+            <td>${item.upc || 'N/A'}</td>
+            <td>${item.brand || 'N/A'}</td>
+            <td>${item.name || 'N/A'}</td>
+            <td>${item.category || 'N/A'}</td>
+            <td>${item.quantity || '0'}</td>
+            <td>${item.expDate || 'N/A'}</td>
+            <td>${item.daysLeft <= 0 ? 'EXPIRED' : item.daysLeft}</td>
+            <td>${statusText}</td>
+            <td>
+              <input type="checkbox" class="item-checkbox" data-upc="${item.upc}" data-name="${item.name}" data-qty="${item.quantity}">
+              <button onclick="loadItemInEntryScreen('${item.upc}')" class="btn-secondary" style="padding: 5px 10px; font-size: 12px;">Edit</button>
+            </td>
+          `;
+          
+          tableBody.appendChild(row);
+        });
         
-        // Refresh the expiration data
-        loadExpirationData();
-        
-        // Log this action
-        logUserAction('Recorded inventory loss: ' + reason);
+        showStatus('Expiration data loaded successfully!', 'success');
       } else {
-        showStatus(result.message || 'Failed to record inventory loss.', 'error');
+        tableBody.innerHTML = '<tr><td colspan="9" style="text-align: center;">No items found matching the selected filters.</td></tr>';
+        showStatus('No items found matching the selected filters.', 'info');
       }
-    })
-    .withFailureHandler(function(error) {
-      console.error('Error recording loss:', error);
-      showStatus('Error recording loss: ' + (error.message || error), 'error');
-    })
-    .recordInventoryLoss(lossItems, reason, notes);
-}
-
-function exportExpirationToHTMLPDF() {
-  showStatus('Generating PDF...', 'info');
-  
-  // Get filter values
-  const expirationFilter = document.getElementById('expiration-filter').value;
-  const categoryFilter = document.getElementById('category-filter').value;
-  
-  google.script.run
-    .withSuccessHandler(function(pdfUrl) {
-      if (pdfUrl) {
-        window.open(pdfUrl, '_blank');
-        showStatus('PDF generated successfully!', 'success');
+      
+      // Populate category filter if needed
+      if (expirationData.categories && expirationData.categories.length > 0) {
+        const categorySelect = document.getElementById('category-filter');
         
-        // Log this action
-        logUserAction('Exported expiration report to PDF');
-      } else {
-        showStatus('Failed to generate PDF.', 'error');
+        // Save current selection
+        const currentSelection = categorySelect.value;
+        
+        // Clear existing options except the first one
+        while (categorySelect.options.length > 1) {
+          categorySelect.remove(1);
+        }
+        
+        // Add new options
+        expirationData.categories.forEach(category => {
+          if (category) {
+            const option = document.createElement('option');
+            option.value = category;
+            option.textContent = category;
+            categorySelect.appendChild(option);
+          }
+        });
+        
+        // Restore selection if possible
+        if (currentSelection && Array.from(categorySelect.options).some(opt => opt.value === currentSelection)) {
+          categorySelect.value = currentSelection;
+        }
       }
-    })
-    .withFailureHandler(onFailure)
-    .exportExpirationReportToHTMLPDF(expirationFilter, categoryFilter);
-}
+    }
 
+    function showMarkLossModal() {
+      // Get selected items
+      const selectedCheckboxes = document.querySelectorAll('.item-checkbox:checked');
+      
+      if (selectedCheckboxes.length === 0) {
+        return showStatus('Please select at least one item to mark as loss.', 'warning');
+      }
+      
+      // Populate the modal with selected items
+      const lossItemsList = document.getElementById('loss-items-list');
+      lossItemsList.innerHTML = '';
+      
+      selectedCheckboxes.forEach(checkbox => {
+        const upc = checkbox.getAttribute('data-upc');
+        const name = checkbox.getAttribute('data-name');
+        const qty = checkbox.getAttribute('data-qty');
+        
+        const itemDiv = document.createElement('div');
+        itemDiv.className = 'loss-item';
+        itemDiv.innerHTML = `
+          <div><strong>${name}</strong> (UPC: ${upc})</div>
+          <div class="row" style="margin-top: 5px; margin-bottom: 15px;">
+            <div class="col">
+              <label for="loss-qty-${upc}">Quantity to Remove:</label>
+              <input type="number" id="loss-qty-${upc}" min="1" max="${qty}" value="${qty}" class="loss-qty" data-upc="${upc}">
+            </div>
+          </div>
+        `;
+        
+        lossItemsList.appendChild(itemDiv);
+      });
+      
+      // Show the modal
+      document.getElementById('mark-loss-modal').style.display = 'block';
+    }
 
+    function recordLoss() {
+      // Get loss details
+      const reason = document.getElementById('loss-reason').value;
+      const notes = document.getElementById('loss-notes').value;
+      
+      // Get quantities for each item
+      const lossItems = [];
+      document.querySelectorAll('.loss-qty').forEach(input => {
+        lossItems.push({
+          upc: input.getAttribute('data-upc'),
+          quantity: parseInt(input.value) || 0
+        });
+      });
+      
+      if (lossItems.length === 0) {
+        return showStatus('No items selected for loss recording.', 'error');
+      }
+      
+      showStatus('Recording inventory loss...', 'info');
+      
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result.success) {
+            showStatus(result.message || 'Inventory loss recorded successfully!', 'success');
+            closeModal('mark-loss-modal');
+            
+            // Refresh the expiration data
+            loadExpirationData();
+            
+            // Log this action
+            logUserAction('Recorded inventory loss: ' + reason);
+          } else {
+            showStatus(result.message || 'Failed to record inventory loss.', 'error');
+          }
+        })
+        .withFailureHandler(function(error) {
+          console.error('Error recording loss:', error);
+          showStatus('Error recording loss: ' + (error.message || error), 'error');
+        })
+        .recordInventoryLoss(lossItems, reason, notes);
+    }
+
+    function exportExpirationToHTMLPDF() {
+      showStatus('Generating PDF...', 'info');
+      
+      // Get filter values
+      const expirationFilter = document.getElementById('expiration-filter').value;
+      const categoryFilter = document.getElementById('category-filter').value;
+      
+      google.script.run
+        .withSuccessHandler(function(pdfUrl) {
+          if (pdfUrl) {
+            window.open(pdfUrl, '_blank');
+            showStatus('PDF generated successfully!', 'success');
+            
+            // Log this action
+            logUserAction('Exported expiration report to PDF');
+          } else {
+            showStatus('Failed to generate PDF.', 'error');
+          }
+        })
+        .withFailureHandler(onFailure)
+        .exportExpirationReportToHTMLPDF(expirationFilter, categoryFilter);
+    }
     function displayCredentials(credentials) {
       const container = document.getElementById('credentials-container');
       
@@ -2689,295 +2664,504 @@ function exportExpirationToHTMLPDF() {
     }
     
     // --- SALES REPORT LOGIC ---
-function generateSalesReport() {
-  const startDate = document.getElementById('start-date').value;
-  const endDate = document.getElementById('end-date').value;
-  
-  if (!startDate || !endDate) {
-    return showStatus('Please select both start and end dates.', 'error');
-  }
-  
-  // Show loading indicator
-  document.getElementById('sales-loading').classList.remove('hidden');
-  document.getElementById('report-content').classList.add('hidden');
-  showStatus('Generating sales report...', 'info');
-  
-  // Add a safety timeout to hide the loading overlay after 10 seconds
-  setTimeout(forceHideLoadingOverlays, 10000);
-  
-  google.script.run
-    .withSuccessHandler(function(reportData) {
-      // Explicitly hide loading indicator
-      forceHideLoadingOverlays();
+    function generateSalesReport() {
+      const startDate = document.getElementById('start-date').value;
+      const endDate = document.getElementById('end-date').value;
       
-      console.log('Report data received:', reportData);
-      
-      if (!reportData) {
-        return showStatus('No data received from server. Please try again.', 'error');
+      if (!startDate || !endDate) {
+        return showStatus('Please select both start and end dates.', 'error');
       }
       
-      displaySalesReport(reportData);
+      // Show loading indicator
+      document.getElementById('sales-loading').classList.remove('hidden');
+      document.getElementById('report-content').classList.add('hidden');
+      showStatus('Generating sales report...', 'info');
       
-      // Log this action
-      logUserAction('Generated sales report');
-    })
-    .withFailureHandler(function(error) {
-      // Hide loading indicator
-      forceHideLoadingOverlays();
-      console.error('Error generating report:', error);
-      showStatus('Error generating report: ' + (error.message || error), 'error');
-    })
-    .generateSalesReport(startDate, endDate);
-}
-
-function displaySalesReport(reportData) {
-  // Make sure loading overlay is hidden
-  forceHideLoadingOverlays();
-  
-  hideStatus();
-  
-  if (!reportData) {
-    return showStatus('No report data received from server.', 'error');
-  }
-  
-  if (!reportData.success) {
-    return showStatus(reportData.message || 'Unknown error generating report.', 'error');
-  }
-  
-  // Show the report content
-  document.getElementById('report-content').classList.remove('hidden');
-  
-  // Update summary metrics
-  document.getElementById('total-transactions').textContent = reportData.totalTransactions;
-  document.getElementById('total-items').textContent = reportData.totalItems;
-  document.getElementById('total-subtotal').textContent = '$' + reportData.totalSubtotal.toFixed(2);
-  document.getElementById('total-tax').textContent = '$' + reportData.totalTax.toFixed(2);
-  document.getElementById('total-revenue').textContent = '$' + reportData.totalRevenue.toFixed(2);
-  
-  // Populate transactions table
-  const tableBody = document.getElementById('transactions-body');
-  tableBody.innerHTML = '';
-  
-  if (reportData.transactions && reportData.transactions.length > 0) {
-    reportData.transactions.forEach(transaction => {
-      const row = document.createElement('tr');
+      // Add a safety timeout to hide the loading overlay after 10 seconds
+      setTimeout(forceHideLoadingOverlays, 10000);
       
-      row.innerHTML = `
-        <td>${transaction.id || 'N/A'}</td>
-        <td>${transaction.date || 'N/A'}</td>
-        <td>${transaction.time || 'N/A'}</td>
-        <td>${transaction.items || '0'}</td>
-        <td>${transaction.paymentMethod || 'N/A'}</td>
-        <td>$${(transaction.subtotal || 0).toFixed(2)}</td>
-        <td>$${(transaction.tax || 0).toFixed(2)}</td>
-        <td>$${(transaction.total || 0).toFixed(2)}</td>
-      `;
-      
-      tableBody.appendChild(row);
-    });
-    
-    showStatus('Report generated successfully!', 'success');
-  } else {
-    tableBody.innerHTML = '<tr><td colspan="8" style="text-align: center;">No transactions found in the selected date range.</td></tr>';
-    showStatus('No transactions found in the selected date range.', 'info');
-  }
-}
-
-function clearReport() {
-  document.getElementById('report-content').classList.add('hidden');
-  document.getElementById('transactions-body').innerHTML = '';
-  hideStatus();
-}
-
-function exportToHTMLPDF() {
-  const startDate = document.getElementById('start-date').value;
-  const endDate = document.getElementById('end-date').value;
-  
-  showStatus('Generating PDF...', 'info');
-  
-  google.script.run
-    .withSuccessHandler(function(pdfUrl) {
-      if (pdfUrl) {
-        window.open(pdfUrl, '_blank');
-        showStatus('PDF generated successfully!', 'success');
-        
-        // Log this action
-        logUserAction('Exported sales report to PDF');
-      } else {
-        showStatus('Failed to generate PDF.', 'error');
-      }
-    })
-    .withFailureHandler(onFailure)
-    .exportSalesReportToHTMLPDF(startDate, endDate);
-}
-
-// --- PRODUCT REPORT LOGIC ---
-function generateProductReport() {
-  const startDate = document.getElementById('product-start-date').value;
-  const endDate = document.getElementById('product-end-date').value;
-  
-  if (!startDate || !endDate) {
-    return showStatus('Please select both start and end dates.', 'error');
-  }
-  
-  // Show loading indicator
-  document.getElementById('product-loading').classList.remove('hidden');
-  document.getElementById('product-report-content').classList.add('hidden');
-  showStatus('Generating product performance report...', 'info');
-  
-  // Add a safety timeout to hide the loading overlay after 10 seconds
-  setTimeout(forceHideLoadingOverlays, 10000);
-  
-  google.script.run
-    .withSuccessHandler(function(reportData) {
-      // Explicitly hide loading indicator
-      forceHideLoadingOverlays();
-      
-      console.log('Product report data received:', reportData);
-      
-      if (!reportData) {
-        return showStatus('No data received from server. Please try again.', 'error');
-      }
-      
-      displayProductReport(reportData);
-      
-      // Log this action
-      logUserAction('Generated product performance report');
-    })
-    .withFailureHandler(function(error) {
-      // Hide loading indicator
-      forceHideLoadingOverlays();
-      console.error('Error generating product report:', error);
-      showStatus('Error generating product report: ' + (error.message || error), 'error');
-    })
-    .generateProductPerformanceReport(startDate, endDate);
-}
-
-function displayProductReport(reportData) {
-  // Make sure loading overlay is hidden
-  forceHideLoadingOverlays();
-  
-  hideStatus();
-  
-  if (!reportData) {
-    return showStatus('No report data received from server.', 'error');
-  }
-  
-  if (!reportData.success) {
-    return showStatus(reportData.message || 'Unknown error generating report.', 'error');
-  }
-  
-  // Show the report content
-  document.getElementById('product-report-content').classList.remove('hidden');
-  
-  // Update summary metrics
-  document.getElementById('total-products').textContent = reportData.totalProducts;
-  document.getElementById('total-quantity').textContent = reportData.totalQuantity;
-  document.getElementById('avg-price').textContent = '$' + reportData.averagePrice.toFixed(2);
-  document.getElementById('total-profit').textContent = '$' + reportData.totalProfit.toFixed(2);
-  
-  // Populate products table
-  const tableBody = document.getElementById('products-body');
-  tableBody.innerHTML = '';
-  
-  if (reportData.products && reportData.products.length > 0) {
-    reportData.products.forEach(product => {
-      const row = document.createElement('tr');
-      
-      row.innerHTML = `
-        <td>${product.upc || 'N/A'}</td>
-        <td>${product.name || 'N/A'}</td>
-        <td>${product.brand || 'N/A'}</td>
-        <td>${product.quantity || '0'}</td>
-        <td>$${(product.price || 0).toFixed(2)}</td>
-        <td>$${(product.totalSales || 0).toFixed(2)}</td>
-        <td>$${(product.profit || 0).toFixed(2)}</td>
-      `;
-      
-      tableBody.appendChild(row);
-    });
-    
-    // Draw chart if Google Charts is loaded
-    if (typeof google.charts !== 'undefined' && google.charts.loaded) {
-      drawProductChart(reportData);
-    } else {
-      google.charts.load('current', {'packages':['corechart']});
-      google.charts.setOnLoadCallback(() => drawProductChart(reportData));
+      google.script.run
+        .withSuccessHandler(function(reportData) {
+          // Explicitly hide loading indicator
+          forceHideLoadingOverlays();
+          
+          console.log('Report data received:', reportData);
+          
+          if (!reportData) {
+            return showStatus('No data received from server. Please try again.', 'error');
+          }
+          
+          displaySalesReport(reportData);
+          
+          // Log this action
+          logUserAction('Generated sales report');
+        })
+        .withFailureHandler(function(error) {
+          // Hide loading indicator
+          forceHideLoadingOverlays();
+          console.error('Error generating report:', error);
+          showStatus('Error generating report: ' + (error.message || error), 'error');
+        })
+        .generateSalesReport(startDate, endDate);
     }
-    
-    showStatus('Product report generated successfully!', 'success');
-  } else {
-    tableBody.innerHTML = '<tr><td colspan="7" style="text-align: center;">No products found in the selected date range.</td></tr>';
-    showStatus('No products found in the selected date range.', 'info');
-  }
-}
 
-function drawProductChart(reportData) {
-  const data = new google.visualization.DataTable();
-  data.addColumn('string', 'Product');
-  data.addColumn('number', 'Sales');
-  
-  // Add top 10 products by sales
-  const topProducts = reportData.products.slice(0, 10);
-  topProducts.forEach(product => {
-    data.addRow([product.name, product.totalSales]);
-  });
-  
-  const options = {
-    title: 'Top Products by Sales',
-    colors: ['#FFD700'],
-    backgroundColor: { fill:'transparent' },
-    titleTextStyle: { color: '#FFD700' },
-    legend: { textStyle: { color: '#ffffff' } },
-    hAxis: { textStyle: { color: '#ffffff' } },
-    vAxis: { textStyle: { color: '#ffffff' }, format: '$#,##0.00' }
-  };
-  
-  const chart = new google.visualization.BarChart(document.getElementById('product-chart'));
-  chart.draw(data, options);
-}
-
-function clearProductReport() {
-  document.getElementById('product-report-content').classList.add('hidden');
-  document.getElementById('products-body').innerHTML = '';
-  hideStatus();
-}
-
-function exportProductReportToHTMLPDF() {
-  const startDate = document.getElementById('product-start-date').value;
-  const endDate = document.getElementById('product-end-date').value;
-  
-  showStatus('Generating PDF...', 'info');
-  
-  google.script.run
-    .withSuccessHandler(function(pdfUrl) {
-      if (pdfUrl) {
-        window.open(pdfUrl, '_blank');
-        showStatus('PDF generated successfully!', 'success');
-        
-        // Log this action
-        logUserAction('Exported product performance report to PDF');
-      } else {
-        showStatus('Failed to generate PDF.', 'error');
+    function displaySalesReport(reportData) {
+      // Make sure loading overlay is hidden
+      forceHideLoadingOverlays();
+      
+      hideStatus();
+      
+      if (!reportData) {
+        return showStatus('No report data received from server.', 'error');
       }
-    })
-    .withFailureHandler(onFailure)
-    .exportProductReportToHTMLPDF(startDate, endDate);
-}
+      
+      if (!reportData.success) {
+        return showStatus(reportData.message || 'Unknown error generating report.', 'error');
+      }
+      
+      // Show the report content
+      document.getElementById('report-content').classList.remove('hidden');
+      
+      // Update summary metrics
+      document.getElementById('total-transactions').textContent = reportData.totalTransactions;
+      document.getElementById('total-items').textContent = reportData.totalItems;
+      document.getElementById('total-subtotal').textContent = '$' + reportData.totalSubtotal.toFixed(2);
+      document.getElementById('total-tax').textContent = '$' + reportData.totalTax.toFixed(2);
+      document.getElementById('total-revenue').textContent = '$' + reportData.totalRevenue.toFixed(2);
+      
+      // Populate transactions table
+      const tableBody = document.getElementById('transactions-body');
+      tableBody.innerHTML = '';
+      
+      if (reportData.transactions && reportData.transactions.length > 0) {
+        reportData.transactions.forEach(transaction => {
+          const row = document.createElement('tr');
+          
+          row.innerHTML = `
+            <td>${transaction.id || 'N/A'}</td>
+            <td>${transaction.date || 'N/A'}</td>
+            <td>${transaction.time || 'N/A'}</td>
+            <td>${transaction.items || '0'}</td>
+            <td>${transaction.paymentMethod || 'N/A'}</td>
+            <td>$${(transaction.subtotal || 0).toFixed(2)}</td>
+            <td>$${(transaction.tax || 0).toFixed(2)}</td>
+            <td>$${(transaction.total || 0).toFixed(2)}</td>
+          `;
+          
+          tableBody.appendChild(row);
+        });
+        
+        showStatus('Report generated successfully!', 'success');
+      } else {
+        tableBody.innerHTML = '<tr><td colspan="8" style="text-align: center;">No transactions found in the selected date range.</td></tr>';
+        showStatus('No transactions found in the selected date range.', 'info');
+      }
+    }
 
-    
     function clearReport() {
       document.getElementById('report-content').classList.add('hidden');
-      document.getElementById('start-date').value = '';
-      document.getElementById('end-date').value = '';
-      showStatus('Report cleared.', 'info');
+      document.getElementById('transactions-body').innerHTML = '';
+      hideStatus();
     }
-    
+
+    function exportToHTMLPDF() {
+      const startDate = document.getElementById('start-date').value;
+      const endDate = document.getElementById('end-date').value;
+      
+      showStatus('Generating PDF...', 'info');
+      
+      google.script.run
+        .withSuccessHandler(function(pdfUrl) {
+          if (pdfUrl) {
+            window.open(pdfUrl, '_blank');
+            showStatus('PDF generated successfully!', 'success');
+            
+            // Log this action
+            logUserAction('Exported sales report to PDF');
+          } else {
+            showStatus('Failed to generate PDF.', 'error');
+          }
+        })
+        .withFailureHandler(onFailure)
+        .exportSalesReportToHTMLPDF(startDate, endDate);
+    }
+
+    // --- PRODUCT REPORT LOGIC ---
+    function generateProductReport() {
+      const startDate = document.getElementById('product-start-date').value;
+      const endDate = document.getElementById('product-end-date').value;
+      
+      if (!startDate || !endDate) {
+        return showStatus('Please select both start and end dates.', 'error');
+      }
+      
+      // Show loading indicator
+      document.getElementById('product-loading').classList.remove('hidden');
+      document.getElementById('product-report-content').classList.add('hidden');
+      showStatus('Generating product performance report...', 'info');
+      
+      // Add a safety timeout to hide the loading overlay after 10 seconds
+      setTimeout(forceHideLoadingOverlays, 10000);
+      
+      google.script.run
+        .withSuccessHandler(function(reportData) {
+          // Explicitly hide loading indicator
+          forceHideLoadingOverlays();
+          
+          console.log('Product report data received:', reportData);
+          
+          if (!reportData) {
+            return showStatus('No data received from server. Please try again.', 'error');
+          }
+          
+          displayProductReport(reportData);
+          
+          // Log this action
+          logUserAction('Generated product performance report');
+        })
+        .withFailureHandler(function(error) {
+          // Hide loading indicator
+          forceHideLoadingOverlays();
+          console.error('Error generating product report:', error);
+          showStatus('Error generating product report: ' + (error.message || error), 'error');
+        })
+        .generateProductPerformanceReport(startDate, endDate);
+    }
+
+    function displayProductReport(reportData) {
+      // Make sure loading overlay is hidden
+      forceHideLoadingOverlays();
+      
+      hideStatus();
+      
+      if (!reportData) {
+        return showStatus('No report data received from server.', 'error');
+      }
+      
+      if (!reportData.success) {
+        return showStatus(reportData.message || 'Unknown error generating report.', 'error');
+      }
+      
+      // Show the report content
+      document.getElementById('product-report-content').classList.remove('hidden');
+      
+      // Update summary metrics
+      document.getElementById('total-products').textContent = reportData.totalProducts;
+      document.getElementById('total-quantity').textContent = reportData.totalQuantity;
+      document.getElementById('avg-price').textContent = '$' + reportData.averagePrice.toFixed(2);
+      document.getElementById('total-profit').textContent = '$' + reportData.totalProfit.toFixed(2);
+      
+      // Populate products table
+      const tableBody = document.getElementById('products-body');
+      tableBody.innerHTML = '';
+      
+      if (reportData.products && reportData.products.length > 0) {
+        reportData.products.forEach(product => {
+          const row = document.createElement('tr');
+          
+          row.innerHTML = `
+            <td>${product.upc || 'N/A'}</td>
+            <td>${product.name || 'N/A'}</td>
+            <td>${product.brand || 'N/A'}</td>
+            <td>${product.quantity || '0'}</td>
+            <td>$${(product.price || 0).toFixed(2)}</td>
+            <td>$${(product.totalSales || 0).toFixed(2)}</td>
+            <td>$${(product.profit || 0).toFixed(2)}</td>
+          `;
+          
+          tableBody.appendChild(row);
+        });
+        
+        // Draw chart if Google Charts is loaded
+        if (typeof google.charts !== 'undefined' && google.charts.loaded) {
+          drawProductChart(reportData);
+        } else {
+          google.charts.load('current', {'packages':['corechart']});
+          google.charts.setOnLoadCallback(() => drawProductChart(reportData));
+        }
+        
+        showStatus('Product report generated successfully!', 'success');
+      } else {
+        tableBody.innerHTML = '<tr><td colspan="7" style="text-align: center;">No products found in the selected date range.</td></tr>';
+        showStatus('No products found in the selected date range.', 'info');
+      }
+    }
+
+    function drawProductChart(reportData) {
+      const data = new google.visualization.DataTable();
+      data.addColumn('string', 'Product');
+      data.addColumn('number', 'Sales');
+      
+      // Add top 10 products by sales
+      const topProducts = reportData.products.slice(0, 10);
+      topProducts.forEach(product => {
+        data.addRow([product.name, product.totalSales]);
+      });
+      
+      const options = {
+        title: 'Top Products by Sales',
+        colors: ['#FFD700'],
+        backgroundColor: { fill:'transparent' },
+        titleTextStyle: { color: '#FFD700' },
+        legend: { textStyle: { color: '#ffffff' } },
+        hAxis: { textStyle: { color: '#ffffff' } },
+        vAxis: { textStyle: { color: '#ffffff' }, format: '$#,##0.00' }
+      };
+      
+      const chart = new google.visualization.BarChart(document.getElementById('product-chart'));
+      chart.draw(data, options);
+    }
+
     function clearProductReport() {
       document.getElementById('product-report-content').classList.add('hidden');
-      document.getElementById('product-start-date').value = '';
-      document.getElementById('product-end-date').value = '';
-      showStatus('Product report cleared.', 'info');
+      document.getElementById('products-body').innerHTML = '';
+      hideStatus();
+    }
+
+    function exportProductReportToHTMLPDF() {
+      const startDate = document.getElementById('product-start-date').value;
+      const endDate = document.getElementById('product-end-date').value;
+      
+      showStatus('Generating PDF...', 'info');
+      
+      google.script.run
+        .withSuccessHandler(function(pdfUrl) {
+          if (pdfUrl) {
+            window.open(pdfUrl, '_blank');
+            showStatus('PDF generated successfully!', 'success');
+            
+            // Log this action
+            logUserAction('Exported product performance report to PDF');
+          } else {
+            showStatus('Failed to generate PDF.', 'error');
+          }
+        })
+        .withFailureHandler(onFailure)
+        .exportProductReportToHTMLPDF(startDate, endDate);
+    }
+    // --- DISCOUNTS FUNCTIONS ---
+    function loadDiscounts() {
+      // Show loading indicator
+      const loadingOverlay = document.getElementById('discounts-loading');
+      if (loadingOverlay) {
+        loadingOverlay.classList.remove('hidden');
+      }
+      
+      // Add a safety timeout to hide the loading overlay after 10 seconds
+      setTimeout(function() {
+        forceHideDiscountsLoading();
+        console.log("Force-hiding discounts loading overlay after timeout");
+      }, 10000);
+      
+      console.log("Calling getDiscounts() server function...");
+      
+      google.script.run
+        .withSuccessHandler(function(result) {
+          console.log("getDiscounts() returned:", result);
+          
+          // Hide loading indicator
+          forceHideDiscountsLoading();
+          
+          if (!result) {
+            return showStatus('No data received from server', 'error');
+          }
+          
+          if (!result.success) {
+            return showStatus(result.message || 'Error loading discounts', 'error');
+          }
+          
+          displayDiscounts(result.discounts || []);
+          populateCategoryDropdown(result.categories || []);
+        })
+        .withFailureHandler(function(error) {
+          console.error("Error in getDiscounts():", error);
+          
+          // Hide loading indicator
+          forceHideDiscountsLoading();
+          
+          showStatus('Error loading discounts: ' + error, 'error');
+        })
+        .getDiscounts();
+    }
+
+    function displayDiscounts(discounts) {
+      console.log("displayDiscounts called with:", discounts);
+      
+      const tableBody = document.getElementById('discounts-body');
+      if (!tableBody) {
+        console.error("Could not find discounts-body element");
+        return;
+      }
+      
+      tableBody.innerHTML = '';
+      
+      if (!discounts || discounts.length === 0) {
+        console.log("No discounts to display");
+        tableBody.innerHTML = '<tr><td colspan="9" style="text-align: center;">No discounts found</td></tr>';
+        return;
+      }
+      
+      console.log("Displaying " + discounts.length + " discounts");
+      
+      discounts.forEach(discount => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td>${discount.code}</td>
+          <td>${discount.type}</td>
+          <td>${discount.once ? '✓' : ''}</td>
+          <td>${discount.expiration}</td>
+          <td>${discount.dollar ? '$' + discount.dollar : ''}</td>
+          <td>${discount.percent ? discount.percent + '%' : ''}</td>
+          <td>${discount.total ? '✓' : ''}</td>
+          <td>${discount.category}</td>
+          <td>
+            <button onclick="editDiscount('${discount.code}')" class="btn-secondary" style="padding: 5px 10px; font-size: 12px; margin-right: 5px;">Edit</button>
+            <button onclick="confirmDeleteDiscount('${discount.code}')" class="btn-danger" style="padding: 5px 10px; font-size: 12px;">Delete</button>
+          </td>
+        `;
+        tableBody.appendChild(row);
+      });
+      
+      console.log("Finished displaying discounts");
+    }
+
+    function populateCategoryDropdown(categories) {
+      const categorySelect = document.getElementById('discount-category');
+      
+      // Clear existing options except the first one
+      while (categorySelect.options.length > 1) {
+        categorySelect.remove(1);
+      }
+      
+      // Add new options
+      categories.forEach(category => {
+        const option = document.createElement('option');
+        option.value = category;
+        option.textContent = category;
+        categorySelect.appendChild(option);
+      });
+    }
+
+    function saveDiscount() {
+      const discountData = {
+        code: document.getElementById('discount-code').value,
+        type: document.getElementById('discount-type').value,
+        once: document.getElementById('discount-once').checked,
+        expiration: document.getElementById('discount-expiration').value,
+        dollar: document.getElementById('discount-dollar').value,
+        percent: document.getElementById('discount-percent').value,
+        total: document.getElementById('discount-total').checked,
+        category: document.getElementById('discount-category').value,
+        item1: document.getElementById('discount-item1').value,
+        item2: document.getElementById('discount-item2').value,
+        item3: document.getElementById('discount-item3').value,
+        item4: document.getElementById('discount-item4').value,
+        item5: document.getElementById('discount-item5').value,
+        rowIndex: document.getElementById('discount-code').getAttribute('data-row-index')
+      };
+      
+      if (!discountData.code) {
+        return showStatus('Discount code is required', 'error');
+      }
+      
+      showStatus('Saving discount...', 'info');
+      
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result.success) {
+            showStatus(result.message, 'success');
+            clearDiscountForm();
+            loadDiscounts();
+          } else {
+            showStatus(result.message, 'error');
+          }
+        })
+        .withFailureHandler(function(error) {
+          showStatus('Error saving discount: ' + error, 'error');
+        })
+        .saveDiscount(discountData);
+    }
+
+    function editDiscount(code) {
+      const rows = document.getElementById('discounts-body').getElementsByTagName('tr');
+      
+      for (let i = 0; i < rows.length; i++) {
+        const cells = rows[i].getElementsByTagName('td');
+        if (cells[0].textContent === code) {
+          document.getElementById('discount-code').value = cells[0].textContent;
+          document.getElementById('discount-code').setAttribute('data-row-index', i + 2); // +2 for header row and 1-based index
+          document.getElementById('discount-type').value = cells[1].textContent;
+          document.getElementById('discount-once').checked = cells[2].textContent === '✓';
+          document.getElementById('discount-expiration').value = formatDateForInput(cells[3].textContent);
+          document.getElementById('discount-dollar').value = cells[4].textContent.replace('$', '');
+          document.getElementById('discount-percent').value = cells[5].textContent.replace('%', '');
+          document.getElementById('discount-total').checked = cells[6].textContent === '✓';
+          document.getElementById('discount-category').value = cells[7].textContent;
+          
+          // Scroll to the top of the form
+          document.getElementById('discount-code').scrollIntoView();
+          break;
+        }
+      }
+    }
+
+    function formatDateForInput(dateStr) {
+      if (!dateStr) return '';
+      
+      try {
+        const parts = dateStr.split('/');
+        if (parts.length === 3) {
+          const month = parts[0].padStart(2, '0');
+          const day = parts[1].padStart(2, '0');
+          const year = parts[2].length === 2 ? '20' + parts[2] : parts[2];
+          return `${year}-${month}-${day}`;
+        }
+      } catch (e) {
+        console.error('Error formatting date:', e);
+      }
+      
+      return '';
+    }
+
+    function clearDiscountForm() {
+      document.getElementById('discount-code').value = '';
+      document.getElementById('discount-code').removeAttribute('data-row-index');
+      document.getElementById('discount-type').value = 'Coupon';
+      document.getElementById('discount-once').checked = false;
+      document.getElementById('discount-expiration').value = '';
+      document.getElementById('discount-dollar').value = '';
+      document.getElementById('discount-percent').value = '';
+      document.getElementById('discount-total').checked = false;
+      document.getElementById('discount-category').value = '';
+      document.getElementById('discount-item1').value = '';
+      document.getElementById('discount-item2').value = '';
+      document.getElementById('discount-item3').value = '';
+      document.getElementById('discount-item4').value = '';
+      document.getElementById('discount-item5').value = '';
+    }
+
+    function confirmDeleteDiscount(code) {
+      if (confirm(`Are you sure you want to delete discount "${code}"?`)) {
+        deleteDiscount(code);
+      }
+    }
+
+    function deleteDiscount(code) {
+      showStatus('Deleting discount...', 'info');
+      
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result.success) {
+            showStatus(result.message, 'success');
+            loadDiscounts();
+          } else {
+            showStatus(result.message, 'error');
+          }
+        })
+        .withFailureHandler(function(error) {
+          showStatus('Error deleting discount: ' + error, 'error');
+        })
+        .deleteDiscount(code);
     }
     
     // --- UTILITY FUNCTIONS ---
@@ -3001,426 +3185,339 @@ function exportProductReportToHTMLPDF() {
       console.error('Error:', error);
       showStatus('An error occurred: ' + error, 'error');
     }
-    
-    // Initialize expiration tracking when page loads
-    document.addEventListener('DOMContentLoaded', function() {
-      // Load expiration data when the page becomes active
-      const expirationTab = document.querySelector('.nav-tab[data-page="expiration-tracking"]');
-      if (expirationTab) {
-        expirationTab.addEventListener('click', function() {
-          setTimeout(loadExpirationData, 100);
-        });
-      }
-
-      // --- DISCOUNTS FUNCTIONS ---
-function loadDiscounts() {
-  // Show loading indicator
-  const loadingOverlay = document.getElementById('discounts-loading');
-  if (loadingOverlay) {
-    loadingOverlay.classList.remove('hidden');
-  }
-  
-  // Add a safety timeout to hide the loading overlay after 10 seconds
-  setTimeout(function() {
-    forceHideDiscountsLoading();
-    console.log("Force-hiding discounts loading overlay after timeout");
-  }, 10000);
-  
-  console.log("Calling getDiscounts() server function...");
-  
-  google.script.run
-    .withSuccessHandler(function(result) {
-      console.log("getDiscounts() returned:", result);
-      
-      // Hide loading indicator
-      forceHideDiscountsLoading();
-      
-      if (!result) {
-        return showStatus('No data received from server', 'error');
-      }
-      
-      if (!result.success) {
-        return showStatus(result.message || 'Error loading discounts', 'error');
-      }
-      
-      displayDiscounts(result.discounts || []);
-      populateCategoryDropdown(result.categories || []);
-    })
-    .withFailureHandler(function(error) {
-      console.error("Error in getDiscounts():", error);
-      
-      // Hide loading indicator
-      forceHideDiscountsLoading();
-      
-      showStatus('Error loading discounts: ' + error, 'error');
-    })
-    .getDiscounts();
-}
-
-
-function forceHideDiscountsLoading() {
-  const loadingOverlay = document.getElementById('discounts-loading');
-  if (loadingOverlay) {
-    loadingOverlay.style.display = 'none';
-    loadingOverlay.classList.add('hidden');
-  }
-}
-
-
-google.script.run.getDiscounts(); // Not getDiscountsFromDiscountsGS
-google.script.run.saveDiscount(discountData); // Not saveDiscountToDiscountsGS
-google.script.run.deleteDiscount(code); // Not deleteDiscountFromDiscountsGS
-
-
-function displayDiscounts(discounts) {
-  console.log("displayDiscounts called with:", discounts);
-  
-  const tableBody = document.getElementById('discounts-body');
-  if (!tableBody) {
-    console.error("Could not find discounts-body element");
-    return;
-  }
-  
-  tableBody.innerHTML = '';
-  
-  if (!discounts || discounts.length === 0) {
-    console.log("No discounts to display");
-    tableBody.innerHTML = '<tr><td colspan="9" style="text-align: center;">No discounts found</td></tr>';
-    return;
-  }
-  
-  console.log("Displaying " + discounts.length + " discounts");
-  
-  discounts.forEach(discount => {
-    const row = document.createElement('tr');
-    row.innerHTML = `
-      <td>${discount.code}</td>
-      <td>${discount.type}</td>
-      <td>${discount.once ? '✓' : ''}</td>
-      <td>${discount.expiration}</td>
-      <td>${discount.dollar ? '$' + discount.dollar : ''}</td>
-      <td>${discount.percent ? discount.percent + '%' : ''}</td>
-      <td>${discount.total ? '✓' : ''}</td>
-      <td>${discount.category}</td>
-      <td>
-        <button onclick="editDiscount('${discount.code}')" class="btn-secondary" style="padding: 5px 10px; font-size: 12px; margin-right: 5px;">Edit</button>
-        <button onclick="confirmDeleteDiscount('${discount.code}')" class="btn-danger" style="padding: 5px 10px; font-size: 12px;">Delete</button>
-      </td>
-    `;
-    tableBody.appendChild(row);
-  });
-  
-  console.log("Finished displaying discounts");
-}
-
-  
-  discounts.forEach(discount => {
-    const row = document.createElement('tr');
-    row.innerHTML = `
-      <td>${discount.code}</td>
-      <td>${discount.type}</td>
-      <td>${discount.once ? '✓' : ''}</td>
-      <td>${discount.expiration}</td>
-      <td>${discount.dollar ? '$' + discount.dollar : ''}</td>
-      <td>${discount.percent ? discount.percent + '%' : ''}</td>
-      <td>${discount.total ? '✓' : ''}</td>
-      <td>${discount.category}</td>
-      <td>
-        <button onclick="editDiscount('${discount.code}')" class="btn-secondary" style="padding: 5px 10px; font-size: 12px; margin-right: 5px;">Edit</button>
-        <button onclick="confirmDeleteDiscount('${discount.code}')" class="btn-danger" style="padding: 5px 10px; font-size: 12px;">Delete</button>
-      </td>
-    `;
-    tableBody.appendChild(row);
-  });
-}
-
-/**
- * Handles POST requests from the web app
- * @param {Object} e The event parameter containing POST data
- * @return {ContentService} JSON response
- */
-function doPost(e) {
-  try {
-    const data = JSON.parse(e.postData.contents);
-    const action = data.action;
-    
-    if (action === 'generatePDF') {
-      try {
-        const pdfBlob = exportInventoryStatusToHTMLPDF();
-        
-        // Convert to base64 for web delivery
-        const base64Data = Utilities.base64Encode(pdfBlob.getBytes());
-        
-        return ContentService
-          .createTextOutput(JSON.stringify({
-            success: true,
-            pdfData: base64Data,
-            fileName: pdfBlob.getName() || 'Inventory_Status_Report.pdf',
-            mimeType: 'application/pdf'
-          }))
-          .setMimeType(ContentService.MimeType.JSON);
-          
-      } catch (error) {
-        console.error('PDF generation error:', error);
-        return ContentService
-          .createTextOutput(JSON.stringify({
-            success: false,
-            error: 'Failed to generate PDF: ' + error.message
-          }))
-          .setMimeType(ContentService.MimeType.JSON);
-      }
-    }
-    
-    // Handle other actions here if needed
-    else {
-      return ContentService
-        .createTextOutput(JSON.stringify({
-          success: false,
-          error: 'Unknown action: ' + action
-        }))
-        .setMimeType(ContentService.MimeType.JSON);
-    }
-    
-  } catch (error) {
-    console.error('Error in doPost:', error);
-    return ContentService
-      .createTextOutput(JSON.stringify({
-        success: false,
-        error: 'Server error: ' + error.message
-      }))
-      .setMimeType(ContentService.MimeType.JSON);
-  }
-}
-
-
-function populateCategoryDropdown(categories) {
-  const categorySelect = document.getElementById('discount-category');
-  
-  // Clear existing options except the first one
-  while (categorySelect.options.length > 1) {
-    categorySelect.remove(1);
-  }
-  
-  // Add new options
-  categories.forEach(category => {
-    const option = document.createElement('option');
-    option.value = category;
-    option.textContent = category;
-    categorySelect.appendChild(option);
-  });
-}
-
-function saveDiscount() {
-  const discountData = {
-    code: document.getElementById('discount-code').value,
-    type: document.getElementById('discount-type').value,
-    once: document.getElementById('discount-once').checked,
-    expiration: document.getElementById('discount-expiration').value,
-    dollar: document.getElementById('discount-dollar').value,
-    percent: document.getElementById('discount-percent').value,
-    total: document.getElementById('discount-total').checked,
-    category: document.getElementById('discount-category').value,
-    item1: document.getElementById('discount-item1').value,
-    item2: document.getElementById('discount-item2').value,
-    item3: document.getElementById('discount-item3').value,
-    item4: document.getElementById('discount-item4').value,
-    item5: document.getElementById('discount-item5').value,
-    rowIndex: document.getElementById('discount-code').getAttribute('data-row-index')
-  };
-  
-  if (!discountData.code) {
-    return showStatus('Discount code is required', 'error');
-  }
-  
-  showStatus('Saving discount...', 'info');
-  
-  google.script.run
-    .withSuccessHandler(function(result) {
-      if (result.success) {
-        showStatus(result.message, 'success');
-        clearDiscountForm();
-        loadDiscounts();
-      } else {
-        showStatus(result.message, 'error');
-      }
-    })
-    .withFailureHandler(function(error) {
-      showStatus('Error saving discount: ' + error, 'error');
-    })
-    .saveDiscount(discountData);
-}
-
-function editDiscount(code) {
-  const rows = document.getElementById('discounts-body').getElementsByTagName('tr');
-  
-  for (let i = 0; i < rows.length; i++) {
-    const cells = rows[i].getElementsByTagName('td');
-    if (cells[0].textContent === code) {
-      document.getElementById('discount-code').value = cells[0].textContent;
-      document.getElementById('discount-code').setAttribute('data-row-index', i + 2); // +2 for header row and 1-based index
-      document.getElementById('discount-type').value = cells[1].textContent;
-      document.getElementById('discount-once').checked = cells[2].textContent === '✓';
-      document.getElementById('discount-expiration').value = formatDateForInput(cells[3].textContent);
-      document.getElementById('discount-dollar').value = cells[4].textContent.replace('$', '');
-      document.getElementById('discount-percent').value = cells[5].textContent.replace('%', '');
-      document.getElementById('discount-total').checked = cells[6].textContent === '✓';
-      document.getElementById('discount-category').value = cells[7].textContent;
-      
-      // Scroll to the top of the form
-      document.getElementById('discount-code').scrollIntoView();
-      break;
-    }
-  }
-}
-
-function formatDateForInput(dateStr) {
-  if (!dateStr) return '';
-  
-  try {
-    const parts = dateStr.split('/');
-    if (parts.length === 3) {
-      const month = parts[0].padStart(2, '0');
-      const day = parts[1].padStart(2, '0');
-      const year = parts[2].length === 2 ? '20' + parts[2] : parts[2];
-      return `${year}-${month}-${day}`;
-    }
-  } catch (e) {
-    console.error('Error formatting date:', e);
-  }
-  
-  return '';
-}
-
-function clearDiscountForm() {
-  document.getElementById('discount-code').value = '';
-  document.getElementById('discount-code').removeAttribute('data-row-index');
-  document.getElementById('discount-type').value = 'Coupon';
-  document.getElementById('discount-once').checked = false;
-  document.getElementById('discount-expiration').value = '';
-  document.getElementById('discount-dollar').value = '';
-  document.getElementById('discount-percent').value = '';
-  document.getElementById('discount-total').checked = false;
-  document.getElementById('discount-category').value = '';
-  document.getElementById('discount-item1').value = '';
-  document.getElementById('discount-item2').value = '';
-  document.getElementById('discount-item3').value = '';
-  document.getElementById('discount-item4').value = '';
-  document.getElementById('discount-item5').value = '';
-}
-
-function confirmDeleteDiscount(code) {
-  if (confirm(`Are you sure you want to delete discount "${code}"?`)) {
-    deleteDiscount(code);
-  }
-}
-
-
-function deleteDiscount(code) {
-  showStatus('Deleting discount...', 'info');
-  
-  google.script.run
-    .withSuccessHandler(function(result) {
-      if (result.success) {
-        showStatus(result.message, 'success');
-        loadDiscounts();
-      } else {
-        showStatus(result.message, 'error');
-      }
-    })
-    .withFailureHandler(function(error) {
-      showStatus('Error deleting discount: ' + error, 'error');
-    })
-    .deleteDiscount(code);
-}
-
-// Function to force hide the discounts loading overlay
-function forceHideDiscountsLoading() {
-  const loadingOverlay = document.getElementById('discounts-loading');
-  if (loadingOverlay) {
-    loadingOverlay.style.display = 'none';
-    loadingOverlay.classList.add('hidden');
-  }
-}
-    
-function loadDiscountsContent() {
-  // Show loading indicator
-  const loadingOverlay = document.querySelector('#discounts-page .loading-overlay');
-  if (loadingOverlay) {
-    loadingOverlay.classList.remove('hidden');
-  }
-  
-  google.script.run
-    .withSuccessHandler(function(result) {
-      // Hide loading indicator
-      if (loadingOverlay) {
-        loadingOverlay.classList.add('hidden');
-      }
-      
-      // Update the HTML content
-      document.getElementById('discounts-content').innerHTML = result.html;
-      
-      // Process the data
-      if (result.data && result.data.success) {
-        displayDiscounts(result.data.discounts);
-        populateCategoryDropdown(result.data.categories);
-      } else {
-        showStatus('Error loading discount data: ' + 
-                  (result.data ? result.data.message : 'Unknown error'), 'error');
-      }
-    })
-    .withFailureHandler(function(error) {
-      // Hide loading indicator
-      if (loadingOverlay) {
-        loadingOverlay.classList.add('hidden');
-      }
-      
-      // Show error
-      document.getElementById('discounts-content').innerHTML = 
-        '<div class="card"><h2>Error</h2><p>Error loading discounts page: ' + error + '</p></div>';
-      
-      showStatus('Error loading discounts page: ' + error, 'error');
-    })
-    .getDiscountsPage();
-}
-
-     
-      // Load turnover data when the page becomes active
-      const turnoverTab = document.querySelector('.nav-tab[data-page="inventory-turnover"]');
-      if (turnoverTab) {
-        turnoverTab.addEventListener('click', function() {
-          setTimeout(loadTurnoverData, 100);
-        });
-      }
-    });
   </script>
-
-  <script>
-// Emergency fix for handleLogin
-window.onload = function() {
-  window.handleLogin = function() {
-    const username = document.getElementById('username').value;
-    const password = document.getElementById('password').value;
+<script>
+  // COMPREHENSIVE FIX FOR NAVIGATION AND LOGIN SCREEN
+  window.onload = function() {
+    console.log("Comprehensive fix loading...");
     
-    if (!username || !password) {
-      alert('Please enter both username and password.');
-      return;
+    // Fix login screen layout first
+    fixLoginScreenLayout();
+    
+    // Set up navigation
+    setupNavigation();
+    
+    // Override login function
+    overrideLoginFunction();
+    
+    // Add emergency buttons if already logged in
+    if (!document.getElementById('login-screen').classList.contains('hidden') && 
+        !document.getElementById('main-portal').classList.contains('hidden')) {
+      addEmergencyButtons();
     }
     
-    // Try to bypass the server call for now
-    document.getElementById('login-screen').classList.add('hidden');
-    document.getElementById('main-portal').classList.remove('hidden');
+    console.log("Comprehensive fix loaded!");
+    
+    // FUNCTION DEFINITIONS
+    
+    // Function to fix login screen layout
+    function fixLoginScreenLayout() {
+      // Check if we're on the login screen
+      if (!document.getElementById('login-screen').classList.contains('hidden')) {
+        console.log("On login screen - hiding all main portal content");
+        
+        // Hide all pages
+        document.querySelectorAll('.page').forEach(function(page) {
+          page.style.display = 'none';
+        });
+        
+        // Make sure main portal is hidden
+        document.getElementById('main-portal').classList.add('hidden');
+        document.getElementById('main-portal').style.display = 'none';
+        
+        // Make login screen visible
+        document.getElementById('login-screen').classList.remove('hidden');
+        document.getElementById('login-screen').style.display = 'block';
+      }
+    }
+    
+    // Function to set up navigation
+    function setupNavigation() {
+      console.log("Setting up navigation handlers");
+      
+      // Direct click handlers for categories
+      document.querySelectorAll('.nav-category').forEach(function(element) {
+        element.onclick = function() {
+          var categoryName = this.getAttribute('data-category');
+          console.log("Category clicked:", categoryName);
+          
+          // Update active category
+          document.querySelectorAll('.nav-category').forEach(function(c) {
+            c.classList.remove('active');
+          });
+          this.classList.add('active');
+          
+          // Hide all tabs
+          document.querySelectorAll('.nav-tab').forEach(function(tab) {
+            tab.classList.add('hidden');
+          });
+          
+          // Show tabs for this category
+          document.querySelectorAll('.nav-tab[data-category="' + categoryName + '"]').forEach(function(tab) {
+            tab.classList.remove('hidden');
+          });
+          
+          // Select first tab in this category
+          var firstTab = document.querySelector('.nav-tab[data-category="' + categoryName + '"]');
+          if (firstTab) {
+            var pageName = firstTab.getAttribute('data-page');
+            
+            // Update active tab
+            document.querySelectorAll('.nav-tab').forEach(function(t) {
+              t.classList.remove('active');
+            });
+            firstTab.classList.add('active');
+            
+            // Update page subtitle
+            document.getElementById('page-subtitle').textContent = firstTab.textContent;
+            
+            // Show corresponding page
+            var pageId = pageName + '-page';
+            document.querySelectorAll('.page').forEach(function(p) {
+              p.classList.remove('active');
+              p.style.display = 'none';
+            });
+            
+            var page = document.getElementById(pageId);
+            if (page) {
+              page.classList.add('active');
+              page.style.display = 'block';
+              
+              // Special handling for specific pages
+              if (pageName === 'inventory-status') {
+                loadInventoryStatus();
+              } else if (pageName === 'expiration-tracking') {
+                loadExpirationData();
+              } else if (pageName === 'inventory-turnover') {
+                loadTurnoverData();
+              } else if (pageName === 'user-management') {
+                loadUsers();
+              } else if (pageName === 'credentials') {
+                loadCredentials();
+              } else if (pageName === 'discounts') {
+                loadDiscounts();
+              }
+            }
+          }
+        };
+      });
+      
+      // Direct click handlers for tabs
+      document.querySelectorAll('.nav-tab').forEach(function(element) {
+        element.onclick = function() {
+          var categoryName = this.getAttribute('data-category');
+          var pageName = this.getAttribute('data-page');
+          console.log("Tab clicked:", categoryName, pageName);
+          
+          // Update active tab
+          document.querySelectorAll('.nav-tab').forEach(function(t) {
+            t.classList.remove('active');
+          });
+          this.classList.add('active');
+          
+          // Update page subtitle
+          document.getElementById('page-subtitle').textContent = this.textContent;
+          
+          // Show corresponding page
+          var pageId = pageName + '-page';
+          document.querySelectorAll('.page').forEach(function(p) {
+            p.classList.remove('active');
+            p.style.display = 'none';
+          });
+          
+          var page = document.getElementById(pageId);
+          if (page) {
+            page.classList.add('active');
+            page.style.display = 'block';
+            
+            // Special handling for specific pages
+            if (pageName === 'inventory-status') {
+              loadInventoryStatus();
+            } else if (pageName === 'expiration-tracking') {
+              loadExpirationData();
+            } else if (pageName === 'inventory-turnover') {
+              loadTurnoverData();
+            } else if (pageName === 'user-management') {
+              loadUsers();
+            } else if (pageName === 'credentials') {
+              loadCredentials();
+            } else if (pageName === 'discounts') {
+              loadDiscounts();
+            }
+          }
+        };
+      });
+    }
+    
+    // Function to override login
+    function overrideLoginFunction() {
+      console.log("Overriding login function");
+      
+      // Store original function if it exists
+      var originalHandleLogin = window.handleLogin;
+      
+      // Override with new function
+      window.handleLogin = function() {
+        const username = document.getElementById('username').value;
+        const password = document.getElementById('password').value;
+        
+        if (!username || !password) {
+          return showStatus('Please enter both username and password.', 'error');
+        }
+        
+        showStatus('Logging in...', 'info');
+        
+        google.script.run
+          .withSuccessHandler(function(isLoggedIn) {
+            console.log(`Login result: ${isLoggedIn}`);
+            if (isLoggedIn) {
+              // Log this action
+              logUserAction('Logged in');
+              
+              // Hide login screen
+              document.getElementById('login-screen').classList.add('hidden');
+              document.getElementById('login-screen').style.display = 'none';
+              
+              // Show main portal
+              document.getElementById('main-portal').classList.remove('hidden');
+              document.getElementById('main-portal').style.display = 'block';
+              
+              // Show active page
+              const activePage = document.querySelector('.page.active');
+              if (activePage) {
+                activePage.style.display = 'block';
+              }
+              
+              // Add emergency buttons
+              addEmergencyButtons();
+              
+              // Setup navigation again
+              setupNavigation();
+              
+              hideStatus();
+            } else {
+              showStatus('Invalid username or password.', 'error');
+            }
+          })
+          .withFailureHandler(function(error) {
+            console.error('Login error:', error);
+            showStatus('An error occurred during login: ' + error, 'error');
+          })
+          .checkLogin(username, password);
+      };
+    }
+    
+    // Function to add emergency buttons
+    function addEmergencyButtons() {
+      console.log("Adding emergency buttons");
+      
+      // Remove any existing emergency buttons first
+      var existingDebugBtn = document.getElementById('emergency-debug-btn');
+      if (existingDebugBtn) existingDebugBtn.remove();
+      
+      var existingButtonContainer = document.getElementById('emergency-nav-buttons');
+      if (existingButtonContainer) existingButtonContainer.remove();
+      
+      // Add emergency debug button
+      var emergencyDebugBtn = document.createElement('button');
+      emergencyDebugBtn.id = 'emergency-debug-btn';
+      emergencyDebugBtn.innerHTML = 'Emergency Debug';
+      emergencyDebugBtn.style.position = 'fixed';
+      emergencyDebugBtn.style.bottom = '100px';
+      emergencyDebugBtn.style.right = '10px';
+      emergencyDebugBtn.style.zIndex = '9999';
+      emergencyDebugBtn.style.backgroundColor = 'red';
+      emergencyDebugBtn.style.color = 'white';
+      emergencyDebugBtn.style.padding = '10px';
+      emergencyDebugBtn.onclick = function() {
+        console.log("--- EMERGENCY NAVIGATION DEBUG ---");
+        
+        // Check categories
+        var categories = document.querySelectorAll('.nav-category');
+        console.log("Found " + categories.length + " categories:");
+        categories.forEach(function(cat) {
+          console.log("- " + cat.textContent + " (" + cat.getAttribute('data-category') + ") " + 
+                    (cat.classList.contains('active') ? '[ACTIVE]' : ''));
+        });
+        
+        // Check tabs
+        var tabs = document.querySelectorAll('.nav-tab');
+        console.log("Found " + tabs.length + " tabs:");
+        tabs.forEach(function(tab) {
+          var isHidden = tab.classList.contains('hidden');
+          var isActive = tab.classList.contains('active');
+          console.log("- " + tab.textContent + " (" + tab.getAttribute('data-category') + "/" + 
+                    tab.getAttribute('data-page') + ") " + 
+                    (isActive ? '[ACTIVE]' : '') + " " + 
+                    (isHidden ? '[HIDDEN]' : ''));
+        });
+        
+        // Check pages
+        var pages = document.querySelectorAll('.page');
+        console.log("Found " + pages.length + " pages:");
+        pages.forEach(function(page) {
+          var id = page.id;
+          var isActive = page.classList.contains('active');
+          var isDisplayed = window.getComputedStyle(page).display !== 'none';
+          console.log("- " + id + " " + (isActive ? '[ACTIVE]' : '') + " " + (isDisplayed ? '[DISPLAYED]' : '[HIDDEN]'));
+        });
+        
+        // Force click on a category
+        console.log("Forcing click on Inventory Management category...");
+        var inventoryCategory = document.querySelector('.nav-category[data-category="inventory"]');
+        if (inventoryCategory) {
+          inventoryCategory.click();
+          console.log("Click executed");
+        } else {
+          console.error("Could not find inventory category element");
+        }
+      };
+      document.body.appendChild(emergencyDebugBtn);
+      
+      // Add direct navigation buttons
+      var categoryButtons = [
+        { name: 'Inventory', category: 'inventory' },
+        { name: 'Financial', category: 'financial' },
+        { name: 'Customer', category: 'customer' },
+        { name: 'Analytics', category: 'analytics' },
+        { name: 'Admin', category: 'admin' }
+      ];
+      
+      var buttonContainer = document.createElement('div');
+      buttonContainer.id = 'emergency-nav-buttons';
+      buttonContainer.style.position = 'fixed';
+      buttonContainer.style.top = '10px';
+      buttonContainer.style.right = '10px';
+      buttonContainer.style.zIndex = '9999';
+      buttonContainer.style.display = 'flex';
+      buttonContainer.style.flexDirection = 'column';
+      buttonContainer.style.gap = '5px';
+      
+      categoryButtons.forEach(function(btn) {
+        var button = document.createElement('button');
+        button.innerHTML = btn.name;
+        button.style.padding = '5px 10px';
+        button.style.backgroundColor = '#FFD700';
+        button.style.color = 'black';
+        button.style.border = 'none';
+        button.style.borderRadius = '4px';
+        button.style.cursor = 'pointer';
+        button.onclick = function() {
+          var categoryElement = document.querySelector('.nav-category[data-category="' + btn.category + '"]');
+          if (categoryElement) {
+            categoryElement.click();
+          }
+        };
+        buttonContainer.appendChild(button);
+      });
+      
+      document.body.appendChild(buttonContainer);
+    }
   };
-  
-  console.log('Emergency handleLogin function created');
-};
 </script>
 
-<!-- Debug button -->
-<button id="debug-button" onclick="debugNavigation()" style="position: fixed; bottom: 10px; right: 10px; z-index: 9999; opacity: 0.5;">Debug Nav</button>
 
 
 </body>
 </html>
 
-
-    
