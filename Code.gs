@@ -135,8 +135,8 @@ function getMachineID() {
       return 'Sheet Not Found';
     }
     
-    // Get the machine ID from cell B16
-    const machineID = sheet.getRange('B16').getValue();
+    // Get the machine ID from cell B25
+    const machineID = sheet.getRange('B25').getValue();
     console.log('Machine ID from sheet:', machineID);
     
     return machineID || 'Not Set';
