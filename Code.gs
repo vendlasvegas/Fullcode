@@ -1,10 +1,10 @@
 // --- CONSTANTS ---
-const MASTER_LIST_SHEET_NAME = 'Master List';
+const MASTER_LIST_SHEET_NAME = 'Inv';
 const SALES_SHEET_NAME = 'Sales Data';
 const LOGIN_SHEET_NAME = 'Login';
 const SERVICE_SHEET_NAME = 'Service';
 const CREDENTIALS_SHEET_NAME = 'Credentials';
-const MASTER_SHEET_NAME = 'Master List'; // Add this line
+const MASTER_SHEET_NAME = 'Inv'; // Add this line
 const HOURS_SHEET_NAME = 'Hours';
 const SPREADSHEET_ID = '1rk02i4TGZQHm3o0wK8umABZgmnQQNN3zNaD9n0XIsMo';
 // Master password - make sure this is set correctly
@@ -23,6 +23,33 @@ function doGet(e) {
     .setTitle('VEND LAS VEGAS Inventory Portal')
     .setFaviconUrl('https://i.imgur.com/lfcgQ0s.png')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
+/**
+ * Initializes the master password if it's not already set.
+ */
+function initializeMasterPassword() {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const loginSheet = ss.getSheetByName(LOGIN_SHEET_NAME);
+    
+    if (!loginSheet) {
+      console.error('Login sheet not found.');
+      return;
+    }
+    
+    // Check if master password is already set
+    const masterPasswordF1 = loginSheet.getRange('F1').getValue();
+    const masterPasswordF2 = loginSheet.getRange('F2').getValue();
+    
+    if (!masterPasswordF1 && !masterPasswordF2) {
+      // Set the default master password
+      loginSheet.getRange('F1').setValue(MASTER_PASSWORD);
+      console.log('Master password initialized.');
+    }
+  } catch (e) {
+    console.error('Error initializing master password:', e);
+  }
 }
 
 // Make sure this function is defined and accessible
@@ -364,6 +391,37 @@ function resetMasterPassword(currentPassword, newPassword) {
   return setMasterPassword(currentPassword, newPassword);
 }
 
+/**
+ * Sets the master password.
+ * @param {string} currentPassword The current master password.
+ * @param {string} newPassword The new master password.
+ * @return {Object} Result object with success flag and message.
+ */
+function setMasterPassword(currentPassword, newPassword) {
+  try {
+    // Verify current master password
+    if (!verifyMasterPassword(currentPassword)) {
+      return { success: false, message: 'Invalid current master password.' };
+    }
+    
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const loginSheet = ss.getSheetByName(LOGIN_SHEET_NAME);
+    
+    if (!loginSheet) {
+      return { success: false, message: 'Login sheet not found.' };
+    }
+    
+    // Update master password in both locations
+    loginSheet.getRange('F1').setValue(newPassword);
+    loginSheet.getRange('F2').setValue(newPassword);
+    
+    return { success: true, message: 'Master password updated successfully.' };
+  } catch (e) {
+    console.error('Error setting master password:', e);
+    return { success: false, message: 'Error setting master password: ' + e.message };
+  }
+}
+
 
 /**
  * Gets the credentials from the Credentials sheet.
@@ -556,7 +614,7 @@ function saveCredentialsWithAuth(masterPassword, credentials) {
 
 
 /**
- * Looks up a UPC in the Master List sheet.
+ * Looks up a UPC in the Inv sheet.
  * @param {string} upc The UPC to look up.
  * @return {Object} Result object with product data.
  */
@@ -570,7 +628,7 @@ function lookupUpcForWebApp(upc) {
     if (!sheet) {
       return { 
         success: false, 
-        message: 'Master List sheet not found.' 
+        message: 'Inv sheet not found.' 
       };
     }
     
@@ -582,7 +640,7 @@ function lookupUpcForWebApp(upc) {
     if (upcIndex === -1) {
       return { 
         success: false, 
-        message: 'UPC column not found in Master List.' 
+        message: 'UPC column not found in Inv.' 
       };
     }
     
@@ -641,7 +699,7 @@ function lookupUpcForWebApp(upc) {
     return {
       success: true,
       found: false,
-      message: `UPC ${upc} not found in Master List.`
+      message: `UPC ${upc} not found in Inv.`
     };
   } catch (e) {
     console.error('Error in lookupUpcForWebApp:', e);
@@ -650,6 +708,19 @@ function lookupUpcForWebApp(upc) {
       message: 'Error looking up UPC: ' + e.message 
     };
   }
+}
+
+/**
+ * Looks up a product by UPC.
+ * @param {string} upc The UPC to look up.
+ * @return {Object} The product data.
+ */
+function lookupProduct(upc) {
+  const result = lookupUpcForWebApp(upc);
+  if (result.success && result.found) {
+    return result.data;
+  }
+  return null;
 }
 
 
@@ -665,7 +736,7 @@ function getInventoryStatus() {
     if (!sheet) {
       return { 
         success: false, 
-        message: 'Master List sheet not found.' 
+        message: 'Inv sheet not found.' 
       };
     }
     
@@ -684,7 +755,7 @@ function getInventoryStatus() {
         sizeIndex === -1 || priceIndex === -1 || qtyIndex === -1) {
       return { 
         success: false, 
-        message: 'Required columns not found in Master List.' 
+        message: 'Required columns not found in Inv.' 
       };
     }
     
@@ -734,229 +805,6 @@ function getInventoryStatus() {
     };
   }
 }
-
-/**
- * Requests product information from online sources.
- * @param {string} upc The UPC to look up.
- * @return {Object} Result object with product data.
- */
-function requestProductInfo(upc) {
-  return requestInfoForWebApp(upc);
-}
-
-/**
- * Saves product data to the Master List sheet.
- * @param {Object} product The product data to save.
- * @return {Object} Result object with success flag and message.
- */
-function saveProduct(product) {
-  return saveProductFromWebApp(product);
-}
-
-/**
- * Gets discount data from the Discounts sheet.
- * @return {Object} Result object with discount data.
- */
-function getDiscounts() {
-  try {
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const discountSheet = ss.getSheetByName('Discounts');
-    
-    if (!discountSheet) {
-      return { 
-        success: false, 
-        message: 'Discounts sheet not found. Please create a sheet named "Discounts".' 
-      };
-    }
-    
-    // Get all discount data
-    const data = discountSheet.getDataRange().getValues();
-    const headers = data[0];
-    
-    // Process discounts
-    const discounts = [];
-    const categories = new Set();
-    
-    // Get categories from Master List for dropdown
-    const masterSheet = ss.getSheetByName(MASTER_LIST_SHEET_NAME);
-    if (masterSheet) {
-      const masterData = masterSheet.getDataRange().getValues();
-      const categoryIndex = masterData[0].indexOf('Category');
-      
-      if (categoryIndex !== -1) {
-        for (let i = 1; i < masterData.length; i++) {
-          if (masterData[i][categoryIndex]) {
-            categories.add(masterData[i][categoryIndex]);
-          }
-        }
-      }
-    }
-    
-    // Skip header row
-    for (let i = 1; i < data.length; i++) {
-      const row = data[i];
-      
-      // Skip empty rows
-      if (!row[0]) continue;
-      
-      discounts.push({
-        code: row[0],
-        type: row[1] || 'Coupon',
-        once: row[2] === true,
-        expiration: row[3] ? Utilities.formatDate(new Date(row[3]), Session.getScriptTimeZone(), 'MM/dd/yyyy') : '',
-        dollar: row[4] || '',
-        percent: row[5] || '',
-        total: row[6] === true,
-        category: row[7] || '',
-        item1: row[8] || '',
-        item2: row[9] || '',
-        item3: row[10] || '',
-        item4: row[11] || '',
-        item5: row[12] || ''
-      });
-    }
-    
-    return {
-      success: true,
-      discounts: discounts,
-      categories: Array.from(categories).sort()
-    };
-  } catch (e) {
-    console.error('Error getting discounts:', e);
-    return { 
-      success: false, 
-      message: 'Error getting discounts: ' + e.message 
-    };
-  }
-}
-
-/**
- * Saves a discount to the Discounts sheet.
- * @param {Object} discountData The discount data to save.
- * @return {Object} Result object with success flag and message.
- */
-function saveDiscount(discountData) {
-  try {
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    let discountSheet = ss.getSheetByName('Discounts');
-    
-    // Create the sheet if it doesn't exist
-    if (!discountSheet) {
-      discountSheet = ss.insertSheet('Discounts');
-      // Add headers
-      discountSheet.appendRow([
-        'Code', 'Type', 'One-time Use', 'Expiration Date', 'Dollar Amount', 
-        'Percent', 'Apply to Total', 'Category', 'Item 1', 'Item 2', 
-        'Item 3', 'Item 4', 'Item 5'
-      ]);
-    }
-    
-    // Check if this is an update or new discount
-    const data = discountSheet.getDataRange().getValues();
-    let rowIndex = -1;
-    
-    if (discountData.rowIndex) {
-      // This is an update
-      rowIndex = parseInt(discountData.rowIndex);
-    } else {
-      // Check if code already exists
-      for (let i = 1; i < data.length; i++) {
-        if (data[i][0] === discountData.code) {
-          rowIndex = i + 1; // +1 because sheet rows are 1-indexed
-          break;
-        }
-      }
-    }
-    
-    // Parse expiration date
-    let expirationDate = null;
-    if (discountData.expiration) {
-      expirationDate = new Date(discountData.expiration);
-    }
-    
-    // Prepare row data
-    const rowData = [
-      discountData.code,
-      discountData.type,
-      discountData.once === true,
-      expirationDate,
-      discountData.dollar ? parseFloat(discountData.dollar) : '',
-      discountData.percent ? parseFloat(discountData.percent) : '',
-      discountData.total === true,
-      discountData.category,
-      discountData.item1,
-      discountData.item2,
-      discountData.item3,
-      discountData.item4,
-      discountData.item5
-    ];
-    
-    if (rowIndex > 0) {
-      // Update existing row
-      discountSheet.getRange(rowIndex, 1, 1, rowData.length).setValues([rowData]);
-      return { 
-        success: true, 
-        message: 'Discount updated successfully.' 
-      };
-    } else {
-      // Add new row
-      discountSheet.appendRow(rowData);
-      return { 
-        success: true, 
-        message: 'Discount added successfully.' 
-      };
-    }
-  } catch (e) {
-    console.error('Error saving discount:', e);
-    return { 
-      success: false, 
-      message: 'Error saving discount: ' + e.message 
-    };
-  }
-}
-
-/**
- * Deletes a discount from the Discounts sheet.
- * @param {string} code The discount code to delete.
- * @return {Object} Result object with success flag and message.
- */
-function deleteDiscount(code) {
-  try {
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const discountSheet = ss.getSheetByName('Discounts');
-    
-    if (!discountSheet) {
-      return { 
-        success: false, 
-        message: 'Discounts sheet not found.' 
-      };
-    }
-    
-    // Find the discount
-    const data = discountSheet.getDataRange().getValues();
-    for (let i = 1; i < data.length; i++) {
-      if (data[i][0] === code) {
-        discountSheet.deleteRow(i + 1); // +1 because sheet rows are 1-indexed
-        return { 
-          success: true, 
-          message: 'Discount deleted successfully.' 
-        };
-      }
-    }
-    
-    return { 
-      success: false, 
-      message: 'Discount not found.' 
-    };
-  } catch (e) {
-    console.error('Error deleting discount:', e);
-    return { 
-      success: false, 
-      message: 'Error deleting discount: ' + e.message 
-    };
-  }
-}
-
 
 /**
  * Exports inventory status to HTML and converts to PDF
@@ -1026,36 +874,9 @@ function exportInventoryStatusToHTMLPDF() {
   }
 }
 
-/**
- * Initializes the master password if it's not already set.
- */
-function initializeMasterPassword() {
-  try {
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const loginSheet = ss.getSheetByName(LOGIN_SHEET_NAME);
-    
-    if (!loginSheet) {
-      console.error('Login sheet not found.');
-      return;
-    }
-    
-    // Check if master password is already set
-    const masterPasswordF1 = loginSheet.getRange('F1').getValue();
-    const masterPasswordF2 = loginSheet.getRange('F2').getValue();
-    
-    if (!masterPasswordF1 && !masterPasswordF2) {
-      // Set the default master password
-      loginSheet.getRange('F1').setValue(MASTER_PASSWORD);
-      console.log('Master password initialized.');
-    }
-  } catch (e) {
-    console.error('Error initializing master password:', e);
-  }
-}
-
 
 /**
- * Gets inventory data from the Master List sheet
+ * Gets inventory data from the Inv sheet
  * @return {Object} Object containing items array, totalQuantity, and totalValue
  */
 function getInventoryData() {
@@ -1126,7 +947,7 @@ function getInventoryData() {
   }
 }
 /**
- * Gets expiration data from the Master List sheet
+ * Gets expiration data from the Inv sheet
  * @return {Object} Object containing items with expiration dates and summary counts
  */
 function getExpirationData() {
@@ -1151,7 +972,7 @@ function getExpirationData() {
     
     if (upcIndex === -1 || brandIndex === -1 || nameIndex === -1 || 
         qtyIndex === -1 || expDateIndex === -1) {
-      throw new Error('Required columns not found in Master List');
+      throw new Error('Required columns not found in Inv');
     }
     
     const today = new Date();
@@ -1254,7 +1075,7 @@ function getExpirationData() {
 }
 
 /**
- * Records inventory loss in the Loss Tracking sheet and updates Master List
+ * Records inventory loss in the Loss Tracking sheet and updates Inv
  * @param {Array} lossItems Array of objects with UPC and quantity
  * @param {string} reason Reason for the loss
  * @param {string} notes Additional notes
@@ -1289,7 +1110,7 @@ function recordInventoryLoss(lossItems, reason, notes) {
       lossSheet.getRange(1, 1, 1, 8).setFontWeight('bold');
     }
     
-    // Get Master List sheet for updating quantities
+    // Get Inv sheet for updating quantities
     const masterSheet = ss.getSheetByName(MASTER_LIST_SHEET_NAME);
     if (!masterSheet) {
       throw new Error(`Sheet '${MASTER_LIST_SHEET_NAME}' not found`);
@@ -1298,14 +1119,14 @@ function recordInventoryLoss(lossItems, reason, notes) {
     const masterData = masterSheet.getDataRange().getValues();
     const headers = masterData[0];
     
-    // Find column indices in Master List
+    // Find column indices in Inv
     const upcIndex = headers.indexOf('UPC');
     const nameIndex = headers.indexOf('Name');
     const brandIndex = headers.indexOf('Brand');
     const qtyIndex = headers.indexOf('QTY');
     
     if (upcIndex === -1 || nameIndex === -1 || brandIndex === -1 || qtyIndex === -1) {
-      throw new Error('Required columns not found in Master List');
+      throw new Error('Required columns not found in Inv');
     }
     
     const today = new Date();
@@ -1318,7 +1139,7 @@ function recordInventoryLoss(lossItems, reason, notes) {
       
       if (!upc || lossQty <= 0) continue;
       
-      // Find the item in Master List
+      // Find the item in Inv
       let rowIndex = -1;
       let productName = '';
       let brand = '';
@@ -1333,11 +1154,11 @@ function recordInventoryLoss(lossItems, reason, notes) {
       }
       
       if (rowIndex === -1) {
-        console.warn(`Item with UPC ${upc} not found in Master List`);
+        console.warn(`Item with UPC ${upc} not found in Inv`);
         continue;
       }
       
-      // Update quantity in Master List
+      // Update quantity in Inv
       const currentQty = parseInt(masterData[rowIndex - 1][qtyIndex]) || 0;
       const newQty = Math.max(0, currentQty - lossQty);
       masterSheet.getRange(rowIndex, qtyIndex + 1).setValue(newQty);
@@ -1379,8 +1200,217 @@ function recordInventoryLoss(lossItems, reason, notes) {
  * @return {Object} Turnover data
  */
 function getInventoryTurnoverData(period, category) {
-  // The updated function from above that works with your transaction structure
-  // [Insert the updated function here]
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const masterSheet = ss.getSheetByName(MASTER_LIST_SHEET_NAME);
+    const transSheet = ss.getSheetByName('Transactions');
+    
+    if (!masterSheet || !transSheet) {
+      return {
+        success: false,
+        message: 'Required sheets not found'
+      };
+    }
+    
+    // Convert period to number
+    const periodDays = parseInt(period) || 90;
+    
+    // Calculate date range
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - periodDays);
+    
+    // Get Inv data
+    const masterData = masterSheet.getDataRange().getValues();
+    const masterHeaders = masterData[0];
+    
+    // Find column indices
+    const upcIndex = masterHeaders.indexOf('UPC');
+    const nameIndex = masterHeaders.indexOf('Name');
+    const brandIndex = masterHeaders.indexOf('Brand');
+    const qtyIndex = masterHeaders.indexOf('QTY');
+    const categoryIndex = masterHeaders.indexOf('Category');
+    
+    if (upcIndex === -1 || nameIndex === -1 || brandIndex === -1 || qtyIndex === -1) {
+      return {
+        success: false,
+        message: 'Required columns not found in Inv'
+      };
+    }
+    
+    // Get transaction data
+    const transData = transSheet.getDataRange().getValues();
+    const transHeaders = transData[0];
+    
+    // Find date column
+    const dateIndex = transHeaders.indexOf('Date');
+    if (dateIndex === -1) {
+      return {
+        success: false,
+        message: 'Date column not found in Transactions sheet'
+      };
+    }
+    
+    // Create a map to track sales by UPC
+    const salesMap = new Map();
+    
+    // Process transactions
+    for (let i = 1; i < transData.length; i++) {
+      const row = transData[i];
+      const transDate = row[dateIndex];
+      
+      // Skip if no date or outside range
+      if (!transDate || !(transDate instanceof Date) || transDate < startDate || transDate > endDate) {
+        continue;
+      }
+      
+      // Process each item in the transaction
+      for (let itemNum = 1; itemNum <= 15; itemNum++) {
+        const upcIndex = transHeaders.indexOf(`Item ${itemNum} UPC`);
+        const qtyIndex = transHeaders.indexOf(`Item ${itemNum} Qty`);
+        
+        if (upcIndex === -1 || qtyIndex === -1) {
+          break; // No more item columns
+        }
+        
+        const upc = row[upcIndex];
+        const qty = parseInt(row[qtyIndex]) || 0;
+        
+        if (!upc || qty <= 0) {
+          continue;
+        }
+        
+        // Update sales count
+        if (salesMap.has(upc)) {
+          salesMap.set(upc, salesMap.get(upc) + qty);
+        } else {
+          salesMap.set(upc, qty);
+        }
+      }
+    }
+    
+    // Process inventory data
+    const items = [];
+    const categories = new Set();
+    const categoryTurnover = new Map();
+    let totalBeginning = 0;
+    let totalEnding = 0;
+    let totalSold = 0;
+    let slowItemsCount = 0;
+    let fastItemsCount = 0;
+    
+    // Assume current inventory is ending inventory
+    for (let i = 1; i < masterData.length; i++) {
+      const row = masterData[i];
+      const upc = row[upcIndex];
+      const name = row[nameIndex] || '';
+      const brand = row[brandIndex] || '';
+      const currentQty = parseInt(row[qtyIndex]) || 0;
+      const itemCategory = row[categoryIndex] || 'Uncategorized';
+      
+      // Skip if filtering by category and doesn't match
+      if (category !== 'all' && itemCategory !== category) {
+        continue;
+      }
+      
+      categories.add(itemCategory);
+      
+      // Get sales quantity
+      const salesQty = salesMap.get(upc) || 0;
+      
+      // Calculate beginning inventory (current + sold)
+      const beginningQty = currentQty + salesQty;
+      
+      // Calculate average inventory
+      const avgInventory = (beginningQty + currentQty) / 2;
+      
+      // Calculate turnover ratio (avoid division by zero)
+      const turnoverRatio = avgInventory > 0 ? salesQty / avgInventory : 0;
+      
+      // Calculate days in inventory
+      const daysInInventory = turnoverRatio > 0 ? periodDays / turnoverRatio : periodDays;
+      
+      // Track category turnover
+      if (!categoryTurnover.has(itemCategory)) {
+        categoryTurnover.set(itemCategory, {
+          category: itemCategory,
+          totalBeginning: 0,
+          totalEnding: 0,
+          totalSold: 0
+        });
+      }
+      
+      const catData = categoryTurnover.get(itemCategory);
+      catData.totalBeginning += beginningQty;
+      catData.totalEnding += currentQty;
+      catData.totalSold += salesQty;
+      
+      // Update totals
+      totalBeginning += beginningQty;
+      totalEnding += currentQty;
+      totalSold += salesQty;
+      
+      // Count slow and fast moving items
+      if (turnoverRatio < 2) {
+        slowItemsCount++;
+      } else if (turnoverRatio > 6) {
+        fastItemsCount++;
+      }
+      
+      // Add to items array
+      items.push({
+        upc: upc,
+        name: name,
+        brand: brand,
+        category: itemCategory,
+        beginningInventory: beginningQty,
+        endingInventory: currentQty,
+        unitsSold: salesQty,
+        turnoverRatio: turnoverRatio,
+        daysInInventory: daysInInventory
+      });
+    }
+    
+    // Calculate overall turnover
+    const overallAvgInventory = (totalBeginning + totalEnding) / 2;
+    const overallTurnover = overallAvgInventory > 0 ? totalSold / overallAvgInventory : 0;
+    const avgDaysInInventory = overallTurnover > 0 ? periodDays / overallTurnover : periodDays;
+    
+    // Calculate category turnover ratios
+    const categoryTurnoverArray = [];
+    categoryTurnover.forEach(catData => {
+      const avgInventory = (catData.totalBeginning + catData.totalEnding) / 2;
+      const turnoverRatio = avgInventory > 0 ? catData.totalSold / avgInventory : 0;
+      categoryTurnoverArray.push({
+        category: catData.category,
+        turnoverRatio: turnoverRatio
+      });
+    });
+    
+    // Sort items by turnover ratio (descending)
+    items.sort((a, b) => b.turnoverRatio - a.turnoverRatio);
+    
+    // Get top items for chart
+    const topItems = items.slice(0, 10);
+    
+    return {
+      success: true,
+      items: items,
+      categories: Array.from(categories),
+      categoryTurnover: categoryTurnoverArray,
+      topItems: topItems,
+      overallTurnover: overallTurnover,
+      avgDaysInInventory: avgDaysInInventory,
+      slowItemsCount: slowItemsCount,
+      fastItemsCount: fastItemsCount
+    };
+  } catch (error) {
+    console.error('Error in getInventoryTurnoverData:', error);
+    return {
+      success: false,
+      message: 'Error calculating turnover: ' + error.message
+    };
+  }
 }
 
 /**
@@ -1724,7 +1754,16 @@ function requestInfoForWebApp(upc) {
 }
 
 /**
- * Saves product data to the Master List sheet.
+ * Requests product information from online sources.
+ * @param {string} upc The UPC to look up.
+ * @return {Object} Result object with product data.
+ */
+function requestProductInfo(upc) {
+  return requestInfoForWebApp(upc);
+}
+
+/**
+ * Saves product data to the Inv sheet.
  * @param {Object} productData The product data to save.
  * @return {Object} Result object with success flag and message.
  */
@@ -1739,7 +1778,7 @@ function saveProductFromWebApp(productData) {
     if (!sheet) {
       return { 
         success: false, 
-        message: 'Master List sheet not found.' 
+        message: 'Inv sheet not found.' 
       };
     }
     
@@ -1751,7 +1790,7 @@ function saveProductFromWebApp(productData) {
     if (upcIndex === -1) {
       return { 
         success: false, 
-        message: 'UPC column not found in Master List.' 
+        message: 'UPC column not found in Inv.' 
       };
     }
     
@@ -1850,6 +1889,15 @@ function saveProductFromWebApp(productData) {
   }
 }
 
+/**
+ * Saves product data to the Inv sheet.
+ * @param {Object} product The product data to save.
+ * @return {Object} Result object with success flag and message.
+ */
+function saveProduct(product) {
+  return saveProductFromWebApp(product);
+}
+
 
 
 
@@ -1904,11 +1952,26 @@ function generateSalesReport(startDate, endDate) {
     
     // Convert string dates to Date objects
     console.log(`Converting dates: ${startDate} and ${endDate}`);
-    const startDateObj = new Date(startDate);
-    const endDateObj = new Date(endDate);
-    endDateObj.setHours(23, 59, 59); // Include the entire end date
+    let startDateObj, endDateObj;
     
-    console.log(`Date objects - Start: ${startDateObj}, End: ${endDateObj}`);
+    try {
+      startDateObj = new Date(startDate);
+      endDateObj = new Date(endDate);
+      endDateObj.setHours(23, 59, 59); // Include the entire end date
+      
+      // Verify these are valid dates
+      if (isNaN(startDateObj.getTime()) || isNaN(endDateObj.getTime())) {
+        throw new Error('Invalid date format');
+      }
+      
+      console.log(`Date objects - Start: ${startDateObj}, End: ${endDateObj}`);
+    } catch (e) {
+      console.error('Error parsing dates:', e);
+      return {
+        success: false,
+        message: 'Error parsing dates. Please use format YYYY-MM-DD.'
+      };
+    }
     
     // Filter transactions by date range
     const transactions = [];
@@ -1929,10 +1992,33 @@ function generateSalesReport(startDate, endDate) {
         continue;
       }
       
-      // Get the date directly - it's already a Date object in Google Sheets
-      const transDate = row[dateColIndex];
+      // Get the date from the sheet
+      let transDate = row[dateColIndex];
+      console.log(`Row ${i+1} date (raw):`, transDate);
       
-      console.log(`Row ${i+1} date: ${transDate}`);
+      // Make sure transDate is a Date object
+      if (!(transDate instanceof Date)) {
+        try {
+          // Try to convert to a Date object if it's a string
+          if (typeof transDate === 'string') {
+            transDate = new Date(transDate);
+          } else {
+            // If it's a number or something else, try to convert to string first
+            transDate = new Date(String(transDate));
+          }
+          
+          // Check if conversion was successful
+          if (isNaN(transDate.getTime())) {
+            console.log(`Row ${i+1} has invalid date, skipping`);
+            continue;
+          }
+        } catch (e) {
+          console.error(`Error converting date in row ${i+1}:`, e);
+          continue;
+        }
+      }
+      
+      console.log(`Row ${i+1} date (processed):`, transDate);
       
       // Compare only the date part (ignore time)
       const transDateOnly = new Date(transDate.getFullYear(), transDate.getMonth(), transDate.getDate());
@@ -1956,9 +2042,54 @@ function generateSalesReport(startDate, endDate) {
         
         const items = Number(row[itemsColIndex]) || 0;
         const paymentMethod = row[paymentColIndex] || 'Unknown';
-        const subtotal = Number(row[subtotalColIndex]) || 0;
-        const tax = Number(row[taxColIndex]) || 0;
-        const total = Number(row[totalColIndex]) || 0;
+        
+        // Debug monetary values
+        console.log(`Row ${i+1} monetary values - Subtotal: ${row[subtotalColIndex]}, Tax: ${row[taxColIndex]}, Total: ${row[totalColIndex]}`);
+        
+        // Ensure proper conversion of monetary values
+        let subtotal = 0;
+        let tax = 0;
+        let total = 0;
+        
+        // Handle subtotal
+        if (subtotalColIndex !== -1 && row[subtotalColIndex] !== null && row[subtotalColIndex] !== undefined) {
+          if (typeof row[subtotalColIndex] === 'number') {
+            subtotal = row[subtotalColIndex];
+          } else if (typeof row[subtotalColIndex] === 'string') {
+            // Remove any currency symbols and commas
+            const cleanedValue = row[subtotalColIndex].replace(/[$,]/g, '');
+            subtotal = parseFloat(cleanedValue) || 0;
+          }
+        }
+        
+        // Handle tax
+        if (taxColIndex !== -1 && row[taxColIndex] !== null && row[taxColIndex] !== undefined) {
+          if (typeof row[taxColIndex] === 'number') {
+            tax = row[taxColIndex];
+          } else if (typeof row[taxColIndex] === 'string') {
+            // Remove any currency symbols and commas
+            const cleanedValue = row[taxColIndex].replace(/[$,]/g, '');
+            tax = parseFloat(cleanedValue) || 0;
+          }
+        }
+        
+        // Handle total
+        if (totalColIndex !== -1 && row[totalColIndex] !== null && row[totalColIndex] !== undefined) {
+          if (typeof row[totalColIndex] === 'number') {
+            total = row[totalColIndex];
+          } else if (typeof row[totalColIndex] === 'string') {
+            // Remove any currency symbols and commas
+            const cleanedValue = row[totalColIndex].replace(/[$,]/g, '');
+            total = parseFloat(cleanedValue) || 0;
+          }
+        }
+        
+        // If total is still 0 but we have subtotal and tax, calculate it
+        if (total === 0 && (subtotal > 0 || tax > 0)) {
+          total = subtotal + tax;
+        }
+        
+        console.log(`Row ${i+1} processed monetary values - Subtotal: ${subtotal}, Tax: ${tax}, Total: ${total}`);
         
         transactions.push({
           id: id,
@@ -1982,6 +2113,7 @@ function generateSalesReport(startDate, endDate) {
     }
     
     console.log(`Report generation complete. Found ${totalTransactions} transactions.`);
+    console.log(`Totals - Items: ${totalItems}, Subtotal: ${totalSubtotal}, Tax: ${totalTax}, Revenue: ${totalRevenue}`);
     
     return {
       success: true,
@@ -2002,12 +2134,15 @@ function generateSalesReport(startDate, endDate) {
   }
 }
 
+
+
 /**
  * Generates a product performance report.
  * @param {string} startDate - Start date in YYYY-MM-DD format.
  * @param {string} endDate - End date in YYYY-MM-DD format.
  * @return {object} The product performance report data.
  */
+
 function generateProductPerformanceReport(startDate, endDate) {
   try {
     console.log(`Starting product report generation for date range: ${startDate} to ${endDate}`);
@@ -2020,7 +2155,7 @@ function generateProductPerformanceReport(startDate, endDate) {
       console.error('Required sheets not found');
       return { 
         success: false, 
-        message: 'Required sheets not found. Please check that both "Transactions" and "Master List" sheets exist.' 
+        message: 'Required sheets not found. Please check that both "Transactions" and "' + MASTER_LIST_SHEET_NAME + '" sheets exist.' 
       };
     }
     
@@ -2030,11 +2165,29 @@ function generateProductPerformanceReport(startDate, endDate) {
     const transData = transSheet.getDataRange().getValues();
     const transHeaders = transData[0];
     
+    // Debug: Log the first few rows of data to check column values
+    console.log("Debugging first 3 rows of transaction data:");
+    for (let i = 0; i < Math.min(3, transData.length); i++) {
+      const row = transData[i];
+      console.log(`Row ${i}:`);
+      for (let j = 0; j < Math.min(15, transHeaders.length); j++) {
+        console.log(`  ${transHeaders[j]}: ${row[j]} (type: ${typeof row[j]})`);
+      }
+    }
+    
     // Find column indexes by exact header names
-    const dateColIndex = transHeaders.indexOf('Date');
+    let dateColIndex = transHeaders.indexOf('Date');
+    
+    // Check for alternative column names if not found
+    if (dateColIndex === -1) {
+      dateColIndex = transHeaders.indexOf('Transaction Date');
+      if (dateColIndex === -1) {
+        dateColIndex = transHeaders.indexOf('Trans Date');
+      }
+    }
     
     if (dateColIndex === -1) {
-      console.error('Date column not found');
+      console.error('Date column not found. Headers in sheet:', transHeaders);
       return { 
         success: false, 
         message: 'Date column not found in Transactions sheet. Please check the header row.' 
@@ -2043,9 +2196,26 @@ function generateProductPerformanceReport(startDate, endDate) {
     
     // Convert string dates to Date objects
     console.log(`Converting dates: ${startDate} and ${endDate}`);
-    const startDateObj = new Date(startDate);
-    const endDateObj = new Date(endDate);
-    endDateObj.setHours(23, 59, 59); // Include the entire end date
+    let startDateObj, endDateObj;
+    
+    try {
+      startDateObj = new Date(startDate);
+      endDateObj = new Date(endDate);
+      endDateObj.setHours(23, 59, 59); // Include the entire end date
+      
+      // Verify these are valid dates
+      if (isNaN(startDateObj.getTime()) || isNaN(endDateObj.getTime())) {
+        throw new Error('Invalid date format');
+      }
+      
+      console.log(`Date objects - Start: ${startDateObj}, End: ${endDateObj}`);
+    } catch (e) {
+      console.error('Error parsing dates:', e);
+      return {
+        success: false,
+        message: 'Error parsing dates. Please use format YYYY-MM-DD.'
+      };
+    }
     
     // Process transactions within date range
     const productMap = new Map(); // Map to track products by UPC
@@ -2061,10 +2231,32 @@ function generateProductPerformanceReport(startDate, endDate) {
         continue;
       }
       
-      // Get the date directly - it's already a Date object in Google Sheets
-      const transDate = row[dateColIndex];
+      // Get the date from the sheet
+      let transDate = row[dateColIndex];
       
-            // Compare only the date part (ignore time)
+      // Make sure transDate is a Date object
+      if (!(transDate instanceof Date)) {
+        try {
+          // Try to convert to a Date object if it's a string
+          if (typeof transDate === 'string') {
+            transDate = new Date(transDate);
+          } else {
+            // If it's a number or something else, try to convert to string first
+            transDate = new Date(String(transDate));
+          }
+          
+          // Check if conversion was successful
+          if (isNaN(transDate.getTime())) {
+            console.log(`Row ${i+1} has invalid date, skipping`);
+            continue;
+          }
+        } catch (e) {
+          console.error(`Error converting date in row ${i+1}:`, e);
+          continue;
+        }
+      }
+      
+      // Compare only the date part (ignore time)
       const transDateOnly = new Date(transDate.getFullYear(), transDate.getMonth(), transDate.getDate());
       const startDateOnly = new Date(startDateObj.getFullYear(), startDateObj.getMonth(), startDateObj.getDate());
       const endDateOnly = new Date(endDateObj.getFullYear(), endDateObj.getMonth(), endDateObj.getDate());
@@ -2090,8 +2282,37 @@ function generateProductPerformanceReport(startDate, endDate) {
           
           const name = row[nameIndex] || 'Unknown';
           const qty = Number(row[qtyIndex]) || 0;
-          const price = Number(row[priceIndex]) || 0;
-          const total = Number(row[totalIndex]) || 0;
+          
+          // Ensure proper conversion of monetary values
+          let price = 0;
+          let total = 0;
+          
+          // Handle price
+          if (priceIndex !== -1 && row[priceIndex] !== null && row[priceIndex] !== undefined) {
+            if (typeof row[priceIndex] === 'number') {
+              price = row[priceIndex];
+            } else if (typeof row[priceIndex] === 'string') {
+              // Remove any currency symbols and commas
+              const cleanedValue = row[priceIndex].replace(/[$,]/g, '');
+              price = parseFloat(cleanedValue) || 0;
+            }
+          }
+          
+          // Handle total
+          if (totalIndex !== -1 && row[totalIndex] !== null && row[totalIndex] !== undefined) {
+            if (typeof row[totalIndex] === 'number') {
+              total = row[totalIndex];
+            } else if (typeof row[totalIndex] === 'string') {
+              // Remove any currency symbols and commas
+              const cleanedValue = row[totalIndex].replace(/[$,]/g, '');
+              total = parseFloat(cleanedValue) || 0;
+            }
+          }
+          
+          // If total is still 0 but we have price and qty, calculate it
+          if (total === 0 && price > 0 && qty > 0) {
+            total = price * qty;
+          }
           
           // Get product info from Master List
           let brand = 'Unknown';
@@ -2114,7 +2335,17 @@ function generateProductPerformanceReport(startDate, endDate) {
                 }
                 
                 if (masterIndvCostIndex !== -1) {
-                  const indvCost = Number(masterData[j][masterIndvCostIndex]) || 0;
+                  let indvCost = 0;
+                  const costValue = masterData[j][masterIndvCostIndex];
+                  
+                  if (typeof costValue === 'number') {
+                    indvCost = costValue;
+                  } else if (typeof costValue === 'string') {
+                    // Remove any currency symbols and commas
+                    const cleanedValue = costValue.replace(/[$,]/g, '');
+                    indvCost = parseFloat(cleanedValue) || 0;
+                  }
+                  
                   profit = (price - indvCost) * qty;
                 }
                 break;
@@ -2162,6 +2393,7 @@ function generateProductPerformanceReport(startDate, endDate) {
     const averagePrice = totalQuantity > 0 ? totalSales / totalQuantity : 0;
     
     console.log(`Product report generation complete. Found ${totalProducts} products.`);
+    console.log(`Totals - Products: ${totalProducts}, Quantity: ${totalQuantity}, Sales: ${totalSales}, Profit: ${totalProfit}`);
     
     return {
       success: true,
@@ -2181,6 +2413,7 @@ function generateProductPerformanceReport(startDate, endDate) {
     };
   }
 }
+
 
 /**
  * Exports the sales report to PDF with enhanced HTML styling.
@@ -2843,31 +3076,6 @@ function updateHoursOfOperation(hoursData) {
   }
 }
 
-// Helper function to format time for display
-function formatTime(timeValue) {
-  if (!timeValue) return '';
-  
-  try {
-    // If it's already a string in the right format, return it
-    if (typeof timeValue === 'string') return timeValue;
-    
-    // If it's a Date object, format it
-    if (timeValue instanceof Date) {
-      const hours = timeValue.getHours();
-      const minutes = timeValue.getMinutes();
-      const ampm = hours >= 12 ? 'PM' : 'AM';
-      const formattedHours = hours % 12 || 12;
-      const formattedMinutes = minutes.toString().padStart(2, '0');
-      return `${formattedHours}:${formattedMinutes} ${ampm}`;
-    }
-    
-    return '';
-  } catch (e) {
-    console.error('Error formatting time:', e);
-    return '';
-  }
-}
-
 // Helper function to parse time string into Date object
 function parseTimeString(timeString) {
   if (!timeString) return null;
@@ -2897,16 +3105,209 @@ function parseTimeString(timeString) {
   }
 }
 
-// Add these to your Code.gs file
-function lookupProduct(upc) {
-  return lookupUpcForWebApp(upc);
+/**
+ * Gets discount data from the Discounts sheet.
+ * @return {Object} Result object with discount data.
+ */
+function getDiscounts() {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const discountSheet = ss.getSheetByName('Discounts');
+    
+    if (!discountSheet) {
+      return { 
+        success: false, 
+        message: 'Discounts sheet not found. Please create a sheet named "Discounts".' 
+      };
+    }
+    
+    // Get all discount data
+    const data = discountSheet.getDataRange().getValues();
+    const headers = data[0];
+    
+    // Process discounts
+    const discounts = [];
+    const categories = new Set();
+    
+    // Get categories from Inv for dropdown
+    const masterSheet = ss.getSheetByName(MASTER_LIST_SHEET_NAME);
+    if (masterSheet) {
+      const masterData = masterSheet.getDataRange().getValues();
+      const categoryIndex = masterData[0].indexOf('Category');
+      
+      if (categoryIndex !== -1) {
+        for (let i = 1; i < masterData.length; i++) {
+          if (masterData[i][categoryIndex]) {
+            categories.add(masterData[i][categoryIndex]);
+          }
+        }
+      }
+    }
+    
+    // Skip header row
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      
+      // Skip empty rows
+      if (!row[0]) continue;
+      
+      discounts.push({
+        code: row[0],
+        type: row[1] || 'Coupon',
+        once: row[2] === true,
+        expiration: row[3] ? Utilities.formatDate(new Date(row[3]), Session.getScriptTimeZone(), 'MM/dd/yyyy') : '',
+        dollar: row[4] || '',
+        percent: row[5] || '',
+        total: row[6] === true,
+        category: row[7] || '',
+        item1: row[8] || '',
+        item2: row[9] || '',
+        item3: row[10] || '',
+        item4: row[11] || '',
+        item5: row[12] || ''
+      });
+    }
+    
+    return {
+      success: true,
+      discounts: discounts,
+      categories: Array.from(categories).sort()
+    };
+  } catch (e) {
+    console.error('Error getting discounts:', e);
+    return { 
+      success: false, 
+      message: 'Error getting discounts: ' + e.message 
+    };
+  }
 }
 
-function requestProductInfo(upc) {
-  return requestInfoForWebApp(upc);
+/**
+ * Saves a discount to the Discounts sheet.
+ * @param {Object} discountData The discount data to save.
+ * @return {Object} Result object with success flag and message.
+ */
+function saveDiscount(discountData) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    let discountSheet = ss.getSheetByName('Discounts');
+    
+    // Create the sheet if it doesn't exist
+    if (!discountSheet) {
+      discountSheet = ss.insertSheet('Discounts');
+      // Add headers
+      discountSheet.appendRow([
+        'Code', 'Type', 'One-time Use', 'Expiration Date', 'Dollar Amount', 
+        'Percent', 'Apply to Total', 'Category', 'Item 1', 'Item 2', 
+        'Item 3', 'Item 4', 'Item 5'
+      ]);
+    }
+    
+    // Check if this is an update or new discount
+    const data = discountSheet.getDataRange().getValues();
+    let rowIndex = -1;
+    
+    if (discountData.rowIndex) {
+      // This is an update
+      rowIndex = parseInt(discountData.rowIndex);
+    } else {
+      // Check if code already exists
+      for (let i = 1; i < data.length; i++) {
+        if (data[i][0] === discountData.code) {
+          rowIndex = i + 1; // +1 because sheet rows are 1-indexed
+          break;
+        }
+      }
+    }
+    
+    // Parse expiration date
+    let expirationDate = null;
+    if (discountData.expiration) {
+      expirationDate = new Date(discountData.expiration);
+    }
+    
+    // Prepare row data
+    const rowData = [
+      discountData.code,
+      discountData.type,
+      discountData.once === true,
+      expirationDate,
+      discountData.dollar ? parseFloat(discountData.dollar) : '',
+      discountData.percent ? parseFloat(discountData.percent) : '',
+      discountData.total === true,
+      discountData.category,
+      discountData.item1,
+      discountData.item2,
+      discountData.item3,
+      discountData.item4,
+      discountData.item5
+    ];
+    
+    if (rowIndex > 0) {
+      // Update existing row
+      discountSheet.getRange(rowIndex, 1, 1, rowData.length).setValues([rowData]);
+      return { 
+        success: true, 
+        message: 'Discount updated successfully.' 
+      };
+    } else {
+      // Add new row
+      discountSheet.appendRow(rowData);
+      return { 
+        success: true, 
+        message: 'Discount added successfully.' 
+      };
+    }
+  } catch (e) {
+    console.error('Error saving discount:', e);
+    return { 
+      success: false, 
+      message: 'Error saving discount: ' + e.message 
+    };
+  }
 }
 
-function saveProduct(product) {
-  return saveProductFromWebApp(product);
+/**
+ * Deletes a discount from the Discounts sheet.
+ * @param {string} code The discount code to delete.
+ * @return {Object} Result object with success flag and message.
+ */
+function deleteDiscount(code) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const discountSheet = ss.getSheetByName('Discounts');
+    
+    if (!discountSheet) {
+      return { 
+        success: false, 
+        message: 'Discounts sheet not found.' 
+      };
+    }
+    
+    // Find the discount
+    const data = discountSheet.getDataRange().getValues();
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][0] === code) {
+        discountSheet.deleteRow(i + 1); // +1 because sheet rows are 1-indexed
+        return { 
+          success: true, 
+          message: 'Discount deleted successfully.' 
+        };
+      }
+    }
+    
+    return { 
+      success: false, 
+      message: 'Discount not found.' 
+    };
+  } catch (e) {
+    console.error('Error deleting discount:', e);
+    return { 
+      success: false, 
+      message: 'Error deleting discount: ' + e.message 
+    };
+  }
 }
+
+
 
