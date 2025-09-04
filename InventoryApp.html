@@ -1,0 +1,3226 @@
+***InventoryApp.html***
+***Upload 9/4/25 11:00***
+
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+  <style>
+    :root {
+      --primary-color: #FFD700; /* Gold */
+      --background-color: #1a1a1a; /* Dark background */
+      --card-color: #2c2c2c; /* Dark card */
+      --text-color: #ffffff; /* White text */
+      --text-secondary: #aaaaaa; /* Gray text */
+      --border-color: #444444;
+      --success-color: #4CAF50;
+      --error-color: #F44336;
+      --warning-color: #FF9800;
+    }
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background-color: var(--background-color);
+      color: var(--text-color);
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    .card {
+      background-color: var(--card-color);
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+      border: 1px solid var(--border-color);
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      margin-bottom: 10px;
+      padding-bottom: 15px;
+      border-bottom: 1px solid var(--border-color);
+    }
+    .logo {
+      width: 60px;
+      height: 60px;
+      margin-right: 15px;
+    }
+    .logo img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+    .title-area {
+      flex: 1;
+    }
+    h1 {
+      margin: 0;
+      color: var(--primary-color);
+      font-size: 24px;
+    }
+    .subtitle {
+      color: var(--text-secondary);
+      font-size: 16px;
+      margin-top: 5px;
+    }
+    .machine-id {
+      color: var(--primary-color);
+      font-size: 14px;
+      margin-top: 5px;
+      font-weight: bold;
+    }
+    h2 {
+      color: var(--primary-color);
+      border-bottom: 1px solid var(--primary-color);
+      padding-bottom: 5px;
+      margin-top: 25px;
+    }
+    h3 {
+      color: var(--primary-color);
+      margin-top: 20px;
+    }
+    label {
+      font-weight: bold;
+      display: block;
+      margin-bottom: 5px;
+      color: var(--text-secondary);
+    }
+    input, select, textarea {
+      width: 100%;
+      padding: 10px;
+      margin-bottom: 15px;
+      box-sizing: border-box;
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      background-color: #3a3a3a;
+      color: var(--text-color);
+      font-size: 14px;
+    }
+    button {
+      padding: 12px 20px;
+      background-color: var(--primary-color);
+      color: #000000;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 16px;
+      font-weight: bold;
+      transition: opacity 0.3s;
+    }
+    button:hover {
+      opacity: 0.8;
+    }
+    button:disabled {
+      background-color: #555;
+      cursor: not-allowed;
+    }
+    .btn-group {
+      display: flex;
+      gap: 10px;
+      margin-top: 20px;
+    }
+    .btn-group button {
+      flex: 1;
+    }
+    .btn-secondary {
+      background-color: #555;
+      color: white;
+    }
+    .btn-danger {
+      background-color: var(--error-color);
+      color: white;
+    }
+    #status {
+      margin-top: 20px;
+      padding: 12px;
+      border-radius: 4px;
+      display: none;
+      text-align: center;
+    }
+    .success { background-color: var(--success-color); color: white; }
+    .error { background-color: var(--error-color); color: white; }
+    .info { background-color: #2196F3; color: white; }
+    .warning { background-color: var(--warning-color); color: white; }
+    .hidden { display: none; }
+    .row { display: flex; gap: 20px; }
+    .col { flex: 1; }
+    
+    /* Navigation Styles */
+    .nav-container {
+      display: flex;
+      margin-bottom: 20px;
+    }
+    .nav-categories {
+      width: 200px;
+      border-right: 1px solid var(--border-color);
+      padding-right: 15px;
+    }
+    .nav-category {
+      padding: 10px;
+      cursor: pointer;
+      border-radius: 4px;
+      margin-bottom: 5px;
+      transition: all 0.3s;
+    }
+    .nav-category:hover {
+      background-color: rgba(255, 215, 0, 0.1);
+    }
+    .nav-category.active {
+      background-color: rgba(255, 215, 0, 0.2);
+      font-weight: bold;
+    }
+    .nav-tabs {
+      flex: 1;
+      display: flex;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
+      padding-left: 15px;
+    }
+    .nav-tab {
+      padding: 10px 15px;
+      cursor: pointer;
+      border-radius: 4px;
+      margin-right: 5px;
+      margin-bottom: 5px;
+      color: var(--text-secondary);
+      transition: all 0.3s;
+    }
+    .nav-tab:hover {
+      background-color: rgba(255, 215, 0, 0.1);
+      color: var(--primary-color);
+    }
+    .nav-tab.active {
+      background-color: rgba(255, 215, 0, 0.2);
+      color: var(--primary-color);
+      font-weight: bold;
+    }
+    
+    /* Page Styles */
+    .page {
+      display: none;
+    }
+    .page.active {
+      display: block;
+    }
+    
+    /* Report Styles */
+    .report-filters {
+      background-color: rgba(0,0,0,0.2);
+      padding: 15px;
+      border-radius: 4px;
+      margin-bottom: 20px;
+    }
+    .report-summary {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 15px;
+      margin-bottom: 20px;
+    }
+    .summary-card {
+      background-color: rgba(0,0,0,0.2);
+      padding: 15px;
+      border-radius: 4px;
+      flex: 1;
+      min-width: 120px;
+      text-align: center;
+    }
+    .summary-value {
+      font-size: 24px;
+      font-weight: bold;
+      color: var(--primary-color);
+      margin-bottom: 5px;
+    }
+    .summary-label {
+      font-size: 14px;
+      color: var(--text-secondary);
+    }
+    .report-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+    .report-table th, .report-table td {
+      padding: 10px;
+      text-align: left;
+      border-bottom: 1px solid var(--border-color);
+    }
+    .report-table th {
+      background-color: rgba(0,0,0,0.2);
+      color: var(--primary-color);
+    }
+    .report-table tr:hover {
+      background-color: rgba(255,255,255,0.05);
+    }
+    .report-table tbody tr:hover {
+      background-color: rgba(255, 215, 0, 0.1);
+      cursor: pointer;
+    }
+    .card {
+      position: relative;
+      z-index: 10;
+      background-color: var(--card-color);
+    }
+
+    script {
+      display: none !important;
+    }
+
+
+    
+    /* Loading Styles */
+    .loading-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: rgba(0, 0, 0, 0.7);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+    
+    /* Force hide loading overlays */
+    .loading-overlay.hidden {
+      display: none !important;
+    }
+    
+    .spinner {
+      border: 5px solid rgba(255, 255, 255, 0.3);
+      border-radius: 50%;
+      border-top: 5px solid var(--primary-color);
+      width: 50px;
+      height: 50px;
+      animation: spin 1s linear infinite;
+      margin-bottom: 15px;
+    }
+    
+    .loading-text {
+      color: var(--primary-color);
+      font-weight: bold;
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    
+    .report-container {
+      position: relative;
+      min-height: 200px;
+    }
+    
+    /* Status Colors */
+    .out-of-stock {
+      background-color: rgba(244, 67, 54, 0.2) !important;
+    }
+    .low-stock {
+      background-color: rgba(255, 152, 0, 0.2) !important;
+    }
+    .expired {
+      background-color: rgba(244, 67, 54, 0.3) !important;
+    }
+    .expiring-soon {
+      background-color: rgba(255, 152, 0, 0.3) !important;
+    }
+
+    /* Turnover Status Colors */
+.very-slow {
+  background-color: rgba(255, 0, 0, 0.1) !important;
+}
+.slow {
+  background-color: rgba(255, 165, 0, 0.1) !important;
+}
+.optimal {
+  background-color: rgba(0, 128, 0, 0.1) !important;
+}
+.fast {
+  background-color: rgba(0, 0, 255, 0.1) !important;
+}
+
+/* Chart container */
+.chart-container {
+  background-color: var(--card-color);
+  border-radius: 8px;
+  padding: 15px;
+  margin-bottom: 20px;
+  border: 1px solid var(--border-color);
+}
+.chart-container h3 {
+  margin-top: 0;
+  margin-bottom: 15px;
+  color: var(--primary-color);
+  font-size: 16px;
+}
+
+
+    
+    /* Modal Styles */
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 2000;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0,0,0,0.7);
+      overflow: auto;
+    }
+    .modal-content {
+      background-color: var(--card-color);
+      margin: 10% auto;
+      padding: 20px;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      width: 80%;
+      max-width: 500px;
+    }
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 10px;
+      margin-bottom: 15px;
+    }
+    .modal-title {
+      color: var(--primary-color);
+      font-size: 18px;
+      font-weight: bold;
+      margin: 0;
+    }
+    .close-modal {
+      color: var(--text-secondary);
+      font-size: 24px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    .close-modal:hover {
+      color: var(--primary-color);
+    }
+    
+    /* Credentials Styles */
+    .credential-section {
+      margin-bottom: 25px;
+      padding-bottom: 15px;
+      border-bottom: 1px solid var(--border-color);
+    }
+    .credential-section h3 {
+      color: var(--primary-color);
+      margin-top: 0;
+      margin-bottom: 15px;
+    }
+    .credential-item {
+      margin-bottom: 15px;
+    }
+    .credential-label {
+      font-weight: bold;
+      margin-bottom: 5px;
+      color: var(--text-secondary);
+    }
+    .credential-value {
+      padding: 10px;
+      background-color: rgba(0,0,0,0.2);
+      border-radius: 4px;
+      word-break: break-all;
+    }
+    .credential-value.editable {
+      background-color: #3a3a3a;
+      border: 1px solid var(--border-color);
+    }
+    
+    /* User Management Styles */
+    .user-list {
+      margin-top: 20px;
+    }
+    .user-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px;
+      border-bottom: 1px solid var(--border-color);
+    }
+    .user-name {
+      font-weight: bold;
+    }
+    .user-actions {
+      display: flex;
+      gap: 10px;
+    }
+    
+    /* Currency Input Styles */
+    .currency-input {
+      position: relative;
+      padding-left: 25px !important;
+    }
+    
+    .currency-display {
+      position: absolute;
+      left: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-secondary);
+      pointer-events: none;
+    }
+
+    /* Expiration Status Colors */
+.expired {
+  background-color: rgba(139, 0, 0, 0.2) !important;
+  color: #ff6666;
+}
+.expiring-7days {
+  background-color: rgba(255, 0, 0, 0.2) !important;
+  color: #ff8080;
+}
+.expiring-30days {
+  background-color: rgba(255, 165, 0, 0.2) !important;
+  color: #ffaa00;
+}
+.expiring-90days {
+  background-color: rgba(255, 255, 0, 0.2) !important;
+  color: #cccc00;
+}
+
+/* Checkbox styling */
+.item-checkbox {
+  width: 18px !important;
+  height: 18px !important;
+  margin-right: 10px;
+}
+
+/* Summary cards for expiration */
+.summary-card.expired {
+  background-color: rgba(139, 0, 0, 0.2);
+  border-left: 4px solid #8b0000;
+}
+.summary-card.expiring-7days {
+  background-color: rgba(255, 0, 0, 0.2);
+  border-left: 4px solid #ff0000;
+}
+.summary-card.expiring-30days {
+  background-color: rgba(255, 165, 0, 0.2);
+  border-left: 4px solid #ffa500;
+}
+.summary-card.expiring-90days {
+  background-color: rgba(255, 255, 0, 0.2);
+  border-left: 4px solid #ffff00;
+}
+
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Login Screen -->
+    <div id="login-screen" class="card">
+      <div class="header">
+        <div class="logo">
+          <img src="https://i.imgur.com/lfcgQ0s.png" alt="VEND LAS VEGAS Logo">
+        </div>
+        <div class="title-area">
+          <h1>VEND LAS VEGAS</h1>
+          <div class="machine-id" id="login-machine-id"></div>
+        </div>
+      </div>
+      <h2>Inventory Portal Login</h2>
+      <label for="username">Username</label>
+      <input type="text" id="username">
+      <label for="password">Password</label>
+      <input type="password" id="password">
+      <div class="btn-group">
+        <button onclick="handleLogin()">Login</button>
+        <button onclick="showResetMasterPasswordModalFromLogin()" class="btn-secondary">Reset Master Password</button>
+      </div>
+      <div style="margin-top: 15px; color: var(--text-secondary); font-size: 12px;">
+        <p>Username is CaSe sensitive. Contact administrator for login credentials</p>
+      </div>
+    </div>
+
+    <!-- Main Portal -->
+    <div id="main-portal" class="card hidden">
+      <div class="header">
+        <div class="logo">
+          <img src="https://i.imgur.com/lfcgQ0s.png" alt="VEND LAS VEGAS Logo">
+        </div>
+        <div class="title-area">
+          <h1>Inventory Portal</h1>
+          <div class="subtitle" id="page-subtitle">Item Entry</div>
+          <div class="machine-id" id="portal-machine-id"></div>
+        </div>
+      </div>
+
+      <!-- Navigation - MOVED INSIDE main-portal -->
+      <div class="nav-container">
+        <div class="nav-categories">
+          <div class="nav-category active" data-category="inventory">Inventory Management</div>
+          <div class="nav-category" data-category="financial">Financial Reports</div>
+          <div class="nav-category" data-category="customer">Customer Behavior</div>
+          <div class="nav-category" data-category="analytics">Advanced Analytics</div>
+          <div class="nav-category" data-category="admin">Admin Functions</div>
+        </div>
+        
+        <div class="nav-tabs">
+          <!-- Inventory Management -->
+          <div class="nav-tab active" data-category="inventory" data-page="item-entry">Item Entry</div>
+          <div class="nav-tab" data-category="inventory" data-page="inventory-status">Inventory Status</div>
+          <div class="nav-tab" data-category="inventory" data-page="inventory-turnover">Inventory Turnover</div>
+          <div class="nav-tab" data-category="inventory" data-page="expiration-tracking">Expiration Tracking</div>
+          
+          <!-- Financial Reports -->
+          <div class="nav-tab hidden" data-category="financial" data-page="sales-report">Sales Report</div>
+          <div class="nav-tab hidden" data-category="financial" data-page="product-report">Product Performance</div>
+          <div class="nav-tab hidden" data-category="financial" data-page="profit-margin">Profit Margin</div>
+          <div class="nav-tab hidden" data-category="financial" data-page="cost-analysis">Cost Analysis</div>
+          <div class="nav-tab hidden" data-category="financial" data-page="revenue-forecast">Revenue Forecast</div>
+          
+          <!-- Customer Behavior -->
+          <div class="nav-tab hidden" data-category="customer" data-page="peak-hours">Peak Hours</div>
+          <div class="nav-tab hidden" data-category="customer" data-page="product-pairing">Product Pairing</div>
+          
+          <!-- Advanced Analytics -->
+          <div class="nav-tab hidden" data-category="analytics" data-page="seasonal-trends">Seasonal Trends</div>
+          <div class="nav-tab hidden" data-category="analytics" data-page="price-sensitivity">Price Sensitivity</div>
+          
+          <!-- Admin Functions -->
+          <div class="nav-tab hidden" data-category="admin" data-page="user-management">User Management</div>
+          <div class="nav-tab hidden" data-category="admin" data-page="credentials">Credentials</div>
+          <div class="nav-tab hidden" data-category="admin" data-page="discounts">Discounts</div>
+        </div>
+      </div>
+      
+      <!-- Item Entry Page -->
+      <div id="item-entry-page" class="page active">
+        <div class="row">
+          <div class="col" style="flex: 2;">
+            <label for="upc-input">Enter or Scan UPC</label>
+            <input type="text" id="upc-input" placeholder="Scan a product...">
+          </div>
+          <div class="col" style="align-self: flex-end;">
+            <div class="btn-group">
+              <button onclick="handleLookup()">Lookup</button>
+              <button onclick="handleRequestInfo()" class="btn-secondary">Request Info</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="form-fields">
+          <h2>Product Details</h2>
+          <div class="row">
+            <div class="col"><label for="brand">Brand</label><input type="text" id="brand"></div>
+            <div class="col"><label for="name">Name</label><input type="text" id="name"></div>
+          </div>
+          <div class="row">
+            <div class="col"><label for="category">Category</label><input type="text" id="category"></div>
+          </div>
+          <label for="details">Details / Ingredients</label>
+          <textarea id="details" rows="3"></textarea>
+          <div class="row">
+            <div class="col"><label for="size">Size</label><input type="text" id="size"></div>
+            <div class="col"><label for="image">Image URL</label><input type="text" id="image"></div>
+          </div>
+          <div class="row">
+            <div class="col"><label for="calories">Calories</label><input type="text" id="calories"></div>
+            <div class="col"><label for="sugar">Sugar</label><input type="text" id="sugar"></div>
+            <div class="col"><label for="sodium">Sodium</label><input type="text" id="sodium"></div>
+          </div>
+
+          <h2>Pricing & Cost</h2>
+          <div class="row">
+            <div class="col">
+              <label for="price">Retail Price</label>
+              <div style="position: relative;">
+                <span class="currency-display">$</span>
+                <input type="number" id="price" step="0.01" class="currency-input">
+              </div>
+            </div>
+            <div class="col"><label for="taxable">Taxable</label>
+              <select id="taxable">
+                <option value="Yes">Yes</option>
+                <option value="No">No</option>
+              </select>
+            </div>
+          </div>
+          <div class="row">
+            <div class="col">
+              <label for="cost">Purchase Cost (for the unit)</label>
+              <div style="position: relative;">
+                <span class="currency-display">$</span>
+                <input type="number" id="cost" step="0.01" class="currency-input">
+              </div>
+            </div>
+            <div class="col"><label for="purchaseUnitQty">Items in Purchase Unit</label><input type="number" id="purchaseUnitQty"></div>
+          </div>
+          <div class="row">
+            <div class="col">
+              <label for="indvCost">Individual Cost</label>
+              <div style="position: relative;">
+                <span class="currency-display">$</span>
+                <input type="number" id="indvCost" readonly class="currency-input">
+              </div>
+            </div>
+            <div class="col">
+              <label for="profit">Profit</label>
+              <div style="position: relative;">
+                <span class="currency-display">$</span>
+                <input type="number" id="profit" readonly class="currency-input">
+              </div>
+            </div>
+          </div>
+          
+          <h2>Stock</h2>
+          <div class="row">
+            <div class="col"><label for="qty">Current Quantity</label><input type="number" id="qty"></div>
+            <div class="col"><label for="expDate">Expiration Date</label><input type="date" id="expDate"></div>
+          </div>
+          
+          <div class="btn-group">
+            <button onclick="handleSave()">Save</button>
+            <button onclick="handleClear()" class="btn-secondary">Clear</button>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Inventory Status Page -->
+      <div id="inventory-status-page" class="page">
+        <h2>Inventory Status</h2>
+        
+        <div class="report-container">
+          <div id="inventory-loading" class="loading-overlay">
+            <div class="spinner"></div>
+            <div class="loading-text">Loading Inventory Status...</div>
+          </div>
+          
+          <div id="inventory-content">
+            <div style="overflow-x: auto;">
+              <table class="report-table" id="inventory-table">
+                <thead>
+                  <tr>
+                    <th>UPC</th>
+                    <th>Brand</th>
+                    <th>Name</th>
+                    <th>Size</th>
+                    <th>Price</th>
+                    <th>Quantity</th>
+                    <th>Value</th>
+                  </tr>
+                </thead>
+                <tbody id="inventory-body">
+                  <!-- Inventory items will be added here -->
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <td colspan="5" style="text-align: right; font-weight: bold;">Totals:</td>
+                    <td id="total-quantity" style="font-weight: bold;">0</td>
+                    <td id="total-value" style="font-weight: bold;">$0.00</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+            
+            <div class="btn-group" style="margin-top: 30px;">
+              <button onclick="exportInventoryToHTMLPDF()">Export to PDF</button>
+              <button onclick="loadInventoryStatus()" class="btn-secondary">Refresh</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Inventory Turnover Page -->
+      <div id="inventory-turnover-page" class="page">
+        <h2>Inventory Turnover</h2>
+        
+        <div class="report-filters">
+          <div class="row">
+            <div class="col">
+              <label for="turnover-period">Time Period</label>
+              <select id="turnover-period">
+                <option value="30">Last 30 Days</option>
+                <option value="90" selected>Last 90 Days</option>
+                <option value="180">Last 180 Days</option>
+                <option value="365">Last 365 Days</option>
+              </select>
+            </div>
+            <div class="col">
+              <label for="turnover-category">Category</label>
+              <select id="turnover-category">
+                <option value="all" selected>All Categories</option>
+                <!-- Categories will be populated dynamically -->
+              </select>
+            </div>
+            <div class="col" style="align-self: flex-end;">
+              <button onclick="loadTurnoverData()">Calculate Turnover</button>
+            </div>
+          </div>
+        </div>
+        
+        <div class="report-container">
+          <div id="turnover-loading" class="loading-overlay">
+            <div class="spinner"></div>
+            <div class="loading-text">Calculating Inventory Turnover...</div>
+          </div>
+          
+          <!-- Summary Cards -->
+          <div class="report-summary">
+            <div class="summary-card">
+              <div class="summary-value" id="overall-turnover">0.0</div>
+              <div class="summary-label">Overall Turnover Ratio</div>
+            </div>
+            <div class="summary-card">
+              <div class="summary-value" id="avg-days-in-inventory">0</div>
+              <div class="summary-label">Avg Days in Inventory</div>
+            </div>
+            <div class="summary-card">
+              <div class="summary-value" id="slow-items-count">0</div>
+              <div class="summary-label">Slow-Moving Items</div>
+            </div>
+            <div class="summary-card">
+              <div class="summary-value" id="fast-items-count">0</div>
+              <div class="summary-label">Fast-Moving Items</div>
+            </div>
+          </div>
+          
+          <!-- Turnover Charts -->
+          <div class="row">
+            <div class="col">
+              <div class="chart-container">
+                <h3>Turnover by Category</h3>
+                <div id="category-turnover-chart" style="height: 300px;"></div>
+              </div>
+            </div>
+            <div class="col">
+              <div class="chart-container">
+                <h3>Top 10 Items by Turnover</h3>
+                <div id="top-items-chart" style="height: 300px;"></div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Turnover Table -->
+          <h3>Detailed Turnover Analysis</h3>
+          <div style="overflow-x: auto;">
+            <table class="report-table" id="turnover-table">
+              <thead>
+                <tr>
+                  <th>UPC</th>
+                  <th>Brand</th>
+                  <th>Name</th>
+                  <th>Category</th>
+                  <th>Beginning Inventory</th>
+                  <th>Ending Inventory</th>
+                  <th>Units Sold</th>
+                  <th>Turnover Ratio</th>
+                  <th>Days in Inventory</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="turnover-body">
+                <!-- Turnover data will be added here -->
+              </tbody>
+            </table>
+          </div>
+          
+          <div class="btn-group" style="margin-top: 30px;">
+            <button onclick="exportTurnoverToHTMLPDF()">Export to PDF</button>
+            <button onclick="loadTurnoverData()" class="btn-secondary">Refresh Data</button>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Expiration Tracking Page -->
+      <div id="expiration-tracking-page" class="page">
+        <h2>Expiration Tracking</h2>
+        
+        <div class="report-filters">
+          <div class="row">
+            <div class="col">
+              <label for="expiration-filter">Show Items</label>
+              <select id="expiration-filter">
+                <option value="all">All Items with Expiration Dates</option>
+                <option value="expired" selected>Already Expired</option>
+                <option value="7days">Expiring in 7 Days</option>
+                <option value="30days">Expiring in 30 Days</option>
+                <option value="90days">Expiring in 90 Days</option>
+              </select>
+            </div>
+            <div class="col">
+              <label for="category-filter">Category</label>
+              <select id="category-filter">
+                <option value="all" selected>All Categories</option>
+                <!-- Categories will be populated dynamically -->
+              </select>
+            </div>
+            <div class="col" style="align-self: flex-end;">
+              <button onclick="loadExpirationData()">Refresh Data</button>
+            </div>
+          </div>
+        </div>
+        
+        <div class="report-container">
+          <div id="expiration-loading" class="loading-overlay">
+            <div class="spinner"></div>
+            <div class="loading-text">Loading Expiration Data...</div>
+          </div>
+          
+          <div class="report-summary">
+            <div class="summary-card expired">
+              <div class="summary-value" id="expired-count">0</div>
+              <div class="summary-label">Expired Items</div>
+            </div>
+            <div class="summary-card expiring-7days">
+              <div class="summary-value" id="expiring-7-count">0</div>
+              <div class="summary-label">Expiring in 7 Days</div>
+            </div>
+            <div class="summary-card expiring-30days">
+              <div class="summary-value" id="expiring-30-count">0</div>
+              <div class="summary-label">Expiring in 30 Days</div>
+            </div>
+            <div class="summary-card expiring-90days">
+              <div class="summary-value" id="expiring-90-count">0</div>
+              <div class="summary-label">Expiring in 90 Days</div>
+            </div>
+          </div>
+          
+          <div style="overflow-x: auto;">
+            <table class="report-table" id="expiration-table">
+              <thead>
+                <tr>
+                  <th>UPC</th>
+                  <th>Brand</th>
+                  <th>Name</th>
+                  <th>Category</th>
+                  <th>Quantity</th>
+                  <th>Expiration Date</th>
+                  <th>Days Left</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="expiration-body">
+                <!-- Expiration data will be added here -->
+              </tbody>
+            </table>
+          </div>
+          
+          <div class="btn-group" style="margin-top: 30px;">
+            <button onclick="exportExpirationToHTMLPDF()">Export to PDF</button>
+            <button onclick="showMarkLossModal()" class="btn-danger">Mark as Loss</button>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Sales Report Page -->
+      <div id="sales-report-page" class="page">
+        <h2>Sales Report</h2>
+        
+        <div class="report-filters">
+          <div class="row">
+            <div class="col">
+              <label for="start-date">Start Date</label>
+              <input type="date" id="start-date">
+            </div>
+            <div class="col">
+              <label for="end-date">End Date</label>
+              <input type="date" id="end-date">
+            </div>
+            <div class="col" style="align-self: flex-end;">
+              <button onclick="generateSalesReport()">Generate Report</button>
+            </div>
+          </div>
+        </div>
+        
+        <div class="report-container">
+          <div id="sales-loading" class="loading-overlay hidden">
+            <div class="spinner"></div>
+            <div class="loading-text">Generating Sales Report...</div>
+          </div>
+          
+          <div id="report-content" class="hidden">
+            <div class="report-summary">
+              <div class="summary-card">
+                <div class="summary-value" id="total-transactions">0</div>
+                <div class="summary-label">Transactions</div>
+              </div>
+              <div class="summary-card">
+                <div class="summary-value" id="total-items">0</div>
+                <div class="summary-label">Items Sold</div>
+              </div>
+              <div class="summary-card">
+                <div class="summary-value" id="total-subtotal">$0.00</div>
+                <div class="summary-label">Subtotal</div>
+              </div>
+              <div class="summary-card">
+                <div class="summary-value" id="total-tax">$0.00</div>
+                <div class="summary-label">Tax</div>
+              </div>
+              <div class="summary-card">
+                <div class="summary-value" id="total-revenue">$0.00</div>
+                <div class="summary-label">Total</div>
+              </div>
+            </div>
+            
+            <h3>Transaction Details</h3>
+            <div style="overflow-x: auto;">
+              <table class="report-table" id="transactions-table">
+                <thead>
+                  <tr>
+                    <th>Transaction ID</th>
+                    <th>Date</th>
+                    <th>Time</th>
+                    <th>Items</th>
+                    <th>Payment Method</th>
+                    <th>Subtotal</th>
+                    <th>Tax</th>
+                    <th>Total</th>
+                  </tr>
+                </thead>
+                <tbody id="transactions-body">
+                  <!-- Transactions will be added here -->
+                </tbody>
+              </table>
+            </div>
+            
+            <div class="btn-group" style="margin-top: 30px;">
+              <button onclick="exportToHTMLPDF()">Export to PDF</button>
+              <button onclick="clearReport()" class="btn-secondary">Clear Report</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Product Performance Report Page -->
+      <div id="product-report-page" class="page">
+        <h2>Product Performance Report</h2>
+        
+        <div class="report-filters">
+          <div class="row">
+            <div class="col">
+              <label for="product-start-date">Start Date</label>
+              <input type="date" id="product-start-date">
+            </div>
+            <div class="col">
+              <label for="product-end-date">End Date</label>
+              <input type="date" id="product-end-date">
+            </div>
+            <div class="col" style="align-self: flex-end;">
+              <button onclick="generateProductReport()">Generate Report</button>
+            </div>
+          </div>
+        </div>
+        
+        <div class="report-container">
+          <div id="product-loading" class="loading-overlay hidden">
+            <div class="spinner"></div>
+            <div class="loading-text">Generating Product Report...</div>
+          </div>
+          
+          <div id="product-report-content" class="hidden">
+            <div class="report-summary">
+              <div class="summary-card">
+                <div class="summary-value" id="total-products">0</div>
+                <div class="summary-label">Products Sold</div>
+              </div>
+              <div class="summary-card">
+                <div class="summary-value" id="total-quantity">0</div>
+                <div class="summary-label">Total Quantity</div>
+              </div>
+              <div class="summary-card">
+                <div class="summary-value" id="avg-price">$0.00</div>
+                <div class="summary-label">Average Price</div>
+              </div>
+              <div class="summary-card">
+                <div class="summary-value" id="total-profit">$0.00</div>
+                <div class="summary-label">Total Profit</div>
+              </div>
+            </div>
+            
+            <h3>Top Selling Products</h3>
+            <div style="overflow-x: auto;">
+              <table class="report-table" id="products-table">
+                <thead>
+                  <tr>
+                    <th>UPC</th>
+                    <th>Product Name</th>
+                    <th>Brand</th>
+                    <th>Quantity Sold</th>
+                    <th>Unit Price</th>
+                    <th>Total Sales</th>
+                    <th>Profit</th>
+                  </tr>
+                </thead>
+                <tbody id="products-body">
+                  <!-- Products will be added here -->
+                </tbody>
+              </table>
+            </div>
+            
+            <div id="product-chart" style="width: 100%; height: 300px; margin-top: 30px;"></div>
+            
+            <div class="btn-group" style="margin-top: 30px;">
+              <button onclick="exportProductReportToHTMLPDF()">Export to PDF</button>
+              <button onclick="clearProductReport()" class="btn-secondary">Clear Report</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- User Management Page -->
+      <div id="user-management-page" class="page">
+        <h2>User Management</h2>
+        
+        <div class="btn-group" style="margin-bottom: 30px;">
+          <button onclick="showAddUserModal()">Add User</button>
+          <button onclick="showResetMasterPasswordModal()" class="btn-secondary">Reset Master Password</button>
+        </div>
+        
+        <div id="user-list" class="user-list">
+          <!-- Users will be added here dynamically -->
+          <div class="loading-text">Loading users...</div>
+        </div>
+      </div>
+      
+      <!-- Credentials Page -->
+      <div id="credentials-page" class="page">
+        <h2>System Credentials</h2>
+        
+        <div id="credentials-auth-form">
+          <label for="credentials-master-password">Enter Master Password</label>
+          <input type="password" id="credentials-master-password">
+          <button onclick="authenticateCredentials()">Access Credentials</button>
+        </div>
+        
+        <div id="credentials-container" class="hidden">
+          <!-- Credentials will be loaded here -->
+          <div class="loading-text">Loading credentials...</div>
+        </div>
+        
+        <div class="btn-group" style="margin-top: 30px;">
+          <button onclick="saveCredentials()" id="save-credentials-btn" class="hidden">Save Changes</button>
+          <button onclick="loadCredentialsWithAuth()" class="btn-secondary hidden" id="refresh-credentials-btn">Refresh</button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Modals -->
+    <div id="add-user-modal" class="modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3 class="modal-title">Add New User</h3>
+          <span class="close-modal" onclick="closeModal('add-user-modal')">×</span>
+        </div>
+        <div class="modal-body">
+          <label for="master-password-add">Master Password</label>
+          <input type="password" id="master-password-add">
+          
+          <label for="new-username">Username</label>
+          <input type="text" id="new-username">
+          
+          <label for="new-password">Password</label>
+          <input type="password" id="new-password">
+          
+          <label for="confirm-password">Confirm Password</label>
+          <input type="password" id="confirm-password">
+          
+          <div class="btn-group" style="margin-top: 20px;">
+            <button onclick="addUser()">Add User</button>
+            <button onclick="closeModal('add-user-modal')" class="btn-secondary">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div id="delete-user-modal" class="modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3 class="modal-title">Delete User</h3>
+          <span class="close-modal" onclick="closeModal('delete-user-modal')">×</span>
+        </div>
+        <div class="modal-body">
+          <p>Are you sure you want to delete user <span id="delete-username" style="font-weight: bold;"></span>?</p>
+          
+          <label for="master-password-delete">Master Password</label>
+          <input type="password" id="master-password-delete">
+          
+          <input type="hidden" id="username-to-delete">
+          
+          <div class="btn-group" style="margin-top: 20px;">
+            <button onclick="deleteUser()" class="btn-danger">Delete User</button>
+            <button onclick="closeModal('delete-user-modal')" class="btn-secondary">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div id="reset-password-modal" class="modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3 class="modal-title">Reset Master Password</h3>
+          <span class="close-modal" onclick="closeModal('reset-password-modal')">×</span>
+        </div>
+        <div class="modal-body">
+          <label for="current-master-password">Current Master Password</label>
+          <input type="password" id="current-master-password">
+          
+          <label for="new-master-password">New Master Password</label>
+          <input type="password" id="new-master-password">
+          
+          <label for="confirm-master-password">Confirm New Password</label>
+          <input type="password" id="confirm-master-password">
+          
+          <div class="btn-group" style="margin-top: 20px;">
+            <button onclick="resetMasterPassword()">Reset Password</button>
+            <button onclick="closeModal('reset-password-modal')" class="btn-secondary">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Mark Loss Modal -->
+    <div id="mark-loss-modal" class="modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3 class="modal-title">Record Inventory Loss</h3>
+          <span class="close-modal" onclick="closeModal('mark-loss-modal')">×</span>
+        </div>
+        <div class="modal-body">
+          <p>Record loss for selected items:</p>
+          <div id="loss-items-list">
+            <!-- Selected items will be listed here -->
+          </div>
+          
+          <label for="loss-reason">Reason for Loss</label>
+          <select id="loss-reason">
+            <option value="Expired">Expired</option>
+            <option value="Damaged">Damaged</option>
+            <option value="Theft">Theft</option>
+            <option value="Other">Other</option>
+          </select>
+          
+          <label for="loss-notes">Notes</label>
+          <textarea id="loss-notes" rows="3"></textarea>
+          
+          <div class="btn-group" style="margin-top: 20px;">
+            <button onclick="recordLoss()" class="btn-danger">Record Loss</button>
+            <button onclick="closeModal('mark-loss-modal')" class="btn-secondary">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div id="status"></div>
+  </div>
+<!-- Discounts Page -->
+<div id="discounts-page" class="page">
+  <div class="card">
+    <h2>Discount Management</h2>
+
+    <button onclick="forceHideDiscountsLoading()" style="position: absolute; top: 10px; right: 10px; z-index: 9999;">
+  Hide Loading
+</button>
+
+    
+    <div class="row">
+      <div class="col">
+        <label for="discount-code">Discount Code</label>
+        <input type="text" id="discount-code" placeholder="Enter discount code">
+      </div>
+      <div class="col">
+        <label for="discount-type">Discount Type</label>
+        <select id="discount-type">
+          <option value="Coupon">Coupon</option>
+          <option value="Promo Code">Promo Code</option>
+          <option value="Customer">Customer</option>
+          <option value="Other">Other</option>
+        </select>
+      </div>
+    </div>
+    
+    <div class="row">
+      <div class="col">
+        <label for="discount-once">One-time Use</label>
+        <input type="checkbox" id="discount-once">
+      </div>
+      <div class="col">
+        <label for="discount-expiration">Expiration Date</label>
+        <input type="date" id="discount-expiration">
+      </div>
+    </div>
+    
+    <div class="row">
+      <div class="col">
+        <label for="discount-dollar">Dollar Amount ($)</label>
+        <div style="position: relative;">
+          <span class="currency-display">$</span>
+          <input type="number" id="discount-dollar" step="0.01" class="currency-input">
+        </div>
+      </div>
+      <div class="col">
+        <label for="discount-percent">Percentage (%)</label>
+        <input type="number" id="discount-percent" min="0" max="100">
+      </div>
+      <div class="col">
+        <label for="discount-total">Apply to Total</label>
+        <input type="checkbox" id="discount-total">
+      </div>
+    </div>
+    
+    <div class="row">
+      <div class="col">
+        <label for="discount-category">Category Restriction</label>
+        <select id="discount-category">
+          <option value="">No Restriction</option>
+          <!-- Categories will be populated dynamically -->
+        </select>
+      </div>
+    </div>
+    
+    <div class="row">
+      <div class="col">
+        <label>Item Restrictions</label>
+        <div class="row">
+          <div class="col">
+            <input type="text" id="discount-item1" placeholder="Item 1">
+          </div>
+          <div class="col">
+            <input type="text" id="discount-item2" placeholder="Item 2">
+          </div>
+        </div>
+        <div class="row" style="margin-top: 10px;">
+          <div class="col">
+            <input type="text" id="discount-item3" placeholder="Item 3">
+          </div>
+          <div class="col">
+            <input type="text" id="discount-item4" placeholder="Item 4">
+          </div>
+          <div class="col">
+            <input type="text" id="discount-item5" placeholder="Item 5">
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="btn-group" style="margin-top: 20px;">
+      <button onclick="saveDiscount()" class="btn-primary">Save Discount</button>
+      <button onclick="clearDiscountForm()" class="btn-secondary">Clear Form</button>
+    </div>
+    
+    <h3 style="margin-top: 30px;">Existing Discounts</h3>
+    <div id="discounts-loading" class="loading-overlay">
+      <div class="spinner"></div>
+      <div class="loading-text">Loading discounts...</div>
+    </div>
+    
+    <div style="overflow-x: auto;">
+      <table class="report-table" id="discounts-table">
+        <thead>
+          <tr>
+            <th>Code</th>
+            <th>Type</th>
+            <th>One-time</th>
+            <th>Expiration</th>
+            <th>Amount</th>
+            <th>Percent</th>
+            <th>Total</th>
+            <th>Category</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="discounts-body">
+          <!-- Discounts will be added here -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+
+
+
+
+
+  <script>
+    // --- INITIALIZATION ---
+    document.addEventListener('DOMContentLoaded', function() {
+      // Load Google Charts
+      google.charts.load('current', {'packages':['corechart', 'bar']});
+      // Set up category navigation
+      document.querySelectorAll('.nav-category').forEach(category => {
+        category.addEventListener('click', function() {
+          // Update active category
+          document.querySelectorAll('.nav-category').forEach(c => c.classList.remove('active'));
+          this.classList.add('active');
+          
+          const categoryName = this.getAttribute('data-category');
+          
+          // Hide all tabs
+          document.querySelectorAll('.nav-tab').forEach(tab => {
+            tab.classList.add('hidden');
+          });
+          
+          // Show tabs for this category
+          document.querySelectorAll(`.nav-tab[data-category="${categoryName}"]`).forEach(tab => {
+            tab.classList.remove('hidden');
+          });
+          
+          // Select first tab in this category if none is active
+          const activeTabs = document.querySelectorAll(`.nav-tab.active[data-category="${categoryName}"]`);
+          if (activeTabs.length === 0) {
+            const firstTab = document.querySelector(`.nav-tab[data-category="${categoryName}"]`);
+            if (firstTab) {
+              firstTab.click();
+            }
+          }
+        });
+      });
+      
+// Set up tab navigation
+document.querySelectorAll('.nav-tab').forEach(tab => {
+  tab.addEventListener('click', function() {
+    // Update active tab
+    document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+    this.classList.add('active');
+    
+    // Update page subtitle
+    document.getElementById('page-subtitle').textContent = this.textContent;
+    
+    // Show corresponding page
+    const pageId = this.getAttribute('data-page') + '-page';
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.getElementById(pageId).classList.add('active');
+    
+// Special handling for admin pages
+if (this.getAttribute('data-category') === 'admin') {
+  if (this.getAttribute('data-page') === 'user-management') {
+    loadUsers();
+  } else if (this.getAttribute('data-page') === 'credentials') {
+    loadCredentials();
+  } else if (this.getAttribute('data-page') === 'discounts') {
+    loadDiscounts(); 
+  }
+}
+
+    
+    // Special handling for inventory status page
+    if (this.getAttribute('data-page') === 'inventory-status') {
+      loadInventoryStatus();
+    }
+  });
+});
+
+      
+      // Set today's date as default for report date fields
+      const today = new Date().toISOString().split('T')[0];
+      document.getElementById('end-date').value = today;
+      document.getElementById('product-end-date').value = today;
+      
+      // Set default start date to 30 days ago
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      const thirtyDaysAgoStr = thirtyDaysAgo.toISOString().split('T')[0];
+      document.getElementById('start-date').value = thirtyDaysAgoStr;
+      document.getElementById('product-start-date').value = thirtyDaysAgoStr;
+      
+      // Load machine ID
+      loadMachineID();
+      
+      // Set up auto-calculation for cost fields
+      document.getElementById('price').addEventListener('input', calculateDerivedValues);
+      document.getElementById('cost').addEventListener('input', calculateDerivedValues);
+      document.getElementById('purchaseUnitQty').addEventListener('input', calculateDerivedValues);
+      
+      // Load Google Charts
+      google.charts.load('current', {'packages':['corechart', 'bar', 'calendar']});
+    });
+    
+    // Function to force hide all loading overlays
+    function forceHideLoadingOverlays() {
+      // Get all loading overlays
+      const overlays = document.querySelectorAll('.loading-overlay');
+      
+      // Force hide each one
+      overlays.forEach(overlay => {
+        overlay.style.display = 'none';
+        overlay.classList.add('hidden');
+      });
+    }
+    
+    // Function to hide all loading overlays
+    function hideAllLoadingOverlays() {
+      document.querySelectorAll('.loading-overlay').forEach(overlay => {
+        overlay.classList.add('hidden');
+      });
+    }
+    
+    function loadMachineID() {
+      google.script.run
+        .withSuccessHandler(function(machineID) {
+          document.getElementById('login-machine-id').textContent = 'Machine ID: ' + machineID;
+          document.getElementById('portal-machine-id').textContent = 'Machine ID: ' + machineID;
+        })
+        .withFailureHandler(function(error) {
+          console.error('Error loading machine ID:', error);
+        })
+        .getMachineID();
+    }
+
+
+ 
+
+// --- INVENTORY TURNOVER LOGIC ---
+function loadTurnoverData() {
+  // Show loading indicator
+  document.getElementById('turnover-loading').classList.remove('hidden');
+  showStatus('Calculating inventory turnover...', 'info');
+  
+  // Get filter values
+  const period = document.getElementById('turnover-period').value;
+  const category = document.getElementById('turnover-category').value;
+  
+  // Add a safety timeout to hide the loading overlay after 15 seconds
+  setTimeout(function() {
+    document.getElementById('turnover-loading').classList.add('hidden');
+  }, 15000);
+  
+  google.script.run
+    .withSuccessHandler(function(turnoverData) {
+      // Hide loading indicator
+      document.getElementById('turnover-loading').classList.add('hidden');
+      
+      console.log('Turnover data received:', turnoverData);
+      
+      if (!turnoverData) {
+        return showStatus('No data received from server. Please try again.', 'error');
+      }
+      
+      displayTurnoverData(turnoverData, period, category);
+      
+      // Log this action
+      logUserAction('Viewed inventory turnover');
+    })
+    .withFailureHandler(function(error) {
+      // Hide loading indicator
+      document.getElementById('turnover-loading').classList.add('hidden');
+      console.error('Error calculating turnover:', error);
+      showStatus('Error calculating turnover: ' + (error.message || error), 'error');
+    })
+    .getInventoryTurnoverData(period, category);
+}
+
+function displayTurnoverData(turnoverData, period, category) {
+  hideStatus();
+  
+  if (!turnoverData) {
+    return showStatus('No turnover data received from server.', 'error');
+  }
+  
+  if (!turnoverData.success) {
+    return showStatus(turnoverData.message || 'Unknown error calculating turnover.', 'error');
+  }
+  
+  // Update summary metrics
+  document.getElementById('overall-turnover').textContent = turnoverData.overallTurnover.toFixed(2);
+  document.getElementById('avg-days-in-inventory').textContent = Math.round(turnoverData.avgDaysInInventory);
+  document.getElementById('slow-items-count').textContent = turnoverData.slowItemsCount;
+  document.getElementById('fast-items-count').textContent = turnoverData.fastItemsCount;
+  
+  // Draw charts
+  drawCategoryTurnoverChart(turnoverData.categoryTurnover);
+  drawTopItemsChart(turnoverData.topItems);
+  
+  // Populate turnover table
+  const tableBody = document.getElementById('turnover-body');
+  tableBody.innerHTML = '';
+  
+  if (turnoverData.items && turnoverData.items.length > 0) {
+    turnoverData.items.forEach(item => {
+      const row = document.createElement('tr');
+      
+      // Add appropriate class based on turnover status
+      if (item.turnoverRatio < 1) {
+        row.classList.add('very-slow');
+      } else if (item.turnoverRatio < 2) {
+        row.classList.add('slow');
+      } else if (item.turnoverRatio > 6) {
+        row.classList.add('fast');
+      } else {
+        row.classList.add('optimal');
+      }
+      
+      // Format the status text
+      let statusText = '';
+      if (item.turnoverRatio < 1) {
+        statusText = 'VERY SLOW';
+      } else if (item.turnoverRatio < 2) {
+        statusText = 'SLOW';
+      } else if (item.turnoverRatio > 6) {
+        statusText = 'FAST';
+      } else {
+        statusText = 'OPTIMAL';
+      }
+      
+      row.innerHTML = `
+        <td>${item.upc || 'N/A'}</td>
+        <td>${item.brand || 'N/A'}</td>
+        <td>${item.name || 'N/A'}</td>
+        <td>${item.category || 'N/A'}</td>
+        <td>${item.beginningInventory}</td>
+        <td>${item.endingInventory}</td>
+        <td>${item.unitsSold}</td>
+        <td>${item.turnoverRatio.toFixed(2)}</td>
+        <td>${Math.round(item.daysInInventory)}</td>
+        <td>${statusText}</td>
+      `;
+      
+      tableBody.appendChild(row);
+    });
+    
+    showStatus('Turnover data loaded successfully!', 'success');
+  } else {
+    tableBody.innerHTML = '<tr><td colspan="10" style="text-align: center;">No turnover data available for the selected period.</td></tr>';
+    showStatus('No turnover data available for the selected period.', 'info');
+  }
+  
+  // Populate category filter if needed
+  if (turnoverData.categories && turnoverData.categories.length > 0) {
+    const categorySelect = document.getElementById('turnover-category');
+    
+    // Save current selection
+    const currentSelection = categorySelect.value;
+    
+    // Clear existing options except the first one
+    while (categorySelect.options.length > 1) {
+      categorySelect.remove(1);
+    }
+    
+    // Add new options
+    turnoverData.categories.forEach(category => {
+      if (category) {
+        const option = document.createElement('option');
+        option.value = category;
+        option.textContent = category;
+        categorySelect.appendChild(option);
+      }
+    });
+    
+    // Restore selection if possible
+    if (currentSelection && Array.from(categorySelect.options).some(opt => opt.value === currentSelection)) {
+      categorySelect.value = currentSelection;
+    }
+  }
+}
+
+function drawCategoryTurnoverChart(categoryData) {
+  if (!categoryData || categoryData.length === 0) return;
+  
+  const data = new google.visualization.DataTable();
+  data.addColumn('string', 'Category');
+  data.addColumn('number', 'Turnover Ratio');
+  
+  categoryData.forEach(item => {
+    data.addRow([item.category, item.turnoverRatio]);
+  });
+  
+  const options = {
+    title: 'Inventory Turnover by Category',
+    colors: ['#FFD700'],
+    backgroundColor: { fill:'transparent' },
+    titleTextStyle: { color: '#FFD700' },
+    legend: { textStyle: { color: '#ffffff' } },
+    hAxis: { textStyle: { color: '#ffffff' } },
+    vAxis: { textStyle: { color: '#ffffff' }, title: 'Turnover Ratio', titleTextStyle: { color: '#ffffff' } }
+  };
+  
+  const chart = new google.visualization.ColumnChart(document.getElementById('category-turnover-chart'));
+  chart.draw(data, options);
+}
+
+function drawTopItemsChart(topItems) {
+  if (!topItems || topItems.length === 0) return;
+  
+  const data = new google.visualization.DataTable();
+  data.addColumn('string', 'Product');
+  data.addColumn('number', 'Turnover Ratio');
+  
+  topItems.forEach(item => {
+    data.addRow([item.name, item.turnoverRatio]);
+  });
+  
+  const options = {
+    title: 'Top 10 Items by Turnover',
+    colors: ['#FFD700'],
+    backgroundColor: { fill:'transparent' },
+    titleTextStyle: { color: '#FFD700' },
+    legend: { textStyle: { color: '#ffffff' } },
+    hAxis: { textStyle: { color: '#ffffff' } },
+    vAxis: { textStyle: { color: '#ffffff' }, title: 'Turnover Ratio', titleTextStyle: { color: '#ffffff' } }
+  };
+  
+  const chart = new google.visualization.BarChart(document.getElementById('top-items-chart'));
+  chart.draw(data, options);
+}; //---Line 1662---
+
+   
+    // --- INVENTORY STATUS LOGIC ---
+function loadInventoryStatus() {
+  // Show loading indicator
+  document.getElementById('inventory-loading').classList.remove('hidden');
+  showStatus('Loading inventory status...', 'info');
+  
+  google.script.run
+    .withSuccessHandler(function(inventoryData) {
+      // Hide loading indicator
+      document.getElementById('inventory-loading').classList.add('hidden');
+      
+      console.log('Inventory data received:', inventoryData);
+      
+      if (!inventoryData) {
+        return showStatus('No data received from server. Please try again.', 'error');
+      }
+      
+      displayInventoryStatus(inventoryData);
+      
+      // Log this action
+      logUserAction('Viewed inventory status');
+    })
+    .withFailureHandler(function(error) {
+      // Hide loading indicator
+      document.getElementById('inventory-loading').classList.add('hidden');
+      console.error('Error loading inventory status:', error);
+      showStatus('Error loading inventory status: ' + (error.message || error), 'error');
+    })
+    .getInventoryStatus();
+}
+
+function exportTurnoverToHTMLPDF() {
+  showStatus("Generating PDF...", 'info');
+  
+  // Get filter values
+  const period = document.getElementById('turnover-period').value;
+  const category = document.getElementById('turnover-category').value;
+  
+  google.script.run
+    .withSuccessHandler(function(pdfUrl) {
+      if (pdfUrl) {
+        window.open(pdfUrl, '_blank');
+        showStatus('PDF generated successfully!', 'success');
+        
+        // Log this action
+        logUserAction('Exported turnover report to PDF');
+      } else {
+        showStatus('Failed to generate PDF.', 'error');
+      }
+    })
+    .withFailureHandler(onFailure)
+    .exportTurnoverReportToHTMLPDF(period, category);
+}
+
+function displayInventoryStatus(inventoryData) {
+  hideStatus();
+  
+  if (!inventoryData) {
+    return showStatus('No inventory data received from server.', 'error');
+  }
+  
+  if (!inventoryData.success) {
+    return showStatus(inventoryData.message || 'Unknown error loading inventory.', 'error');
+  }
+  
+  // Populate inventory table
+  const tableBody = document.getElementById('inventory-body');
+  tableBody.innerHTML = '';
+  
+  if (inventoryData.items && inventoryData.items.length > 0) {
+    inventoryData.items.forEach(item => {
+      const row = document.createElement('tr');
+      row.style.cursor = 'pointer';
+      row.onclick = function() { loadItemInEntryScreen(item.upc); };
+      
+      row.innerHTML = `
+        <td>${item.upc || 'N/A'}</td>
+        <td>${item.brand || 'N/A'}</td>
+        <td>${item.name || 'N/A'}</td>
+        <td>${item.size || 'N/A'}</td>
+        <td>$${(item.price || 0).toFixed(2)}</td>
+        <td>${item.qty || '0'}</td>
+        <td>$${(item.value || 0).toFixed(2)}</td>
+      `;
+      
+      tableBody.appendChild(row);
+    });
+    
+    // Update totalsclick
+    document.getElementById('total-quantity').textContent = inventoryData.totalQuantity;
+    document.getElementById('total-value').textContent = '$' + inventoryData.totalValue.toFixed(2);
+    
+    showStatus('Inventory status loaded successfully!', 'success');
+  } else {
+    tableBody.innerHTML = '<tr><td colspan="7" style="text-align: center;">No inventory items found with positive quantity.</td></tr>';
+    document.getElementById('total-quantity').textContent = '0';
+    document.getElementById('total-value').textContent = '$0.00';
+    showStatus('No inventory items found with positive quantity.', 'info');
+  }
+}
+
+function loadItemInEntryScreen(upc) {
+  // Switch to the Item Entry tab
+  document.querySelector('.nav-tab[data-page="item-entry"]').click();
+  
+  // Set the UPC and trigger lookup
+  document.getElementById('upc-input').value = upc;
+  handleLookup();
+  
+  // Log this action
+  logUserAction(`Loaded item ${upc} from inventory status`);
+}
+
+function exportInventoryToHTMLPDF() {
+  showStatus('Generating PDF...', 'info');
+  
+  google.script.run
+    .withSuccessHandler(function(pdfUrl) {
+      if (pdfUrl) {
+        window.open(pdfUrl, '_blank');
+        showStatus('PDF generated successfully!', 'success');
+        
+        // Log this action
+        logUserAction('Exported inventory status to PDF');
+      } else {
+        showStatus('Failed to generate PDF.', 'error');
+      }
+    })
+    .withFailureHandler(function(error) {
+      console.error('Error generating PDF:', error);
+      showStatus('Failed to generate PDF: ' + (error.message || error), 'error');
+    })
+    .exportInventoryStatusToHTMLPDF();
+}
+
+
+
+
+    // --- LOGIN LOGIC ---
+    function handleLogin() {
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+      
+      if (!username || !password) {
+        return showStatus('Please enter both username and password.', 'error');
+      }
+      
+      showStatus('Logging in...', 'info');
+      
+      google.script.run
+        .withSuccessHandler(function(isLoggedIn) {
+          console.log(`Login result: ${isLoggedIn}`);
+          if (isLoggedIn) {
+            // Log this action
+            logUserAction('Logged in');
+            
+            document.getElementById('login-screen').classList.add('hidden');
+            document.getElementById('main-portal').classList.remove('hidden');
+            hideStatus();
+          } else {
+            showStatus('Invalid username or password.', 'error');
+          }
+        })
+        .withFailureHandler(function(error) {
+          console.error('Login error:', error);
+          showStatus('An error occurred during login: ' + error, 'error');
+        })
+        .checkLogin(username, password);
+    }
+    
+    function showResetMasterPasswordModalFromLogin() {
+      document.getElementById('current-master-password').value = '';
+      document.getElementById('new-master-password').value = '';
+      document.getElementById('confirm-master-password').value = '';
+      document.getElementById('reset-password-modal').style.display = 'block';
+    }
+    
+    // --- USER MANAGEMENT FUNCTIONS ---
+    function loadUsers() {
+      const userList = document.getElementById('user-list');
+      userList.innerHTML = '<div class="loading-text">Loading users...</div>';
+      
+      google.script.run
+        .withSuccessHandler(function(users) {
+          if (!users || users.length === 0) {
+            userList.innerHTML = '<div class="loading-text">No users found.</div>';
+            return;
+          }
+          
+          let html = '';
+          users.forEach(user => {
+            html += `
+              <div class="user-item">
+                <div class="user-name">${user}</div>
+                <div class="user-actions">
+                  <button onclick="showDeleteUserModal('${user}')" class="btn-danger">Delete</button>
+                </div>
+              </div>
+            `;
+          });
+          
+          userList.innerHTML = html;
+        })
+        .withFailureHandler(function(error) {
+          userList.innerHTML = `<div class="loading-text error">Error loading users: ${error}</div>`;
+        })
+        .getUsers();
+    }
+    
+    function showAddUserModal() {
+      document.getElementById('master-password-add').value = '';
+      document.getElementById('new-username').value = '';
+      document.getElementById('new-password').value = '';
+      document.getElementById('confirm-password').value = '';
+      document.getElementById('add-user-modal').style.display = 'block';
+    }
+    
+    function showDeleteUserModal(username) {
+      document.getElementById('delete-username').textContent = username;
+      document.getElementById('username-to-delete').value = username;
+      document.getElementById('master-password-delete').value = '';
+      document.getElementById('delete-user-modal').style.display = 'block';
+    }
+    
+    function showResetMasterPasswordModal() {
+      document.getElementById('current-master-password').value = '';
+      document.getElementById('new-master-password').value = '';
+      document.getElementById('confirm-master-password').value = '';
+      document.getElementById('reset-password-modal').style.display = 'block';
+    }
+    
+    function closeModal(modalId) {
+      document.getElementById(modalId).style.display = 'none';
+    }
+    
+    function addUser() {
+      const masterPassword = document.getElementById('master-password-add').value;
+      const username = document.getElementById('new-username').value;
+      const password = document.getElementById('new-password').value;
+      const confirmPassword = document.getElementById('confirm-password').value;
+      
+      if (!masterPassword || !username || !password || !confirmPassword) {
+        return showStatus('Please fill in all fields.', 'error');
+      }
+      
+      if (password !== confirmPassword) {
+        return showStatus('Passwords do not match.', 'error');
+      }
+      
+      showStatus('Adding user...', 'info');
+      
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result.success) {
+            showStatus(result.message, 'success');
+            closeModal('add-user-modal');
+            loadUsers();
+            
+            // Log this action
+            logUserAction(`Added user: ${username}`);
+          } else {
+            showStatus(result.message, 'error');
+          }
+        })
+        .withFailureHandler(onFailure)
+        .addUser(masterPassword, username, password);
+    }
+    
+    function deleteUser() {
+      const masterPassword = document.getElementById('master-password-delete').value;
+      const username = document.getElementById('username-to-delete').value;
+      
+      if (!masterPassword || !username) {
+        return showStatus('Please enter the master password.', 'error');
+      }
+      
+      showStatus('Deleting user...', 'info');
+      
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result.success) {
+            showStatus(result.message, 'success');
+            closeModal('delete-user-modal');
+            loadUsers();
+            
+            // Log this action
+            logUserAction(`Deleted user: ${username}`);
+          } else {
+            showStatus(result.message, 'error');
+          }
+        })
+        .withFailureHandler(onFailure)
+        .deleteUser(masterPassword, username);
+    }
+    
+    function resetMasterPassword() {
+      const currentPassword = document.getElementById('current-master-password').value;
+      const newPassword = document.getElementById('new-master-password').value;
+      const confirmPassword = document.getElementById('confirm-master-password').value;
+      
+      if (!currentPassword || !newPassword || !confirmPassword) {
+        return showStatus('Please fill in all fields.', 'error');
+      }
+      
+      if (newPassword !== confirmPassword) {
+        return showStatus('New passwords do not match.', 'error');
+      }
+      
+      showStatus('Resetting master password...', 'info');
+      
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result.success) {
+            showStatus(result.message, 'success');
+            closeModal('reset-password-modal');
+            
+            // Log this action
+            logUserAction('Reset master password');
+          } else {
+            showStatus(result.message, 'error');
+          }
+        })
+        .withFailureHandler(onFailure)
+        .resetMasterPassword(currentPassword, newPassword);
+    }
+    
+    // --- CREDENTIALS FUNCTIONS ---
+    function authenticateCredentials() {
+      const masterPassword = document.getElementById('credentials-master-password').value;
+      
+      if (!masterPassword) {
+        return showStatus('Please enter the master password.', 'error');
+      }
+      
+      showStatus('Verifying password...', 'info');
+      
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result.success) {
+            // Hide the auth form and show the credentials
+            document.getElementById('credentials-auth-form').classList.add('hidden');
+            document.getElementById('credentials-container').classList.remove('hidden');
+            document.getElementById('save-credentials-btn').classList.remove('hidden');
+            document.getElementById('refresh-credentials-btn').classList.remove('hidden');
+            
+            // Display the credentials
+            displayCredentials(result.credentials);
+            
+            hideStatus();
+          } else {
+            showStatus(result.message || 'Authentication failed.', 'error');
+          }
+        })
+        .withFailureHandler(function(error) {
+          showStatus('Error authenticating: ' + error, 'error');
+        })
+        .getCredentialsWithAuth(masterPassword);
+    }
+
+    function loadCredentialsWithAuth() {
+      const masterPassword = document.getElementById('credentials-master-password').value;
+      
+      if (!masterPassword) {
+        return showStatus('Please enter the master password.', 'error');
+      }
+      
+      showStatus('Refreshing credentials...', 'info');
+      
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result.success) {
+            displayCredentials(result.credentials);
+            showStatus('Credentials refreshed successfully.', 'success');
+          } else {
+            showStatus(result.message || 'Failed to refresh credentials.', 'error');
+          }
+        })
+        .withFailureHandler(function(error) {
+          showStatus('Error refreshing credentials: ' + error, 'error');
+        })
+        .getCredentialsWithAuth(masterPassword);
+    }
+
+    // --- EXPIRATION TRACKING LOGIC ---
+function loadExpirationData() {
+  // Show loading indicator
+  document.getElementById('expiration-loading').classList.remove('hidden');
+  showStatus('Loading expiration data...', 'info');
+  
+  // Get filter values
+  const expirationFilter = document.getElementById('expiration-filter').value;
+  const categoryFilter = document.getElementById('category-filter').value;
+  
+  google.script.run
+    .withSuccessHandler(function(expirationData) {
+      // Hide loading indicator
+      document.getElementById('expiration-loading').classList.add('hidden');
+      
+      console.log('Expiration data received:', expirationData);
+      
+      if (!expirationData) {
+        return showStatus('No data received from server. Please try again.', 'error');
+      }
+      
+      displayExpirationData(expirationData, expirationFilter, categoryFilter);
+      
+      // Log this action
+      logUserAction('Viewed expiration tracking');
+    })
+    .withFailureHandler(function(error) {
+      // Hide loading indicator
+      document.getElementById('expiration-loading').classList.add('hidden');
+      console.error('Error loading expiration data:', error);
+      showStatus('Error loading expiration data: ' + (error.message || error), 'error');
+    })
+    .getExpirationData();
+}
+
+function displayExpirationData(expirationData, expirationFilter, categoryFilter) {
+  hideStatus();
+  
+  if (!expirationData) {
+    return showStatus('No expiration data received from server.', 'error');
+  }
+  
+  if (!expirationData.success) {
+    return showStatus(expirationData.message || 'Unknown error loading expiration data.', 'error');
+  }
+  
+  // Update summary counts
+  document.getElementById('expired-count').textContent = expirationData.expiredCount || 0;
+  document.getElementById('expiring-7-count').textContent = expirationData.expiring7Count || 0;
+  document.getElementById('expiring-30-count').textContent = expirationData.expiring30Count || 0;
+  document.getElementById('expiring-90-count').textContent = expirationData.expiring90Count || 0;
+  
+  // Filter items based on selected filters
+  let filteredItems = expirationData.items;
+  
+  // Apply expiration filter
+  if (expirationFilter !== 'all') {
+    switch (expirationFilter) {
+      case 'expired':
+        filteredItems = filteredItems.filter(item => item.daysLeft <= 0);
+        break;
+      case '7days':
+        filteredItems = filteredItems.filter(item => item.daysLeft > 0 && item.daysLeft <= 7);
+        break;
+      case '30days':
+        filteredItems = filteredItems.filter(item => item.daysLeft > 7 && item.daysLeft <= 30);
+        break;
+      case '90days':
+        filteredItems = filteredItems.filter(item => item.daysLeft > 30 && item.daysLeft <= 90);
+        break;
+    }
+  }
+  
+  // Apply category filter
+  if (categoryFilter !== 'all') {
+    filteredItems = filteredItems.filter(item => item.category === categoryFilter);
+  }
+  
+  // Populate expiration table
+  const tableBody = document.getElementById('expiration-body');
+  tableBody.innerHTML = '';
+  
+  if (filteredItems && filteredItems.length > 0) {
+    filteredItems.forEach(item => {
+      const row = document.createElement('tr');
+      
+      // Add appropriate class based on expiration status
+      if (item.daysLeft <= 0) {
+        row.classList.add('expired');
+      } else if (item.daysLeft <= 7) {
+        row.classList.add('expiring-7days');
+      } else if (item.daysLeft <= 30) {
+        row.classList.add('expiring-30days');
+      } else if (item.daysLeft <= 90) {
+        row.classList.add('expiring-90days');
+      }
+      
+      // Format the status text
+      let statusText = '';
+      if (item.daysLeft <= 0) {
+        statusText = 'EXPIRED';
+      } else if (item.daysLeft === 1) {
+        statusText = 'EXPIRES TOMORROW';
+      } else {
+        statusText = `EXPIRES IN ${item.daysLeft} DAYS`;
+      }
+      
+      row.innerHTML = `
+        <td>${item.upc || 'N/A'}</td>
+        <td>${item.brand || 'N/A'}</td>
+        <td>${item.name || 'N/A'}</td>
+        <td>${item.category || 'N/A'}</td>
+        <td>${item.quantity || '0'}</td>
+        <td>${item.expDate || 'N/A'}</td>
+        <td>${item.daysLeft <= 0 ? 'EXPIRED' : item.daysLeft}</td>
+        <td>${statusText}</td>
+        <td>
+          <input type="checkbox" class="item-checkbox" data-upc="${item.upc}" data-name="${item.name}" data-qty="${item.quantity}">
+          <button onclick="loadItemInEntryScreen('${item.upc}')" class="btn-secondary" style="padding: 5px 10px; font-size: 12px;">Edit</button>
+        </td>
+      `;
+      
+      tableBody.appendChild(row);
+    });
+    
+    showStatus('Expiration data loaded successfully!', 'success');
+  } else {
+    tableBody.innerHTML = '<tr><td colspan="9" style="text-align: center;">No items found matching the selected filters.</td></tr>';
+    showStatus('No items found matching the selected filters.', 'info');
+  }
+  
+  // Populate category filter if needed
+  if (expirationData.categories && expirationData.categories.length > 0) {
+    const categorySelect = document.getElementById('category-filter');
+    
+    // Save current selection
+    const currentSelection = categorySelect.value;
+    
+    // Clear existing options except the first one
+    while (categorySelect.options.length > 1) {
+      categorySelect.remove(1);
+    }
+    
+    // Add new options
+    expirationData.categories.forEach(category => {
+      if (category) {
+        const option = document.createElement('option');
+        option.value = category;
+        option.textContent = category;
+        categorySelect.appendChild(option);
+      }
+    });
+    
+    // Restore selection if possible
+    if (currentSelection && Array.from(categorySelect.options).some(opt => opt.value === currentSelection)) {
+      categorySelect.value = currentSelection;
+    }
+  }
+}
+
+function showMarkLossModal() {
+  // Get selected items
+  const selectedCheckboxes = document.querySelectorAll('.item-checkbox:checked');
+  
+  if (selectedCheckboxes.length === 0) {
+    return showStatus('Please select at least one item to mark as loss.', 'warning');
+  }
+  
+  // Populate the modal with selected items
+  const lossItemsList = document.getElementById('loss-items-list');
+  lossItemsList.innerHTML = '';
+  
+  selectedCheckboxes.forEach(checkbox => {
+    const upc = checkbox.getAttribute('data-upc');
+    const name = checkbox.getAttribute('data-name');
+    const qty = checkbox.getAttribute('data-qty');
+    
+    const itemDiv = document.createElement('div');
+    itemDiv.className = 'loss-item';
+    itemDiv.innerHTML = `
+      <div><strong>${name}</strong> (UPC: ${upc})</div>
+      <div class="row" style="margin-top: 5px; margin-bottom: 15px;">
+        <div class="col">
+          <label for="loss-qty-${upc}">Quantity to Remove:</label>
+          <input type="number" id="loss-qty-${upc}" min="1" max="${qty}" value="${qty}" class="loss-qty" data-upc="${upc}">
+        </div>
+      </div>
+    `;
+    
+    lossItemsList.appendChild(itemDiv);
+  });
+  
+  // Show the modal
+  document.getElementById('mark-loss-modal').style.display = 'block';
+}
+
+function recordLoss() {
+  // Get loss details
+  const reason = document.getElementById('loss-reason').value;
+  const notes = document.getElementById('loss-notes').value;
+  
+  // Get quantities for each item
+  const lossItems = [];
+  document.querySelectorAll('.loss-qty').forEach(input => {
+    lossItems.push({
+      upc: input.getAttribute('data-upc'),
+      quantity: parseInt(input.value) || 0
+    });
+  });
+  
+  if (lossItems.length === 0) {
+    return showStatus('No items selected for loss recording.', 'error');
+  }
+  
+  showStatus('Recording inventory loss...', 'info');
+  
+  google.script.run
+    .withSuccessHandler(function(result) {
+      if (result.success) {
+        showStatus(result.message || 'Inventory loss recorded successfully!', 'success');
+        closeModal('mark-loss-modal');
+        
+        // Refresh the expiration data
+        loadExpirationData();
+        
+        // Log this action
+        logUserAction('Recorded inventory loss: ' + reason);
+      } else {
+        showStatus(result.message || 'Failed to record inventory loss.', 'error');
+      }
+    })
+    .withFailureHandler(function(error) {
+      console.error('Error recording loss:', error);
+      showStatus('Error recording loss: ' + (error.message || error), 'error');
+    })
+    .recordInventoryLoss(lossItems, reason, notes);
+}
+
+function exportExpirationToHTMLPDF() {
+  showStatus('Generating PDF...', 'info');
+  
+  // Get filter values
+  const expirationFilter = document.getElementById('expiration-filter').value;
+  const categoryFilter = document.getElementById('category-filter').value;
+  
+  google.script.run
+    .withSuccessHandler(function(pdfUrl) {
+      if (pdfUrl) {
+        window.open(pdfUrl, '_blank');
+        showStatus('PDF generated successfully!', 'success');
+        
+        // Log this action
+        logUserAction('Exported expiration report to PDF');
+      } else {
+        showStatus('Failed to generate PDF.', 'error');
+      }
+    })
+    .withFailureHandler(onFailure)
+    .exportExpirationReportToHTMLPDF(expirationFilter, categoryFilter);
+}
+
+
+    function displayCredentials(credentials) {
+      const container = document.getElementById('credentials-container');
+      
+      if (!credentials || credentials.length === 0) {
+        container.innerHTML = '<div class="loading-text">No credentials found.</div>';
+        return;
+      }
+      
+      let html = '';
+      let currentSection = '';
+      
+      credentials.forEach(cred => {
+        if (cred.section !== currentSection) {
+          if (currentSection !== '') {
+            html += '</div>'; // Close previous section
+          }
+          currentSection = cred.section;
+          html += `<div class="credential-section"><h3>${currentSection}</h3>`;
+        }
+        
+        html += `
+          <div class="credential-item">
+            <div class="credential-label">${cred.label}</div>
+        `;
+        
+        if (cred.editable) {
+          html += `<input type="text" class="credential-value editable" id="cred-${cred.id}" value="${cred.value}" data-id="${cred.id}">`;
+        } else {
+          html += `<div class="credential-value">${cred.value}</div>`;
+        }
+        
+        html += `</div>`;
+      });
+      
+      if (currentSection !== '') {
+        html += '</div>'; // Close last section
+      }
+      
+      container.innerHTML = html;
+    }
+
+    function loadCredentials() {
+      // Reset the credentials page
+      document.getElementById('credentials-auth-form').classList.remove('hidden');
+      document.getElementById('credentials-container').classList.add('hidden');
+      document.getElementById('save-credentials-btn').classList.add('hidden');
+      document.getElementById('refresh-credentials-btn').classList.add('hidden');
+      document.getElementById('credentials-master-password').value = '';
+    }
+
+    function saveCredentials() {
+      const credentialInputs = document.querySelectorAll('.credential-value.editable');
+      const credentials = [];
+      
+      credentialInputs.forEach(input => {
+        credentials.push({
+          id: input.getAttribute('data-id'),
+          value: input.value
+        });
+      });
+      
+      const masterPassword = document.getElementById('credentials-master-password').value;
+      
+      if (!masterPassword) {
+        return showStatus('Master password is required to save changes.', 'error');
+      }
+      
+      showStatus('Saving credentials...', 'info');
+      
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result.success) {
+            showStatus(result.message, 'success');
+            
+            // Log this action
+            logUserAction('Updated system credentials');
+          } else {
+            showStatus(result.message, 'error');
+          }
+        })
+        .withFailureHandler(onFailure)
+        .saveCredentialsWithAuth(masterPassword, credentials);
+    }
+
+    // --- LOGGING FUNCTION ---
+    function logUserAction(description) {
+      const username = document.getElementById('username').value;
+      
+      google.script.run
+        .withFailureHandler(function(error) {
+          console.error('Error logging user action:', error);
+        })
+        .logUserAction(username, description);
+    }
+
+    // --- ITEM ENTRY LOGIC ---
+    function handleLookup() {
+      const upc = document.getElementById('upc-input').value.trim();
+      if (!upc) { 
+        return showStatus('Please enter a UPC code.', 'error');
+      }
+      
+      showStatus('Looking up product...', 'info');
+      
+      google.script.run
+        .withSuccessHandler(function(product) {
+          if (product) {
+            populateForm(product);
+            showStatus('Product found!', 'success');
+            
+            // Log this action
+            logUserAction(`Looked up product: ${upc}`);
+          } else {
+            clearForm();
+            document.getElementById('upc-input').value = upc;
+            showStatus('Product not found. Please enter details manually.', 'warning');
+          }
+        })
+        .withFailureHandler(onFailure)
+        .lookupProduct(upc);
+    }
+    
+    function handleRequestInfo() {
+      const upc = document.getElementById('upc-input').value.trim();
+      if (!upc) {
+        return showStatus('Please enter a UPC code.', 'error');
+      }
+      
+      showStatus('Requesting product information...', 'info');
+      
+      google.script.run
+        .withSuccessHandler(function(product) {
+          if (product) {
+            populateForm(product);
+            showStatus('Product information retrieved!', 'success');
+            
+            // Log this action
+            logUserAction(`Requested info for product: ${upc}`);
+          } else {
+            showStatus('Could not retrieve product information. Please enter details manually.', 'warning');
+          }
+        })
+        .withFailureHandler(onFailure)
+        .requestProductInfo(upc);
+    }
+    
+    function populateForm(product) {
+      document.getElementById('upc-input').value = product.upc || '';
+      document.getElementById('brand').value = product.brand || '';
+      document.getElementById('name').value = product.name || '';
+      document.getElementById('category').value = product.category || '';
+      document.getElementById('details').value = product.details || '';
+      document.getElementById('size').value = product.size || '';
+      document.getElementById('image').value = product.image || '';
+      document.getElementById('calories').value = product.calories || '';
+      document.getElementById('sugar').value = product.sugar || '';
+      document.getElementById('sodium').value = product.sodium || '';
+      document.getElementById('price').value = product.price || '';
+      document.getElementById('taxable').value = product.taxable || 'Yes';
+      document.getElementById('cost').value = product.cost || '';
+      document.getElementById('purchaseUnitQty').value = product.purchaseUnitQty || '';
+      document.getElementById('qty').value = product.qty || '';
+      document.getElementById('expDate').value = product.expDate || '';
+      
+      calculateDerivedValues();
+    }
+    
+    function calculateDerivedValues() {
+      const price = parseFloat(document.getElementById('price').value) || 0;
+      const cost = parseFloat(document.getElementById('cost').value) || 0;
+      const purchaseUnitQty = parseInt(document.getElementById('purchaseUnitQty').value) || 1;
+      
+      const indvCost = cost / purchaseUnitQty;
+      const profit = price - indvCost;
+      
+      document.getElementById('indvCost').value = indvCost.toFixed(2);
+      document.getElementById('profit').value = profit.toFixed(2);
+    }
+    
+    function handleSave() {
+      const product = {
+        upc: document.getElementById('upc-input').value.trim(),
+        brand: document.getElementById('brand').value.trim(),
+        name: document.getElementById('name').value.trim(),
+        category: document.getElementById('category').value.trim(),
+        details: document.getElementById('details').value.trim(),
+        size: document.getElementById('size').value.trim(),
+        image: document.getElementById('image').value.trim(),
+        calories: document.getElementById('calories').value.trim(),
+        sugar: document.getElementById('sugar').value.trim(),
+        sodium: document.getElementById('sodium').value.trim(),
+        price: parseFloat(document.getElementById('price').value) || 0,
+        taxable: document.getElementById('taxable').value,
+        cost: parseFloat(document.getElementById('cost').value) || 0,
+        purchaseUnitQty: parseInt(document.getElementById('purchaseUnitQty').value) || 1,
+        qty: parseInt(document.getElementById('qty').value) || 0,
+        expDate: document.getElementById('expDate').value
+      };
+      
+      if (!product.upc) {
+        return showStatus('UPC is required.', 'error');
+      }
+      
+      if (!product.name) {
+        return showStatus('Product name is required.', 'error');
+      }
+      
+      showStatus('Saving product...', 'info');
+      
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result.success) {
+            showStatus(result.message, 'success');
+            
+            // Log this action
+            logUserAction(`Saved product: ${product.upc} - ${product.name}`);
+          } else {
+            showStatus(result.message, 'error');
+          }
+        })
+        .withFailureHandler(onFailure)
+        .saveProduct(product);
+    }
+    
+    function handleClear() {
+      clearForm();
+      showStatus('Form cleared.', 'info');
+    }
+    
+    function clearForm() {
+      document.getElementById('upc-input').value = '';
+      document.getElementById('brand').value = '';
+      document.getElementById('name').value = '';
+      document.getElementById('category').value = '';
+      document.getElementById('details').value = '';
+      document.getElementById('size').value = '';
+      document.getElementById('image').value = '';
+      document.getElementById('calories').value = '';
+      document.getElementById('sugar').value = '';
+      document.getElementById('sodium').value = '';
+      document.getElementById('price').value = '';
+      document.getElementById('taxable').value = 'Yes';
+      document.getElementById('cost').value = '';
+      document.getElementById('purchaseUnitQty').value = '';
+      document.getElementById('indvCost').value = '';
+      document.getElementById('profit').value = '';
+      document.getElementById('qty').value = '';
+      document.getElementById('expDate').value = '';
+    }
+    
+    // --- SALES REPORT LOGIC ---
+function generateSalesReport() {
+  const startDate = document.getElementById('start-date').value;
+  const endDate = document.getElementById('end-date').value;
+  
+  if (!startDate || !endDate) {
+    return showStatus('Please select both start and end dates.', 'error');
+  }
+  
+  // Show loading indicator
+  document.getElementById('sales-loading').classList.remove('hidden');
+  document.getElementById('report-content').classList.add('hidden');
+  showStatus('Generating sales report...', 'info');
+  
+  // Add a safety timeout to hide the loading overlay after 10 seconds
+  setTimeout(forceHideLoadingOverlays, 10000);
+  
+  google.script.run
+    .withSuccessHandler(function(reportData) {
+      // Explicitly hide loading indicator
+      forceHideLoadingOverlays();
+      
+      console.log('Report data received:', reportData);
+      
+      if (!reportData) {
+        return showStatus('No data received from server. Please try again.', 'error');
+      }
+      
+      displaySalesReport(reportData);
+      
+      // Log this action
+      logUserAction('Generated sales report');
+    })
+    .withFailureHandler(function(error) {
+      // Hide loading indicator
+      forceHideLoadingOverlays();
+      console.error('Error generating report:', error);
+      showStatus('Error generating report: ' + (error.message || error), 'error');
+    })
+    .generateSalesReport(startDate, endDate);
+}
+
+function displaySalesReport(reportData) {
+  // Make sure loading overlay is hidden
+  forceHideLoadingOverlays();
+  
+  hideStatus();
+  
+  if (!reportData) {
+    return showStatus('No report data received from server.', 'error');
+  }
+  
+  if (!reportData.success) {
+    return showStatus(reportData.message || 'Unknown error generating report.', 'error');
+  }
+  
+  // Show the report content
+  document.getElementById('report-content').classList.remove('hidden');
+  
+  // Update summary metrics
+  document.getElementById('total-transactions').textContent = reportData.totalTransactions;
+  document.getElementById('total-items').textContent = reportData.totalItems;
+  document.getElementById('total-subtotal').textContent = '$' + reportData.totalSubtotal.toFixed(2);
+  document.getElementById('total-tax').textContent = '$' + reportData.totalTax.toFixed(2);
+  document.getElementById('total-revenue').textContent = '$' + reportData.totalRevenue.toFixed(2);
+  
+  // Populate transactions table
+  const tableBody = document.getElementById('transactions-body');
+  tableBody.innerHTML = '';
+  
+  if (reportData.transactions && reportData.transactions.length > 0) {
+    reportData.transactions.forEach(transaction => {
+      const row = document.createElement('tr');
+      
+      row.innerHTML = `
+        <td>${transaction.id || 'N/A'}</td>
+        <td>${transaction.date || 'N/A'}</td>
+        <td>${transaction.time || 'N/A'}</td>
+        <td>${transaction.items || '0'}</td>
+        <td>${transaction.paymentMethod || 'N/A'}</td>
+        <td>$${(transaction.subtotal || 0).toFixed(2)}</td>
+        <td>$${(transaction.tax || 0).toFixed(2)}</td>
+        <td>$${(transaction.total || 0).toFixed(2)}</td>
+      `;
+      
+      tableBody.appendChild(row);
+    });
+    
+    showStatus('Report generated successfully!', 'success');
+  } else {
+    tableBody.innerHTML = '<tr><td colspan="8" style="text-align: center;">No transactions found in the selected date range.</td></tr>';
+    showStatus('No transactions found in the selected date range.', 'info');
+  }
+}
+
+function clearReport() {
+  document.getElementById('report-content').classList.add('hidden');
+  document.getElementById('transactions-body').innerHTML = '';
+  hideStatus();
+}
+
+function exportToHTMLPDF() {
+  const startDate = document.getElementById('start-date').value;
+  const endDate = document.getElementById('end-date').value;
+  
+  showStatus('Generating PDF...', 'info');
+  
+  google.script.run
+    .withSuccessHandler(function(pdfUrl) {
+      if (pdfUrl) {
+        window.open(pdfUrl, '_blank');
+        showStatus('PDF generated successfully!', 'success');
+        
+        // Log this action
+        logUserAction('Exported sales report to PDF');
+      } else {
+        showStatus('Failed to generate PDF.', 'error');
+      }
+    })
+    .withFailureHandler(onFailure)
+    .exportSalesReportToHTMLPDF(startDate, endDate);
+}
+
+// --- PRODUCT REPORT LOGIC ---
+function generateProductReport() {
+  const startDate = document.getElementById('product-start-date').value;
+  const endDate = document.getElementById('product-end-date').value;
+  
+  if (!startDate || !endDate) {
+    return showStatus('Please select both start and end dates.', 'error');
+  }
+  
+  // Show loading indicator
+  document.getElementById('product-loading').classList.remove('hidden');
+  document.getElementById('product-report-content').classList.add('hidden');
+  showStatus('Generating product performance report...', 'info');
+  
+  // Add a safety timeout to hide the loading overlay after 10 seconds
+  setTimeout(forceHideLoadingOverlays, 10000);
+  
+  google.script.run
+    .withSuccessHandler(function(reportData) {
+      // Explicitly hide loading indicator
+      forceHideLoadingOverlays();
+      
+      console.log('Product report data received:', reportData);
+      
+      if (!reportData) {
+        return showStatus('No data received from server. Please try again.', 'error');
+      }
+      
+      displayProductReport(reportData);
+      
+      // Log this action
+      logUserAction('Generated product performance report');
+    })
+    .withFailureHandler(function(error) {
+      // Hide loading indicator
+      forceHideLoadingOverlays();
+      console.error('Error generating product report:', error);
+      showStatus('Error generating product report: ' + (error.message || error), 'error');
+    })
+    .generateProductPerformanceReport(startDate, endDate);
+}
+
+function displayProductReport(reportData) {
+  // Make sure loading overlay is hidden
+  forceHideLoadingOverlays();
+  
+  hideStatus();
+  
+  if (!reportData) {
+    return showStatus('No report data received from server.', 'error');
+  }
+  
+  if (!reportData.success) {
+    return showStatus(reportData.message || 'Unknown error generating report.', 'error');
+  }
+  
+  // Show the report content
+  document.getElementById('product-report-content').classList.remove('hidden');
+  
+  // Update summary metrics
+  document.getElementById('total-products').textContent = reportData.totalProducts;
+  document.getElementById('total-quantity').textContent = reportData.totalQuantity;
+  document.getElementById('avg-price').textContent = '$' + reportData.averagePrice.toFixed(2);
+  document.getElementById('total-profit').textContent = '$' + reportData.totalProfit.toFixed(2);
+  
+  // Populate products table
+  const tableBody = document.getElementById('products-body');
+  tableBody.innerHTML = '';
+  
+  if (reportData.products && reportData.products.length > 0) {
+    reportData.products.forEach(product => {
+      const row = document.createElement('tr');
+      
+      row.innerHTML = `
+        <td>${product.upc || 'N/A'}</td>
+        <td>${product.name || 'N/A'}</td>
+        <td>${product.brand || 'N/A'}</td>
+        <td>${product.quantity || '0'}</td>
+        <td>$${(product.price || 0).toFixed(2)}</td>
+        <td>$${(product.totalSales || 0).toFixed(2)}</td>
+        <td>$${(product.profit || 0).toFixed(2)}</td>
+      `;
+      
+      tableBody.appendChild(row);
+    });
+    
+    // Draw chart if Google Charts is loaded
+    if (typeof google.charts !== 'undefined' && google.charts.loaded) {
+      drawProductChart(reportData);
+    } else {
+      google.charts.load('current', {'packages':['corechart']});
+      google.charts.setOnLoadCallback(() => drawProductChart(reportData));
+    }
+    
+    showStatus('Product report generated successfully!', 'success');
+  } else {
+    tableBody.innerHTML = '<tr><td colspan="7" style="text-align: center;">No products found in the selected date range.</td></tr>';
+    showStatus('No products found in the selected date range.', 'info');
+  }
+}
+
+function drawProductChart(reportData) {
+  const data = new google.visualization.DataTable();
+  data.addColumn('string', 'Product');
+  data.addColumn('number', 'Sales');
+  
+  // Add top 10 products by sales
+  const topProducts = reportData.products.slice(0, 10);
+  topProducts.forEach(product => {
+    data.addRow([product.name, product.totalSales]);
+  });
+  
+  const options = {
+    title: 'Top Products by Sales',
+    colors: ['#FFD700'],
+    backgroundColor: { fill:'transparent' },
+    titleTextStyle: { color: '#FFD700' },
+    legend: { textStyle: { color: '#ffffff' } },
+    hAxis: { textStyle: { color: '#ffffff' } },
+    vAxis: { textStyle: { color: '#ffffff' }, format: '$#,##0.00' }
+  };
+  
+  const chart = new google.visualization.BarChart(document.getElementById('product-chart'));
+  chart.draw(data, options);
+}
+
+function clearProductReport() {
+  document.getElementById('product-report-content').classList.add('hidden');
+  document.getElementById('products-body').innerHTML = '';
+  hideStatus();
+}
+
+function exportProductReportToHTMLPDF() {
+  const startDate = document.getElementById('product-start-date').value;
+  const endDate = document.getElementById('product-end-date').value;
+  
+  showStatus('Generating PDF...', 'info');
+  
+  google.script.run
+    .withSuccessHandler(function(pdfUrl) {
+      if (pdfUrl) {
+        window.open(pdfUrl, '_blank');
+        showStatus('PDF generated successfully!', 'success');
+        
+        // Log this action
+        logUserAction('Exported product performance report to PDF');
+      } else {
+        showStatus('Failed to generate PDF.', 'error');
+      }
+    })
+    .withFailureHandler(onFailure)
+    .exportProductReportToHTMLPDF(startDate, endDate);
+}
+
+    
+    function clearReport() {
+      document.getElementById('report-content').classList.add('hidden');
+      document.getElementById('start-date').value = '';
+      document.getElementById('end-date').value = '';
+      showStatus('Report cleared.', 'info');
+    }
+    
+    function clearProductReport() {
+      document.getElementById('product-report-content').classList.add('hidden');
+      document.getElementById('product-start-date').value = '';
+      document.getElementById('product-end-date').value = '';
+      showStatus('Product report cleared.', 'info');
+    }
+    
+    // --- UTILITY FUNCTIONS ---
+    function showStatus(message, type) {
+      const statusDiv = document.getElementById('status');
+      statusDiv.textContent = message;
+      statusDiv.className = type;
+      statusDiv.style.display = 'block';
+      
+      // Auto-hide success messages after 3 seconds
+      if (type === 'success') {
+        setTimeout(hideStatus, 3000);
+      }
+    }
+    
+    function hideStatus() {
+      document.getElementById('status').style.display = 'none';
+    }
+    
+    function onFailure(error) {
+      console.error('Error:', error);
+      showStatus('An error occurred: ' + error, 'error');
+    }
+    
+    // Initialize expiration tracking when page loads
+    document.addEventListener('DOMContentLoaded', function() {
+      // Load expiration data when the page becomes active
+      const expirationTab = document.querySelector('.nav-tab[data-page="expiration-tracking"]');
+      if (expirationTab) {
+        expirationTab.addEventListener('click', function() {
+          setTimeout(loadExpirationData, 100);
+        });
+      }
+
+      // --- DISCOUNTS FUNCTIONS ---
+function loadDiscounts() {
+  // Show loading indicator
+  const loadingOverlay = document.getElementById('discounts-loading');
+  if (loadingOverlay) {
+    loadingOverlay.classList.remove('hidden');
+  }
+  
+  // Add a safety timeout to hide the loading overlay after 10 seconds
+  setTimeout(function() {
+    forceHideDiscountsLoading();
+    console.log("Force-hiding discounts loading overlay after timeout");
+  }, 10000);
+  
+  console.log("Calling getDiscounts() server function...");
+  
+  google.script.run
+    .withSuccessHandler(function(result) {
+      console.log("getDiscounts() returned:", result);
+      
+      // Hide loading indicator
+      forceHideDiscountsLoading();
+      
+      if (!result) {
+        return showStatus('No data received from server', 'error');
+      }
+      
+      if (!result.success) {
+        return showStatus(result.message || 'Error loading discounts', 'error');
+      }
+      
+      displayDiscounts(result.discounts || []);
+      populateCategoryDropdown(result.categories || []);
+    })
+    .withFailureHandler(function(error) {
+      console.error("Error in getDiscounts():", error);
+      
+      // Hide loading indicator
+      forceHideDiscountsLoading();
+      
+      showStatus('Error loading discounts: ' + error, 'error');
+    })
+    .getDiscounts();
+}
+
+
+function forceHideDiscountsLoading() {
+  const loadingOverlay = document.getElementById('discounts-loading');
+  if (loadingOverlay) {
+    loadingOverlay.style.display = 'none';
+    loadingOverlay.classList.add('hidden');
+  }
+}
+
+
+google.script.run.getDiscounts(); // Not getDiscountsFromDiscountsGS
+google.script.run.saveDiscount(discountData); // Not saveDiscountToDiscountsGS
+google.script.run.deleteDiscount(code); // Not deleteDiscountFromDiscountsGS
+
+
+function displayDiscounts(discounts) {
+  console.log("displayDiscounts called with:", discounts);
+  
+  const tableBody = document.getElementById('discounts-body');
+  if (!tableBody) {
+    console.error("Could not find discounts-body element");
+    return;
+  }
+  
+  tableBody.innerHTML = '';
+  
+  if (!discounts || discounts.length === 0) {
+    console.log("No discounts to display");
+    tableBody.innerHTML = '<tr><td colspan="9" style="text-align: center;">No discounts found</td></tr>';
+    return;
+  }
+  
+  console.log("Displaying " + discounts.length + " discounts");
+  
+  discounts.forEach(discount => {
+    const row = document.createElement('tr');
+    row.innerHTML = `
+      <td>${discount.code}</td>
+      <td>${discount.type}</td>
+      <td>${discount.once ? '✓' : ''}</td>
+      <td>${discount.expiration}</td>
+      <td>${discount.dollar ? '$' + discount.dollar : ''}</td>
+      <td>${discount.percent ? discount.percent + '%' : ''}</td>
+      <td>${discount.total ? '✓' : ''}</td>
+      <td>${discount.category}</td>
+      <td>
+        <button onclick="editDiscount('${discount.code}')" class="btn-secondary" style="padding: 5px 10px; font-size: 12px; margin-right: 5px;">Edit</button>
+        <button onclick="confirmDeleteDiscount('${discount.code}')" class="btn-danger" style="padding: 5px 10px; font-size: 12px;">Delete</button>
+      </td>
+    `;
+    tableBody.appendChild(row);
+  });
+  
+  console.log("Finished displaying discounts");
+}
+
+  
+  discounts.forEach(discount => {
+    const row = document.createElement('tr');
+    row.innerHTML = `
+      <td>${discount.code}</td>
+      <td>${discount.type}</td>
+      <td>${discount.once ? '✓' : ''}</td>
+      <td>${discount.expiration}</td>
+      <td>${discount.dollar ? '$' + discount.dollar : ''}</td>
+      <td>${discount.percent ? discount.percent + '%' : ''}</td>
+      <td>${discount.total ? '✓' : ''}</td>
+      <td>${discount.category}</td>
+      <td>
+        <button onclick="editDiscount('${discount.code}')" class="btn-secondary" style="padding: 5px 10px; font-size: 12px; margin-right: 5px;">Edit</button>
+        <button onclick="confirmDeleteDiscount('${discount.code}')" class="btn-danger" style="padding: 5px 10px; font-size: 12px;">Delete</button>
+      </td>
+    `;
+    tableBody.appendChild(row);
+  });
+}
+
+function populateCategoryDropdown(categories) {
+  const categorySelect = document.getElementById('discount-category');
+  
+  // Clear existing options except the first one
+  while (categorySelect.options.length > 1) {
+    categorySelect.remove(1);
+  }
+  
+  // Add new options
+  categories.forEach(category => {
+    const option = document.createElement('option');
+    option.value = category;
+    option.textContent = category;
+    categorySelect.appendChild(option);
+  });
+}
+
+function saveDiscount() {
+  const discountData = {
+    code: document.getElementById('discount-code').value,
+    type: document.getElementById('discount-type').value,
+    once: document.getElementById('discount-once').checked,
+    expiration: document.getElementById('discount-expiration').value,
+    dollar: document.getElementById('discount-dollar').value,
+    percent: document.getElementById('discount-percent').value,
+    total: document.getElementById('discount-total').checked,
+    category: document.getElementById('discount-category').value,
+    item1: document.getElementById('discount-item1').value,
+    item2: document.getElementById('discount-item2').value,
+    item3: document.getElementById('discount-item3').value,
+    item4: document.getElementById('discount-item4').value,
+    item5: document.getElementById('discount-item5').value,
+    rowIndex: document.getElementById('discount-code').getAttribute('data-row-index')
+  };
+  
+  if (!discountData.code) {
+    return showStatus('Discount code is required', 'error');
+  }
+  
+  showStatus('Saving discount...', 'info');
+  
+  google.script.run
+    .withSuccessHandler(function(result) {
+      if (result.success) {
+        showStatus(result.message, 'success');
+        clearDiscountForm();
+        loadDiscounts();
+      } else {
+        showStatus(result.message, 'error');
+      }
+    })
+    .withFailureHandler(function(error) {
+      showStatus('Error saving discount: ' + error, 'error');
+    })
+    .saveDiscount(discountData);
+}
+
+function editDiscount(code) {
+  const rows = document.getElementById('discounts-body').getElementsByTagName('tr');
+  
+  for (let i = 0; i < rows.length; i++) {
+    const cells = rows[i].getElementsByTagName('td');
+    if (cells[0].textContent === code) {
+      document.getElementById('discount-code').value = cells[0].textContent;
+      document.getElementById('discount-code').setAttribute('data-row-index', i + 2); // +2 for header row and 1-based index
+      document.getElementById('discount-type').value = cells[1].textContent;
+      document.getElementById('discount-once').checked = cells[2].textContent === '✓';
+      document.getElementById('discount-expiration').value = formatDateForInput(cells[3].textContent);
+      document.getElementById('discount-dollar').value = cells[4].textContent.replace('$', '');
+      document.getElementById('discount-percent').value = cells[5].textContent.replace('%', '');
+      document.getElementById('discount-total').checked = cells[6].textContent === '✓';
+      document.getElementById('discount-category').value = cells[7].textContent;
+      
+      // Scroll to the top of the form
+      document.getElementById('discount-code').scrollIntoView();
+      break;
+    }
+  }
+}
+
+function formatDateForInput(dateStr) {
+  if (!dateStr) return '';
+  
+  try {
+    const parts = dateStr.split('/');
+    if (parts.length === 3) {
+      const month = parts[0].padStart(2, '0');
+      const day = parts[1].padStart(2, '0');
+      const year = parts[2].length === 2 ? '20' + parts[2] : parts[2];
+      return `${year}-${month}-${day}`;
+    }
+  } catch (e) {
+    console.error('Error formatting date:', e);
+  }
+  
+  return '';
+}
+
+function clearDiscountForm() {
+  document.getElementById('discount-code').value = '';
+  document.getElementById('discount-code').removeAttribute('data-row-index');
+  document.getElementById('discount-type').value = 'Coupon';
+  document.getElementById('discount-once').checked = false;
+  document.getElementById('discount-expiration').value = '';
+  document.getElementById('discount-dollar').value = '';
+  document.getElementById('discount-percent').value = '';
+  document.getElementById('discount-total').checked = false;
+  document.getElementById('discount-category').value = '';
+  document.getElementById('discount-item1').value = '';
+  document.getElementById('discount-item2').value = '';
+  document.getElementById('discount-item3').value = '';
+  document.getElementById('discount-item4').value = '';
+  document.getElementById('discount-item5').value = '';
+}
+
+function confirmDeleteDiscount(code) {
+  if (confirm(`Are you sure you want to delete discount "${code}"?`)) {
+    deleteDiscount(code);
+  }
+}
+
+
+function deleteDiscount(code) {
+  showStatus('Deleting discount...', 'info');
+  
+  google.script.run
+    .withSuccessHandler(function(result) {
+      if (result.success) {
+        showStatus(result.message, 'success');
+        loadDiscounts();
+      } else {
+        showStatus(result.message, 'error');
+      }
+    })
+    .withFailureHandler(function(error) {
+      showStatus('Error deleting discount: ' + error, 'error');
+    })
+    .deleteDiscount(code);
+}
+
+function loadDiscountsContent() {
+  // Show loading indicator
+  const loadingOverlay = document.querySelector('#discounts-page .loading-overlay');
+  if (loadingOverlay) {
+    loadingOverlay.classList.remove('hidden');
+  }
+  
+  google.script.run
+    .withSuccessHandler(function(result) {
+      // Hide loading indicator
+      if (loadingOverlay) {
+        loadingOverlay.classList.add('hidden');
+      }
+      
+      // Update the HTML content
+      document.getElementById('discounts-content').innerHTML = result.html;
+      
+      // Process the data
+      if (result.data && result.data.success) {
+        displayDiscounts(result.data.discounts);
+        populateCategoryDropdown(result.data.categories);
+      } else {
+        showStatus('Error loading discount data: ' + 
+                  (result.data ? result.data.message : 'Unknown error'), 'error');
+      }
+    })
+    .withFailureHandler(function(error) {
+      // Hide loading indicator
+      if (loadingOverlay) {
+        loadingOverlay.classList.add('hidden');
+      }
+      
+      // Show error
+      document.getElementById('discounts-content').innerHTML = 
+        '<div class="card"><h2>Error</h2><p>Error loading discounts page: ' + error + '</p></div>';
+      
+      showStatus('Error loading discounts page: ' + error, 'error');
+    })
+    .getDiscountsPage();
+}
+
+     
+      // Load turnover data when the page becomes active
+      const turnoverTab = document.querySelector('.nav-tab[data-page="inventory-turnover"]');
+      if (turnoverTab) {
+        turnoverTab.addEventListener('click', function() {
+          setTimeout(loadTurnoverData, 100);
+        });
+      }
+    });
+  </script>
+
+  <script>
+// Emergency fix for handleLogin
+window.onload = function() {
+  window.handleLogin = function() {
+    const username = document.getElementById('username').value;
+    const password = document.getElementById('password').value;
+    
+    if (!username || !password) {
+      alert('Please enter both username and password.');
+      return;
+    }
+    
+    // Try to bypass the server call for now
+    document.getElementById('login-screen').classList.add('hidden');
+    document.getElementById('main-portal').classList.remove('hidden');
+  };
+  
+  console.log('Emergency handleLogin function created');
+};
+</script>
+
+</body>
+</html>
+
+
+    
