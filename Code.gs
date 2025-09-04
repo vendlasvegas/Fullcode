@@ -736,7 +736,231 @@ function getInventoryStatus() {
 }
 
 /**
+ * Requests product information from online sources.
+ * @param {string} upc The UPC to look up.
+ * @return {Object} Result object with product data.
+ */
+function requestProductInfo(upc) {
+  return requestInfoForWebApp(upc);
+}
+
+/**
+ * Saves product data to the Master List sheet.
+ * @param {Object} product The product data to save.
+ * @return {Object} Result object with success flag and message.
+ */
+function saveProduct(product) {
+  return saveProductFromWebApp(product);
+}
+
+/**
+ * Gets discount data from the Discounts sheet.
+ * @return {Object} Result object with discount data.
+ */
+function getDiscounts() {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const discountSheet = ss.getSheetByName('Discounts');
+    
+    if (!discountSheet) {
+      return { 
+        success: false, 
+        message: 'Discounts sheet not found. Please create a sheet named "Discounts".' 
+      };
+    }
+    
+    // Get all discount data
+    const data = discountSheet.getDataRange().getValues();
+    const headers = data[0];
+    
+    // Process discounts
+    const discounts = [];
+    const categories = new Set();
+    
+    // Get categories from Master List for dropdown
+    const masterSheet = ss.getSheetByName(MASTER_LIST_SHEET_NAME);
+    if (masterSheet) {
+      const masterData = masterSheet.getDataRange().getValues();
+      const categoryIndex = masterData[0].indexOf('Category');
+      
+      if (categoryIndex !== -1) {
+        for (let i = 1; i < masterData.length; i++) {
+          if (masterData[i][categoryIndex]) {
+            categories.add(masterData[i][categoryIndex]);
+          }
+        }
+      }
+    }
+    
+    // Skip header row
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      
+      // Skip empty rows
+      if (!row[0]) continue;
+      
+      discounts.push({
+        code: row[0],
+        type: row[1] || 'Coupon',
+        once: row[2] === true,
+        expiration: row[3] ? Utilities.formatDate(new Date(row[3]), Session.getScriptTimeZone(), 'MM/dd/yyyy') : '',
+        dollar: row[4] || '',
+        percent: row[5] || '',
+        total: row[6] === true,
+        category: row[7] || '',
+        item1: row[8] || '',
+        item2: row[9] || '',
+        item3: row[10] || '',
+        item4: row[11] || '',
+        item5: row[12] || ''
+      });
+    }
+    
+    return {
+      success: true,
+      discounts: discounts,
+      categories: Array.from(categories).sort()
+    };
+  } catch (e) {
+    console.error('Error getting discounts:', e);
+    return { 
+      success: false, 
+      message: 'Error getting discounts: ' + e.message 
+    };
+  }
+}
+
+/**
+ * Saves a discount to the Discounts sheet.
+ * @param {Object} discountData The discount data to save.
+ * @return {Object} Result object with success flag and message.
+ */
+function saveDiscount(discountData) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    let discountSheet = ss.getSheetByName('Discounts');
+    
+    // Create the sheet if it doesn't exist
+    if (!discountSheet) {
+      discountSheet = ss.insertSheet('Discounts');
+      // Add headers
+      discountSheet.appendRow([
+        'Code', 'Type', 'One-time Use', 'Expiration Date', 'Dollar Amount', 
+        'Percent', 'Apply to Total', 'Category', 'Item 1', 'Item 2', 
+        'Item 3', 'Item 4', 'Item 5'
+      ]);
+    }
+    
+    // Check if this is an update or new discount
+    const data = discountSheet.getDataRange().getValues();
+    let rowIndex = -1;
+    
+    if (discountData.rowIndex) {
+      // This is an update
+      rowIndex = parseInt(discountData.rowIndex);
+    } else {
+      // Check if code already exists
+      for (let i = 1; i < data.length; i++) {
+        if (data[i][0] === discountData.code) {
+          rowIndex = i + 1; // +1 because sheet rows are 1-indexed
+          break;
+        }
+      }
+    }
+    
+    // Parse expiration date
+    let expirationDate = null;
+    if (discountData.expiration) {
+      expirationDate = new Date(discountData.expiration);
+    }
+    
+    // Prepare row data
+    const rowData = [
+      discountData.code,
+      discountData.type,
+      discountData.once === true,
+      expirationDate,
+      discountData.dollar ? parseFloat(discountData.dollar) : '',
+      discountData.percent ? parseFloat(discountData.percent) : '',
+      discountData.total === true,
+      discountData.category,
+      discountData.item1,
+      discountData.item2,
+      discountData.item3,
+      discountData.item4,
+      discountData.item5
+    ];
+    
+    if (rowIndex > 0) {
+      // Update existing row
+      discountSheet.getRange(rowIndex, 1, 1, rowData.length).setValues([rowData]);
+      return { 
+        success: true, 
+        message: 'Discount updated successfully.' 
+      };
+    } else {
+      // Add new row
+      discountSheet.appendRow(rowData);
+      return { 
+        success: true, 
+        message: 'Discount added successfully.' 
+      };
+    }
+  } catch (e) {
+    console.error('Error saving discount:', e);
+    return { 
+      success: false, 
+      message: 'Error saving discount: ' + e.message 
+    };
+  }
+}
+
+/**
+ * Deletes a discount from the Discounts sheet.
+ * @param {string} code The discount code to delete.
+ * @return {Object} Result object with success flag and message.
+ */
+function deleteDiscount(code) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const discountSheet = ss.getSheetByName('Discounts');
+    
+    if (!discountSheet) {
+      return { 
+        success: false, 
+        message: 'Discounts sheet not found.' 
+      };
+    }
+    
+    // Find the discount
+    const data = discountSheet.getDataRange().getValues();
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][0] === code) {
+        discountSheet.deleteRow(i + 1); // +1 because sheet rows are 1-indexed
+        return { 
+          success: true, 
+          message: 'Discount deleted successfully.' 
+        };
+      }
+    }
+    
+    return { 
+      success: false, 
+      message: 'Discount not found.' 
+    };
+  } catch (e) {
+    console.error('Error deleting discount:', e);
+    return { 
+      success: false, 
+      message: 'Error deleting discount: ' + e.message 
+    };
+  }
+}
+
+
+/**
  * Exports inventory status to HTML and converts to PDF
+ * @return {Blob} PDF blob
  */
 function exportInventoryStatusToHTMLPDF() {
   try {
@@ -790,18 +1014,42 @@ function exportInventoryStatusToHTMLPDF() {
     const pdfBlob = docFile.getAs('application/pdf');
     pdfBlob.setName('Inventory_Status_Report.pdf');
     
-    // Save PDF to Drive
-    const pdfFile = DriveApp.createFile(pdfBlob);
-    
     // Clean up the temporary Google Doc
     DriveApp.getFileById(doc.getId()).setTrashed(true);
     
-    // Return the PDF URL for opening in browser
-    return pdfFile.getUrl();
+    // Return the PDF blob directly
+    return pdfBlob;
     
   } catch (error) {
     console.error('Error in exportInventoryStatusToHTMLPDF:', error);
     throw new Error('Failed to generate inventory report: ' + error.message);
+  }
+}
+
+/**
+ * Initializes the master password if it's not already set.
+ */
+function initializeMasterPassword() {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const loginSheet = ss.getSheetByName(LOGIN_SHEET_NAME);
+    
+    if (!loginSheet) {
+      console.error('Login sheet not found.');
+      return;
+    }
+    
+    // Check if master password is already set
+    const masterPasswordF1 = loginSheet.getRange('F1').getValue();
+    const masterPasswordF2 = loginSheet.getRange('F2').getValue();
+    
+    if (!masterPasswordF1 && !masterPasswordF2) {
+      // Set the default master password
+      loginSheet.getRange('F1').setValue(MASTER_PASSWORD);
+      console.log('Master password initialized.');
+    }
+  } catch (e) {
+    console.error('Error initializing master password:', e);
   }
 }
 
@@ -2649,4 +2897,16 @@ function parseTimeString(timeString) {
   }
 }
 
+// Add these to your Code.gs file
+function lookupProduct(upc) {
+  return lookupUpcForWebApp(upc);
+}
+
+function requestProductInfo(upc) {
+  return requestInfoForWebApp(upc);
+}
+
+function saveProduct(product) {
+  return saveProductFromWebApp(product);
+}
 
