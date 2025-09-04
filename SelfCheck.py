@@ -14,7 +14,7 @@
 # Transactions synced
 # Email Receipt 
 # Working on Admin Functions
-# 9/3/25 upload to git hub 15:00
+# 9/3/25 upload to git hub 16:00
 
 import os
 import random
@@ -110,7 +110,7 @@ PC_BLUE_BOX  = (32, 357, 704, 777)     # Scaled from (20, 170, 440, 370)
 PC_GREEN_BOX = (736, 462, 1248, 882)   # Scaled from (460, 220, 780, 420)
 
 # Inactivity timeout
-PRICECHECK_TIMEOUT_MS = 30_000  # 30s
+PRICECHECK_TIMEOUT_MS = 15_000  # 15s
 
 
 # ==============================
@@ -1011,11 +1011,17 @@ class PriceCheckMode:
         x, y = event.x, event.y
         logging.info(f"Touch in PriceCheck mode at ({x}, {y})")
 
-        # Example: Define a touch area for resetting scan
-        reset_area = (WINDOW_W//2 - 150, WINDOW_H - 100, WINDOW_W//2 + 150, WINDOW_H - 20)
-        if (reset_area[0] <= x <= reset_area[2] and
-            reset_area[1] <= y <= reset_area[3]):
-            self._reset_for_next_scan()
+        # Define the button area
+        button_area = (WINDOW_W//2 - 150, WINDOW_H - 100, WINDOW_W//2 + 150, WINDOW_H - 20)
+        
+        # Check if touch is in the button area
+        if (button_area[0] <= x <= button_area[2] and
+            button_area[1] <= y <= button_area[3]):
+            # Start Transaction button clicked
+            logging.info("Start Transaction button clicked")
+            if hasattr(self, "on_cart_action"):
+                self.on_cart_action()
+
 
     def _on_scan_var_change(self, *args):
         """Debug callback to see when scanner input is received"""
@@ -1088,18 +1094,19 @@ class PriceCheckMode:
         w,h = d.textbbox((0,0), msg, font=PC_FONT_SUB)[2:]
         d.text((x1 + (x2-x1-w)//2, y1 + (y2-y1-h)//2), msg, font=PC_FONT_SUB, fill=(0,0,0))
 
-        # Add a touch-friendly "Reset" button at the bottom
-        button_text = "Tap here to scan another item"
+        # Change button text and style
+        button_text = "Start Transaction"
         bw, bh = d.textbbox((0,0), button_text, font=PC_FONT_SUB)[2:]
         button_x = WINDOW_W//2 - bw//2
         button_y = WINDOW_H - 80
         d.rectangle([button_x-20, button_y-10, button_x+bw+20, button_y+bh+10],
-                   fill=(0,120,200), outline=(0,0,0), width=2)
+                   fill=(0,150,0), outline=(0,0,0), width=2)  # Changed color to green
         d.text((button_x, button_y), button_text, font=PC_FONT_SUB, fill=(255,255,255))
 
         self.tk_img = ImageTk.PhotoImage(frame)
         self.label.configure(image=self.tk_img)
         self.label.lift()
+
 
     def _overlay_result(self, row_list):
         frame = self.base_bg.copy()
@@ -1156,13 +1163,13 @@ class PriceCheckMode:
             except Exception as e:
                 logging.error("Error loading product image %s: %s", picnm, e)
 
-        # Add a touch-friendly "Reset" button at the bottom
-        button_text = "Tap here to scan another item"
+        # Change button text and style
+        button_text = "Start Transaction"
         bw, bh = d.textbbox((0,0), button_text, font=PC_FONT_SUB)[2:]
         button_x = WINDOW_W//2 - bw//2
         button_y = WINDOW_H - 80
         d.rectangle([button_x-20, button_y-10, button_x+bw+20, button_y+bh+10],
-                   fill=(0,120,200), outline=(0,0,0), width=2)
+                   fill=(0,150,0), outline=(0,0,0), width=2)  # Changed color to green
         d.text((button_x, button_y), button_text, font=PC_FONT_SUB, fill=(255,255,255))
 
         self.tk_img = ImageTk.PhotoImage(frame)
@@ -5068,7 +5075,7 @@ class CartMode:
         
         # Title
         title_label = tk.Label(self.transaction_id_popup, 
-                             text="Enter last 4 digits of Venmo Transaction ID", 
+                             text="Enter last 4 digits of Venmo/CashApp Transaction ID#", 
                              font=("Arial", 18, "bold"), 
                              bg="white",
                              wraplength=450)
@@ -7173,6 +7180,7 @@ class App:
         self.idle.on_touch_action = lambda: self.set_mode("PriceCheck")
         self.idle.on_wifi_tap = lambda: self.set_mode("Admin")
         self.idle.on_cart_action = lambda: self.set_mode("Cart")
+        self.price.on_cart_action = lambda: self.set_mode("Cart")
         self.cart.on_exit = lambda: self.set_mode("Idle")
 
     # Button handlers
