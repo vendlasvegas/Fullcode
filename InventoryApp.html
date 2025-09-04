@@ -1,5 +1,5 @@
-***InventoryApp.html***
-***Upload 9/4/25 11:00***
+// InventoryApp.html
+// Upload 9/4/25 11:00
 
 <!DOCTYPE html>
 <html>
@@ -173,6 +173,21 @@
       background-color: rgba(255, 215, 0, 0.2);
       font-weight: bold;
     }
+
+    /* Add these to your existing CSS */
+    .nav-category, .nav-tab {
+      cursor: pointer !important;
+      user-select: none;
+      position: relative;
+      z-index: 20;
+}
+
+    /* Make sure there are no overlapping elements blocking clicks */
+    .nav-container {
+      position: relative;
+      z-index: 100;
+}
+
     .nav-tabs {
       flex: 1;
       display: flex;
@@ -1344,43 +1359,143 @@
 
 
   <script>
-    // --- INITIALIZATION ---
-    document.addEventListener('DOMContentLoaded', function() {
-      // Load Google Charts
-      google.charts.load('current', {'packages':['corechart', 'bar']});
-      // Set up category navigation
-      document.querySelectorAll('.nav-category').forEach(category => {
-        category.addEventListener('click', function() {
-          // Update active category
-          document.querySelectorAll('.nav-category').forEach(c => c.classList.remove('active'));
-          this.classList.add('active');
-          
-          const categoryName = this.getAttribute('data-category');
-          
-          // Hide all tabs
-          document.querySelectorAll('.nav-tab').forEach(tab => {
-            tab.classList.add('hidden');
-          });
-          
-          // Show tabs for this category
-          document.querySelectorAll(`.nav-tab[data-category="${categoryName}"]`).forEach(tab => {
-            tab.classList.remove('hidden');
-          });
-          
-          // Select first tab in this category if none is active
-          const activeTabs = document.querySelectorAll(`.nav-tab.active[data-category="${categoryName}"]`);
-          if (activeTabs.length === 0) {
-            const firstTab = document.querySelector(`.nav-tab[data-category="${categoryName}"]`);
-            if (firstTab) {
-              firstTab.click();
-            }
-          }
-        });
+
+// Global error handler
+window.onerror = function(message, source, lineno, colno, error) {
+  console.error('JavaScript error:', message, 'at', source, 'line', lineno, ':', error);
+  return true;
+};
+
+// Replace your existing category navigation code with this:
+document.addEventListener('DOMContentLoaded', function() {
+  // Set up category navigation
+  document.querySelectorAll('.nav-category').forEach(category => {
+    category.addEventListener('click', function() {
+      console.log('Category clicked:', this.getAttribute('data-category'));
+      
+      // Update active category
+      document.querySelectorAll('.nav-category').forEach(c => c.classList.remove('active'));
+      this.classList.add('active');
+      
+      const categoryName = this.getAttribute('data-category');
+      
+      // Hide all tabs
+      document.querySelectorAll('.nav-tab').forEach(tab => {
+        tab.classList.add('hidden');
       });
+      
+      // Show tabs for this category
+      document.querySelectorAll(`.nav-tab[data-category="${categoryName}"]`).forEach(tab => {
+        tab.classList.remove('hidden');
+      });
+      
+      // Select first tab in this category
+      const firstTab = document.querySelector(`.nav-tab[data-category="${categoryName}"]`);
+      if (firstTab) {
+        firstTab.click();
+      }
+    });
+  });
+  
+  // Add this function to help debug navigation issues
+function debugNavigation() {
+  console.log('--- Navigation Debug Info ---');
+  
+  // Check categories
+  const categories = document.querySelectorAll('.nav-category');
+  console.log(`Found ${categories.length} categories:`);
+  categories.forEach(cat => {
+    console.log(`- ${cat.textContent} (${cat.getAttribute('data-category')}) ${cat.classList.contains('active') ? '[ACTIVE]' : ''}`);
+  });
+  
+  // Check tabs
+  const tabs = document.querySelectorAll('.nav-tab');
+  console.log(`Found ${tabs.length} tabs:`);
+  tabs.forEach(tab => {
+    const isHidden = tab.classList.contains('hidden');
+    const isActive = tab.classList.contains('active');
+    console.log(`- ${tab.textContent} (${tab.getAttribute('data-category')}/${tab.getAttribute('data-page')}) ${isActive ? '[ACTIVE]' : ''} ${isHidden ? '[HIDDEN]' : ''}`);
+  });
+  
+  // Check pages
+  const pages = document.querySelectorAll('.page');
+  console.log(`Found ${pages.length} pages:`);
+  pages.forEach(page => {
+    const id = page.id;
+    const isActive = page.classList.contains('active');
+    console.log(`- ${id} ${isActive ? '[ACTIVE]' : ''}`);
+  });
+}
+
+// Function to verify page IDs
+function verifyPageIds() {
+  const tabs = document.querySelectorAll('.nav-tab');
+  let hasErrors = false;
+  
+  tabs.forEach(tab => {
+    const pageId = tab.getAttribute('data-page') + '-page';
+    const page = document.getElementById(pageId);
+    
+    if (!page) {
+      console.error(`Missing page element with ID "${pageId}" for tab "${tab.textContent}"`);
+      hasErrors = true;
+    }
+  });
+  
+  if (!hasErrors) {
+    console.log('All page IDs verified successfully!');
+  }
+  
+  return !hasErrors;
+}
+
+  // Set up tab navigation
+  document.querySelectorAll('.nav-tab').forEach(tab => {
+    tab.addEventListener('click', function() {
+      console.log('Tab clicked:', this.getAttribute('data-page'));
+      
+      // Update active tab
+      document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+      this.classList.add('active');
+      
+      // Update page subtitle
+      document.getElementById('page-subtitle').textContent = this.textContent;
+      
+      // Show corresponding page
+      const pageId = this.getAttribute('data-page') + '-page';
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+      
+      const page = document.getElementById(pageId);
+      if (page) {
+        page.classList.add('active');
+        
+        // Special handling for specific pages
+        if (this.getAttribute('data-page') === 'inventory-status') {
+          loadInventoryStatus();
+        } else if (this.getAttribute('data-page') === 'expiration-tracking') {
+          loadExpirationData();
+        } else if (this.getAttribute('data-page') === 'inventory-turnover') {
+          loadTurnoverData();
+        } else if (this.getAttribute('data-page') === 'user-management') {
+          loadUsers();
+        } else if (this.getAttribute('data-page') === 'credentials') {
+          loadCredentials();
+        } else if (this.getAttribute('data-page') === 'discounts') {
+          loadDiscounts();
+        }
+      } else {
+        console.error('Page not found:', pageId);
+      }
+    });
+  });
+});
+
       
 // Set up tab navigation
 document.querySelectorAll('.nav-tab').forEach(tab => {
   tab.addEventListener('click', function() {
+    console.log('Tab clicked:', this.getAttribute('data-page'));
+    
     // Update active tab
     document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
     this.classList.add('active');
@@ -1391,18 +1506,31 @@ document.querySelectorAll('.nav-tab').forEach(tab => {
     // Show corresponding page
     const pageId = this.getAttribute('data-page') + '-page';
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-    document.getElementById(pageId).classList.add('active');
     
-// Special handling for admin pages
-if (this.getAttribute('data-category') === 'admin') {
-  if (this.getAttribute('data-page') === 'user-management') {
-    loadUsers();
-  } else if (this.getAttribute('data-page') === 'credentials') {
-    loadCredentials();
-  } else if (this.getAttribute('data-page') === 'discounts') {
-    loadDiscounts(); 
-  }
-}
+    const page = document.getElementById(pageId);
+    if (page) {
+      page.classList.add('active');
+      
+      // Special handling for specific pages
+      if (this.getAttribute('data-page') === 'inventory-status') {
+        loadInventoryStatus();
+      } else if (this.getAttribute('data-page') === 'expiration-tracking') {
+        loadExpirationData();
+      } else if (this.getAttribute('data-page') === 'inventory-turnover') {
+        loadTurnoverData();
+      } else if (this.getAttribute('data-page') === 'user-management') {
+        loadUsers();
+      } else if (this.getAttribute('data-page') === 'credentials') {
+        loadCredentials();
+      } else if (this.getAttribute('data-page') === 'discounts') {
+        loadDiscounts();
+      }
+    } else {
+      console.error('Page not found:', pageId);
+    }
+  });
+});
+
 
     
     // Special handling for inventory status page
@@ -3006,6 +3134,65 @@ function displayDiscounts(discounts) {
   });
 }
 
+/**
+ * Handles POST requests from the web app
+ * @param {Object} e The event parameter containing POST data
+ * @return {ContentService} JSON response
+ */
+function doPost(e) {
+  try {
+    const data = JSON.parse(e.postData.contents);
+    const action = data.action;
+    
+    if (action === 'generatePDF') {
+      try {
+        const pdfBlob = exportInventoryStatusToHTMLPDF();
+        
+        // Convert to base64 for web delivery
+        const base64Data = Utilities.base64Encode(pdfBlob.getBytes());
+        
+        return ContentService
+          .createTextOutput(JSON.stringify({
+            success: true,
+            pdfData: base64Data,
+            fileName: pdfBlob.getName() || 'Inventory_Status_Report.pdf',
+            mimeType: 'application/pdf'
+          }))
+          .setMimeType(ContentService.MimeType.JSON);
+          
+      } catch (error) {
+        console.error('PDF generation error:', error);
+        return ContentService
+          .createTextOutput(JSON.stringify({
+            success: false,
+            error: 'Failed to generate PDF: ' + error.message
+          }))
+          .setMimeType(ContentService.MimeType.JSON);
+      }
+    }
+    
+    // Handle other actions here if needed
+    else {
+      return ContentService
+        .createTextOutput(JSON.stringify({
+          success: false,
+          error: 'Unknown action: ' + action
+        }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    
+  } catch (error) {
+    console.error('Error in doPost:', error);
+    return ContentService
+      .createTextOutput(JSON.stringify({
+        success: false,
+        error: 'Server error: ' + error.message
+      }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+
 function populateCategoryDropdown(categories) {
   const categorySelect = document.getElementById('discount-category');
   
@@ -3146,6 +3333,15 @@ function deleteDiscount(code) {
     .deleteDiscount(code);
 }
 
+// Function to force hide the discounts loading overlay
+function forceHideDiscountsLoading() {
+  const loadingOverlay = document.getElementById('discounts-loading');
+  if (loadingOverlay) {
+    loadingOverlay.style.display = 'none';
+    loadingOverlay.classList.add('hidden');
+  }
+}
+    
 function loadDiscountsContent() {
   // Show loading indicator
   const loadingOverlay = document.querySelector('#discounts-page .loading-overlay');
@@ -3218,6 +3414,10 @@ window.onload = function() {
   console.log('Emergency handleLogin function created');
 };
 </script>
+
+<!-- Debug button -->
+<button id="debug-button" onclick="debugNavigation()" style="position: fixed; bottom: 10px; right: 10px; z-index: 9999; opacity: 0.5;">Debug Nav</button>
+
 
 </body>
 </html>
