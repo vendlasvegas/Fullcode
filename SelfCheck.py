@@ -14,7 +14,7 @@
 # Transactions synced
 # Email Receipt 
 # Working on Admin Functions
-# 9/3/25 upload to git hub 16:00
+# 9/4/25 upload to git hub 15:00
 
 import os
 import random
@@ -231,8 +231,91 @@ class IdleMode:
         self.weather_api_key = None
 
 
+    
 
-    # Add these methods to the IdleMode class
+
+    def start_command_checker(self):
+        """Start periodic checking for remote commands in Google Sheets."""
+        logging.info("Starting remote command checker")
+        self._check_remote_commands()
+        
+    def _check_remote_commands(self):
+        """Check for remote commands in the Command tab of Google Sheets."""
+        if not self.is_active:
+            return
+            
+        try:
+            # Connect to Google Sheet
+            scopes = [
+                "https://www.googleapis.com/auth/spreadsheets",
+                "https://www.googleapis.com/auth/drive",
+            ]
+            creds = Credentials.from_service_account_file(str(GS_CRED_PATH), scopes=scopes)
+            gc = gspread.authorize(creds)
+            
+            # Open the Command tab
+            sheet = gc.open(GS_SHEET_NAME).worksheet("Command")
+            
+            # Check cell A1 for restart command
+            command = sheet.acell('A1').value
+            
+            if command == "Restart":
+                logging.info("Remote restart command detected")
+                
+                # Clear the command cell
+                sheet.update('A1', "")
+                
+                # Log to Service tab
+                service_sheet = gc.open(GS_SHEET_NAME).worksheet("Service")
+                timestamp = datetime.now().strftime("%m/%d/%Y %H:%M:%S")
+                service_sheet.append_row([timestamp, "Remote User", "System Remote Restart"])
+                
+                # Show restart popup with countdown
+                self._show_restart_countdown()
+                return
+                
+        except Exception as e:
+            logging.error(f"Error checking remote commands: {e}")
+        
+        # Schedule next check in 90 seconds if still active
+        if self.is_active:
+            self.command_check_timer = self.root.after(90000, self._check_remote_commands)
+        
+    def _show_restart_countdown(self):
+        """Show restart countdown popup."""
+        # Create popup frame
+        self.restart_popup = tk.Frame(self.root, bg="#2c3e50", bd=3, relief=tk.RAISED)
+        self.restart_popup.place(relx=0.5, rely=0.5, width=500, height=300, anchor=tk.CENTER)
+        
+        # Title
+        title_label = tk.Label(self.restart_popup, text="System Restarting:", 
+                             font=("Arial", 24, "bold"), bg="#2c3e50", fg="white")
+        title_label.pack(pady=(40, 20))
+        
+        # Countdown label
+        self.restart_countdown_value = 15
+        self.restart_countdown_label = tk.Label(self.restart_popup, 
+                                              text=f"{self.restart_countdown_value}", 
+                                              font=("Arial", 48, "bold"), bg="#2c3e50", fg="white")
+        self.restart_countdown_label.pack(pady=20)
+        
+        # Start countdown
+        self._update_restart_countdown()
+        
+    def _update_restart_countdown(self):
+        """Update the restart countdown timer."""
+        self.restart_countdown_value -= 1
+        self.restart_countdown_label.config(text=f"{self.restart_countdown_value}")
+        
+        if self.restart_countdown_value <= 0:
+            # Time to restart
+            if hasattr(self, "on_remote_restart"):
+                self.on_remote_restart()
+            return
+            
+        self.restart_countdown_timer = self.root.after(1000, self._update_restart_countdown)
+
+
     def _load_button_images(self):
         """Load button images."""
         try:
@@ -540,6 +623,9 @@ class IdleMode:
         # Start overlay update timer
         self._update_overlays()
 
+        # Start command checker
+        self.start_command_checker()
+
     def stop(self):
         logging.info("IdleMode: Stopping")
         self.is_active = False
@@ -560,6 +646,22 @@ class IdleMode:
         # Hide all overlays and main label
         self._hide_all_overlays()
         self._hide_selection_screen()
+
+        # Cancel command checker timer
+        if hasattr(self, 'command_check_timer') and self.command_check_timer:
+            self.root.after_cancel(self.command_check_timer)
+            self.command_check_timer = None
+
+        # Cancel restart countdown timer if active
+        if hasattr(self, 'restart_countdown_timer') and self.restart_countdown_timer:
+            self.root.after_cancel(self.restart_countdown_timer)
+            self.restart_countdown_timer = None
+        
+        # Destroy restart popup if it exists
+        if hasattr(self, 'restart_popup') and self.restart_popup:
+            self.restart_popup.destroy()
+            self.restart_popup = None
+    
         
     def _hide_all_overlays(self):
         """Hide all overlay elements and main label"""
@@ -7141,6 +7243,7 @@ class App:
 
         # Modes
         self.idle = IdleMode(self.root)
+        self.idle.on_remote_restart = self.remote_restart
         self.price = PriceCheckMode(self.root)
         self.admin = AdminMode(self.root)
         self.mode = None
@@ -7426,6 +7529,16 @@ class App:
             
         except Exception as e:
             logging.error(f"Failed to update UPC catalog and tax rate: {e}")
+
+    def remote_restart(self):
+        """Handle remote restart command."""
+        logging.info("Executing remote restart")
+        self.shutdown()
+        
+        # Optional: Add system restart command if needed
+        # import os
+        # os.system("sudo reboot")
+    
 
     def shutdown(self):
         try:
