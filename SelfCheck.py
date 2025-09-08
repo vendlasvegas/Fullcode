@@ -262,8 +262,8 @@ class IdleMode:
             if command == "Restart":
                 logging.info("Remote restart command detected")
                 
-                # Clear the command cell
-                sheet.update('A1', "")
+                # Clear the command cell - FIXED THIS LINE
+                sheet.update_cell(1, 1, "")  # Row 1, Column 1 is A1
                 
                 # Log to Service tab
                 service_sheet = gc.open(GS_SHEET_NAME).worksheet("Service")
@@ -280,6 +280,7 @@ class IdleMode:
         # Schedule next check in 90 seconds if still active
         if self.is_active:
             self.command_check_timer = self.root.after(90000, self._check_remote_commands)
+
         
     def _show_restart_countdown(self):
         """Show restart countdown popup."""
@@ -622,9 +623,11 @@ class IdleMode:
         
         # Start overlay update timer
         self._update_overlays()
-
+        
         # Start command checker
         self.start_command_checker()
+
+
 
     def stop(self):
         logging.info("IdleMode: Stopping")
@@ -7147,7 +7150,7 @@ class CartMode:
             # Try to write a test row
             test_row = [datetime.now().strftime("%m/%d/%Y %H:%M:%S"), 
                         self.machine_id, 
-                        "Test access - please ignore"]
+                        "System Started"]
             service_tab.append_row(test_row)
             logging.info("Successfully wrote test row to Service tab")
             
