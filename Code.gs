@@ -2414,6 +2414,1962 @@ function generateProductPerformanceReport(startDate, endDate) {
   }
 }
 
+/**
+ * Generates a profit margin report.
+ * @param {string} startDate - Start date in YYYY-MM-DD format.
+ * @param {string} endDate - End date in YYYY-MM-DD format.
+ * @param {string} category - Category filter (optional).
+ * @return {object} The profit margin report data.
+ */
+function generateProfitMarginReport(startDate, endDate, category) {
+  try {
+    console.log(`Starting profit margin report generation for date range: ${startDate} to ${endDate}, category: ${category}`);
+    
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const transSheet = ss.getSheetByName('Transactions');
+    const masterSheet = ss.getSheetByName(MASTER_LIST_SHEET_NAME);
+    
+    if (!transSheet || !masterSheet) {
+      console.error('Required sheets not found');
+      return { 
+        success: false, 
+        message: 'Required sheets not found. Please check that both "Transactions" and "' + MASTER_LIST_SHEET_NAME + '" sheets exist.' 
+      };
+    }
+    
+    // Convert string dates to Date objects
+    let startDateObj, endDateObj;
+    
+    try {
+      startDateObj = new Date(startDate);
+      endDateObj = new Date(endDate);
+      endDateObj.setHours(23, 59, 59); // Include the entire end date
+      
+      // Verify these are valid dates
+      if (isNaN(startDateObj.getTime()) || isNaN(endDateObj.getTime())) {
+        throw new Error('Invalid date format');
+      }
+    } catch (e) {
+      console.error('Error parsing dates:', e);
+      return {
+        success: false,
+        message: 'Error parsing dates. Please use format YYYY-MM-DD.'
+      };
+    }
+    
+    // Get all transaction data
+    const transData = transSheet.getDataRange().getValues();
+    const transHeaders = transData[0];
+    
+    // Find column indexes by exact header names
+    let dateColIndex = transHeaders.indexOf('Date');
+    
+    // Check for alternative column names if not found
+    if (dateColIndex === -1) {
+      dateColIndex = transHeaders.indexOf('Transaction Date');
+      if (dateColIndex === -1) {
+        dateColIndex = transHeaders.indexOf('Trans Date');
+      }
+    }
+    
+    if (dateColIndex === -1) {
+      console.error('Date column not found. Headers in sheet:', transHeaders);
+      return { 
+        success: false, 
+        message: 'Date column not found in Transactions sheet. Please check the header row.' 
+      };
+    }
+    
+    // Get master sheet data for cost information
+    const masterData = masterSheet.getDataRange().getValues();
+    const masterHeaders = masterData[0];
+    
+    // Find column indexes in master sheet
+    const masterUpcIndex = masterHeaders.indexOf('UPC');
+    const masterNameIndex = masterHeaders.indexOf('Name');
+    const masterBrandIndex = masterHeaders.indexOf('Brand');
+    const masterCategoryIndex = masterHeaders.indexOf('Category');
+    const masterIndvCostIndex = masterHeaders.indexOf('Indv Cost');
+    
+    if (masterUpcIndex === -1 || masterIndvCostIndex === -1) {
+      return { 
+        success: false, 
+        message: 'Required columns not found in Inv sheet.' 
+      };
+    }
+    
+    // Process transactions within date range
+    const productMap = new Map(); // Map to track products by UPC
+    const categories = new Set();
+    
+    for (let i = 1; i < transData.length; i++) {
+      const row = transData[i];
+      
+      // Skip empty rows
+      if (!row[dateColIndex]) {
+        continue;
+      }
+      
+      // Get the date from the sheet
+      let transDate = row[dateColIndex];
+      
+      // Make sure transDate is a Date object
+      if (!(transDate instanceof Date)) {
+        try {
+          // Try to convert to a Date object if it's a string
+          if (typeof transDate === 'string') {
+            transDate = new Date(transDate);
+          } else {
+            // If it's a number or something else, try to convert to string first
+            transDate = new Date(String(transDate));
+          }
+          
+          // Check if conversion was successful
+          if (isNaN(transDate.getTime())) {
+            console.log(`Row ${i+1} has invalid date, skipping`);
+            continue;
+          }
+        } catch (e) {
+          console.error(`Error converting date in row ${i+1}:`, e);
+          continue;
+        }
+      }
+      
+      // Compare only the date part (ignore time)
+      const transDateOnly = new Date(transDate.getFullYear(), transDate.getMonth(), transDate.getDate());
+      const startDateOnly = new Date(startDateObj.getFullYear(), startDateObj.getMonth(), startDateObj.getDate());
+      const endDateOnly = new Date(endDateObj.getFullYear(), endDateObj.getMonth(), endDateObj.getDate());
+      
+      if (transDateOnly >= startDateOnly && transDateOnly <= endDateOnly) {
+        // Process each item in the transaction
+        for (let itemNum = 1; itemNum <= 15; itemNum++) {
+          const upcIndex = transHeaders.indexOf(`Item ${itemNum} UPC`);
+          const nameIndex = transHeaders.indexOf(`Item ${itemNum} Name`);
+          const qtyIndex = transHeaders.indexOf(`Item ${itemNum} Qty`);
+          const priceIndex = transHeaders.indexOf(`Item ${itemNum} Price`);
+          const totalIndex = transHeaders.indexOf(`Item ${itemNum} Total`);
+          
+          if (upcIndex === -1 || nameIndex === -1 || qtyIndex === -1 || priceIndex === -1) {
+            // If we can't find columns for this item number, we've probably reached the end of the item columns
+            break;
+          }
+          
+          const upc = row[upcIndex];
+          if (!upc) continue; // Skip empty items
+          
+          const name = row[nameIndex] || 'Unknown';
+          const qty = Number(row[qtyIndex]) || 0;
+          
+          // Ensure proper conversion of monetary values
+          let price = 0;
+          let total = 0;
+          
+          // Handle price
+          if (priceIndex !== -1 && row[priceIndex] !== null && row[priceIndex] !== undefined) {
+            if (typeof row[priceIndex] === 'number') {
+              price = row[priceIndex];
+            } else if (typeof row[priceIndex] === 'string') {
+              // Remove any currency symbols and commas
+              const cleanedValue = row[priceIndex].replace(/[$,]/g, '');
+              price = parseFloat(cleanedValue) || 0;
+            }
+          }
+          
+          // Handle total
+          if (totalIndex !== -1 && row[totalIndex] !== null && row[totalIndex] !== undefined) {
+            if (typeof row[totalIndex] === 'number') {
+              total = row[totalIndex];
+            } else if (typeof row[totalIndex] === 'string') {
+              // Remove any currency symbols and commas
+              const cleanedValue = row[totalIndex].replace(/[$,]/g, '');
+              total = parseFloat(cleanedValue) || 0;
+            }
+          }
+          
+          // If total is still 0 but we have price and qty, calculate it
+          if (total === 0 && price > 0 && qty > 0) {
+            total = price * qty;
+          }
+          
+          // Get product info from Master List
+          let productCategory = 'Unknown';
+          let cost = 0;
+          let brand = 'Unknown';
+          
+          // Look up product in Master List
+          for (let j = 1; j < masterData.length; j++) {
+            if (String(masterData[j][masterUpcIndex]).trim() === String(upc).trim()) {
+              if (masterCategoryIndex !== -1) {
+                productCategory = masterData[j][masterCategoryIndex] || 'Unknown';
+                categories.add(productCategory);
+              }
+              
+              if (masterBrandIndex !== -1) {
+                brand = masterData[j][masterBrandIndex] || 'Unknown';
+              }
+              
+              if (masterIndvCostIndex !== -1) {
+                const costValue = masterData[j][masterIndvCostIndex];
+                
+                if (typeof costValue === 'number') {
+                  cost = costValue;
+                } else if (typeof costValue === 'string') {
+                  // Remove any currency symbols and commas
+                  const cleanedValue = costValue.replace(/[$,]/g, '');
+                  cost = parseFloat(cleanedValue) || 0;
+                }
+              }
+              break;
+            }
+          }
+          
+          // Skip if category filter is applied and doesn't match
+          if (category && category !== 'all' && productCategory !== category) {
+            continue;
+          }
+          
+          // Calculate profit and margin
+          const revenue = total;
+          const totalCost = cost * qty;
+          const profit = revenue - totalCost;
+          const marginPercent = revenue > 0 ? (profit / revenue) * 100 : 0;
+          
+          // Update product map
+          if (productMap.has(upc)) {
+            const product = productMap.get(upc);
+            product.quantity += qty;
+            product.revenue += revenue;
+            product.totalCost += totalCost;
+            product.profit += profit;
+            // Recalculate margin percent based on updated totals
+            product.marginPercent = product.revenue > 0 ? (product.profit / product.revenue) * 100 : 0;
+          } else {
+            productMap.set(upc, {
+              upc: upc,
+              name: name,
+              brand: brand,
+              category: productCategory,
+              quantity: qty,
+              price: price,
+              cost: cost,
+              revenue: revenue,
+              totalCost: totalCost,
+              profit: profit,
+              marginPercent: marginPercent
+            });
+          }
+        }
+      }
+    }
+    
+    // Convert map to array and sort by margin percentage (descending)
+    const products = Array.from(productMap.values())
+      .sort((a, b) => b.marginPercent - a.marginPercent);
+    
+    // Calculate category margins
+    const categoryMarginMap = new Map();
+    products.forEach(product => {
+      if (!categoryMarginMap.has(product.category)) {
+        categoryMarginMap.set(product.category, {
+          category: product.category,
+          revenue: 0,
+          cost: 0,
+          profit: 0,
+          marginPercent: 0
+        });
+      }
+      
+      const catMargin = categoryMarginMap.get(product.category);
+      catMargin.revenue += product.revenue;
+      catMargin.cost += product.totalCost;
+      catMargin.profit += product.profit;
+      catMargin.marginPercent = catMargin.revenue > 0 ? (catMargin.profit / catMargin.revenue) * 100 : 0;
+    });
+    
+    const categoryMargins = Array.from(categoryMarginMap.values())
+      .sort((a, b) => b.marginPercent - a.marginPercent);
+    
+    // Get top 10 products by margin percentage (with minimum revenue)
+    const topMarginProducts = products
+      .filter(p => p.revenue >= 10) // Only include products with at least $10 in revenue
+      .slice(0, 10);
+    
+    // Calculate summary metrics
+    let totalRevenue = 0;
+    let totalCost = 0;
+    let totalProfit = 0;
+    
+    products.forEach(product => {
+      totalRevenue += product.revenue;
+      totalCost += product.totalCost;
+      totalProfit += product.profit;
+    });
+    
+    const averageMarginPercent = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0;
+    
+    return {
+      success: true,
+      products: products,
+      categoryMargins: categoryMargins,
+      topMarginProducts: topMarginProducts,
+      categories: Array.from(categories).sort(),
+      totalRevenue: totalRevenue,
+      totalCost: totalCost,
+      totalProfit: totalProfit,
+      averageMarginPercent: averageMarginPercent
+    };
+  } catch (e) {
+    console.error('ERROR in generateProfitMarginReport:', e);
+    console.error('Stack trace:', e.stack);
+    return { 
+      success: false, 
+      message: 'Error generating profit margin report: ' + e.message 
+    };
+  }
+}
+
+/**
+ * Generates a revenue forecast.
+ * @param {string} startDate - Historical start date in YYYY-MM-DD format.
+ * @param {string} endDate - Historical end date in YYYY-MM-DD format.
+ * @param {string} forecastPeriod - Number of days to forecast.
+ * @return {object} The revenue forecast data.
+ */
+function generateRevenueForecast(startDate, endDate, forecastPeriod) {
+  try {
+    console.log(`Starting revenue forecast generation for historical period: ${startDate} to ${endDate}, forecast period: ${forecastPeriod} days`);
+    
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const transSheet = ss.getSheetByName('Transactions');
+    const masterSheet = ss.getSheetByName(MASTER_LIST_SHEET_NAME);
+    
+    if (!transSheet || !masterSheet) {
+      console.error('Required sheets not found');
+      return { 
+        success: false, 
+        message: 'Required sheets not found. Please check that both "Transactions" and "' + MASTER_LIST_SHEET_NAME + '" sheets exist.' 
+      };
+    }
+    
+    // Convert string dates to Date objects
+    let startDateObj, endDateObj;
+    
+    try {
+      startDateObj = new Date(startDate);
+      endDateObj = new Date(endDate);
+      endDateObj.setHours(23, 59, 59); // Include the entire end date
+      
+      // Verify these are valid dates
+      if (isNaN(startDateObj.getTime()) || isNaN(endDateObj.getTime())) {
+        throw new Error('Invalid date format');
+      }
+    } catch (e) {
+      console.error('Error parsing dates:', e);
+      return {
+        success: false,
+        message: 'Error parsing dates. Please use format YYYY-MM-DD.'
+      };
+    }
+    
+    // Calculate forecast end date
+    const forecastDays = parseInt(forecastPeriod) || 90;
+    const forecastEndDate = new Date();
+    forecastEndDate.setDate(forecastEndDate.getDate() + forecastDays);
+    
+    // Get all transaction data
+    const transData = transSheet.getDataRange().getValues();
+    const transHeaders = transData[0];
+    
+    // Find column indexes by exact header names
+    let dateColIndex = transHeaders.indexOf('Date');
+    let totalColIndex = transHeaders.indexOf('Total');
+    
+    // Check for alternative column names if not found
+    if (dateColIndex === -1) {
+      dateColIndex = transHeaders.indexOf('Transaction Date');
+      if (dateColIndex === -1) {
+        dateColIndex = transHeaders.indexOf('Trans Date');
+      }
+    }
+    
+    if (totalColIndex === -1) {
+      totalColIndex = transHeaders.indexOf('Total Amount');
+    }
+    
+    if (dateColIndex === -1 || totalColIndex === -1) {
+      console.error('Required columns not found. Headers in sheet:', transHeaders);
+      return { 
+        success: false, 
+        message: 'Required columns not found in Transactions sheet. Please check the header row.' 
+      };
+    }
+    
+    // Process historical transactions
+    const dailyRevenue = new Map(); // Map of date string to revenue
+    const weekdayRevenue = new Map(); // Map of weekday (0-6) to revenue array
+    const monthlyRevenue = new Map(); // Map of month-year to revenue
+    const productSales = new Map(); // Map of UPC to sales data
+    const categorySales = new Map(); // Map of category to sales data
+    
+    let totalHistoricalRevenue = 0;
+    let transactionCount = 0;
+    
+    for (let i = 1; i < transData.length; i++) {
+      const row = transData[i];
+      
+      // Skip empty rows
+      if (!row[dateColIndex]) {
+        continue;
+      }
+      
+      // Get the date from the sheet
+      let transDate = row[dateColIndex];
+      
+      // Make sure transDate is a Date object
+      if (!(transDate instanceof Date)) {
+        try {
+          // Try to convert to a Date object if it's a string
+          if (typeof transDate === 'string') {
+            transDate = new Date(transDate);
+          } else {
+            // If it's a number or something else, try to convert to string first
+            transDate = new Date(String(transDate));
+          }
+          
+          // Check if conversion was successful
+          if (isNaN(transDate.getTime())) {
+            console.log(`Row ${i+1} has invalid date, skipping`);
+            continue;
+          }
+        } catch (e) {
+          console.error(`Error converting date in row ${i+1}:`, e);
+          continue;
+        }
+      }
+      
+      // Check if the transaction is within the historical date range
+      if (transDate >= startDateObj && transDate <= endDateObj) {
+        // Get the total revenue for this transaction
+        let total = 0;
+        if (totalColIndex !== -1 && row[totalColIndex] !== null && row[totalColIndex] !== undefined) {
+          if (typeof row[totalColIndex] === 'number') {
+            total = row[totalColIndex];
+          } else if (typeof row[totalColIndex] === 'string') {
+            // Remove any currency symbols and commas
+            const cleanedValue = row[totalColIndex].replace(/[$,]/g, '');
+            total = parseFloat(cleanedValue) || 0;
+          }
+        }
+        
+        // Skip if total is zero
+        if (total <= 0) continue;
+        
+        // Format date as YYYY-MM-DD for daily revenue tracking
+        const dateStr = Utilities.formatDate(transDate, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+        
+        // Add to daily revenue
+        if (dailyRevenue.has(dateStr)) {
+          dailyRevenue.set(dateStr, dailyRevenue.get(dateStr) + total);
+        } else {
+          dailyRevenue.set(dateStr, total);
+        }
+        
+        // Add to weekday revenue
+        const weekday = transDate.getDay(); // 0 = Sunday, 6 = Saturday
+        if (!weekdayRevenue.has(weekday)) {
+          weekdayRevenue.set(weekday, []);
+        }
+        weekdayRevenue.get(weekday).push(total);
+        
+        // Add to monthly revenue
+        const monthYear = Utilities.formatDate(transDate, Session.getScriptTimeZone(), 'MMM yyyy');
+        if (monthlyRevenue.has(monthYear)) {
+          monthlyRevenue.set(monthYear, monthlyRevenue.get(monthYear) + total);
+        } else {
+          monthlyRevenue.set(monthYear, total);
+        }
+        
+        // Process each item in the transaction
+        for (let itemNum = 1; itemNum <= 15; itemNum++) {
+          const upcIndex = transHeaders.indexOf(`Item ${itemNum} UPC`);
+          const nameIndex = transHeaders.indexOf(`Item ${itemNum} Name`);
+          const qtyIndex = transHeaders.indexOf(`Item ${itemNum} Qty`);
+          const priceIndex = transHeaders.indexOf(`Item ${itemNum} Price`);
+          
+          if (upcIndex === -1 || nameIndex === -1 || qtyIndex === -1 || priceIndex === -1) {
+            // If we can't find columns for this item number, we've probably reached the end of the item columns
+            break;
+          }
+          
+          const upc = row[upcIndex];
+          if (!upc) continue; // Skip empty items
+          
+          const name = row[nameIndex] || 'Unknown';
+          const qty = Number(row[qtyIndex]) || 0;
+          
+          // Ensure proper conversion of monetary values
+          let price = 0;
+          if (priceIndex !== -1 && row[priceIndex] !== null && row[priceIndex] !== undefined) {
+            if (typeof row[priceIndex] === 'number') {
+              price = row[priceIndex];
+            } else if (typeof row[priceIndex] === 'string') {
+              // Remove any currency symbols and commas
+              const cleanedValue = row[priceIndex].replace(/[$,]/g, '');
+              price = parseFloat(cleanedValue) || 0;
+            }
+          }
+          
+          // Skip if price or quantity is zero
+          if (price <= 0 || qty <= 0) continue;
+          
+          // Get category from master sheet
+          let category = 'Unknown';
+          
+          // Look up product in Master List
+          const masterData = masterSheet.getDataRange().getValues();
+          const masterHeaders = masterData[0];
+          const masterUpcIndex = masterHeaders.indexOf('UPC');
+          const masterCategoryIndex = masterHeaders.indexOf('Category');
+          
+          if (masterUpcIndex !== -1 && masterCategoryIndex !== -1) {
+            for (let j = 1; j < masterData.length; j++) {
+              if (String(masterData[j][masterUpcIndex]).trim() === String(upc).trim()) {
+                category = masterData[j][masterCategoryIndex] || 'Unknown';
+                break;
+              }
+            }
+          }
+          
+          // Update product sales
+          if (!productSales.has(upc)) {
+            productSales.set(upc, {
+              upc: upc,
+              name: name,
+              category: category,
+              totalUnits: 0,
+              totalRevenue: 0,
+              unitPrice: price,
+              salesByMonth: new Map() // Track sales by month for trend analysis
+            });
+          }
+          
+          const product = productSales.get(upc);
+          product.totalUnits += qty;
+          product.totalRevenue += price * qty;
+          
+          // Track sales by month for trend analysis
+          const monthKey = Utilities.formatDate(transDate, Session.getScriptTimeZone(), 'yyyy-MM');
+          if (!product.salesByMonth.has(monthKey)) {
+            product.salesByMonth.set(monthKey, 0);
+          }
+          product.salesByMonth.set(monthKey, product.salesByMonth.get(monthKey) + qty);
+          
+          // Update category sales
+          if (!categorySales.has(category)) {
+            categorySales.set(category, {
+              name: category,
+              totalUnits: 0,
+              totalRevenue: 0
+            });
+          }
+          
+          const categoryData = categorySales.get(category);
+          categoryData.totalUnits += qty;
+          categoryData.totalRevenue += price * qty;
+        }
+        
+        // Update totals
+        totalHistoricalRevenue += total;
+        transactionCount++;
+      }
+    }
+    
+    // Calculate historical metrics
+    const historicalDays = Math.max(1, Math.round((endDateObj - startDateObj) / (1000 * 60 * 60 * 24)));
+    const dailyAverageRevenue = totalHistoricalRevenue / historicalDays;
+    
+    // Generate revenue trend (historical + forecast)
+    const revenueTrend = [];
+    
+    // Add historical data points
+    const sortedDates = Array.from(dailyRevenue.keys()).sort();
+    sortedDates.forEach(dateStr => {
+      revenueTrend.push({
+        date: dateStr,
+        revenue: dailyRevenue.get(dateStr),
+        type: 'historical'
+      });
+    });
+    
+    // Calculate average revenue by weekday
+    const weeklyPattern = [];
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    
+    for (let i = 0; i < 7; i++) {
+      const revenues = weekdayRevenue.get(i) || [];
+      const avgRevenue = revenues.length > 0 ? revenues.reduce((sum, val) => sum + val, 0) / revenues.length : dailyAverageRevenue;
+      
+      weeklyPattern.push({
+        day: i,
+        name: dayNames[i],
+        averageRevenue: avgRevenue
+      });
+    }
+    
+    // Calculate monthly historical averages
+    const monthlyHistoricalAverages = new Map();
+    monthlyRevenue.forEach((revenue, monthYear) => {
+      const month = monthYear.split(' ')[0]; // Extract month name
+      if (!monthlyHistoricalAverages.has(month)) {
+        monthlyHistoricalAverages.set(month, []);
+      }
+      monthlyHistoricalAverages.get(month).push(revenue);
+    });
+    
+    // Calculate average revenue by month
+    const monthlyAverages = new Map();
+    monthlyHistoricalAverages.forEach((revenues, month) => {
+      const avgRevenue = revenues.reduce((sum, val) => sum + val, 0) / revenues.length;
+      monthlyAverages.set(month, avgRevenue);
+    });
+    
+    // Generate forecast data points
+    const today = new Date();
+    let forecastDate = new Date(today);
+    let totalForecastedRevenue = 0;
+    
+    // Generate monthly forecasts
+    const monthlyForecasts = [];
+    const forecastMonths = new Set();
+    
+    // Calculate growth rate based on historical data
+    let growthRate = 0;
+    if (sortedDates.length >= 60) { // Need at least 60 days of data for meaningful growth calculation
+      // Compare first 30 days with last 30 days
+      const firstMonthRevenue = sortedDates.slice(0, 30).reduce((sum, dateStr) => sum + dailyRevenue.get(dateStr), 0);
+      const lastMonthRevenue = sortedDates.slice(-30).reduce((sum, dateStr) => sum + dailyRevenue.get(dateStr), 0);
+      
+      if (firstMonthRevenue > 0) {
+        growthRate = ((lastMonthRevenue - firstMonthRevenue) / firstMonthRevenue) * 100;
+      }
+    }
+    
+    // Apply a conservative growth rate (cap at +/- 20%)
+    growthRate = Math.max(-20, Math.min(20, growthRate));
+    
+    // Generate daily forecast for the forecast period
+    for (let i = 0; i < forecastDays; i++) {
+      forecastDate.setDate(today.getDate() + i);
+      
+      // Get the weekday for this forecast date
+      const weekday = forecastDate.getDay();
+      
+      // Use weekday average as base forecast
+      const weekdayAvg = weeklyPattern.find(day => day.day === weekday)?.averageRevenue || dailyAverageRevenue;
+      
+      // Apply monthly seasonality factor
+      const monthName = Utilities.formatDate(forecastDate, Session.getScriptTimeZone(), 'MMM');
+      const monthlyFactor = monthlyAverages.has(monthName) ? 
+        monthlyAverages.get(monthName) / dailyAverageRevenue : 1;
+      
+      // Apply growth rate (compounded daily)
+      const growthFactor = 1 + ((growthRate / 100) * (i / 365));
+      
+      // Calculate forecasted revenue for this day
+      const forecastedRevenue = weekdayAvg * monthlyFactor * growthFactor;
+      
+      // Add to total forecasted revenue
+      totalForecastedRevenue += forecastedRevenue;
+      
+      // Add to forecast trend (only add every 3rd day to avoid cluttering the chart)
+      if (i % 3 === 0 || i === forecastDays - 1) {
+        const dateStr = Utilities.formatDate(forecastDate, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+        revenueTrend.push({
+          date: dateStr,
+          revenue: forecastedRevenue,
+          type: 'forecast'
+        });
+      }
+      
+      // Track monthly forecasts
+      const monthYearStr = Utilities.formatDate(forecastDate, Session.getScriptTimeZone(), 'MMM yyyy');
+      forecastMonths.add(monthYearStr);
+    }
+    
+    // Generate monthly forecasts
+    forecastMonths.forEach(monthYear => {
+      const month = monthYear.split(' ')[0]; // Extract month name
+      
+      // Get historical average for this month
+      const historicalAvg = monthlyAverages.has(month) ? monthlyAverages.get(month) * 30 : dailyAverageRevenue * 30;
+      
+      // Apply growth rate
+      const monthIndex = Array.from(forecastMonths).indexOf(monthYear);
+      const monthlyGrowthFactor = 1 + ((growthRate / 100) * (monthIndex + 1) / 12);
+      
+      const forecastedRevenue = historicalAvg * monthlyGrowthFactor;
+      const varianceFactor = 0.15; // 15% variance for confidence interval
+      
+      monthlyForecasts.push({
+        month: monthYear,
+        forecastedRevenue: forecastedRevenue,
+        lowerBound: forecastedRevenue * (1 - varianceFactor),
+        upperBound: forecastedRevenue * (1 + varianceFactor),
+        historicalAverage: historicalAvg,
+        growthRate: (monthlyGrowthFactor - 1) * 100
+      });
+    });
+    
+    // Generate product forecasts
+    const productForecasts = [];
+    
+    productSales.forEach(product => {
+      // Calculate historical units per month
+      const historicalMonths = Math.max(1, historicalDays / 30);
+      const historicalUnitsPerMonth = product.totalUnits / historicalMonths;
+      
+      // Calculate trend based on monthly sales data
+      let trend = 0;
+      if (product.salesByMonth.size >= 2) {
+        const monthKeys = Array.from(product.salesByMonth.keys()).sort();
+        if (monthKeys.length >= 2) {
+          const firstMonth = product.salesByMonth.get(monthKeys[0]);
+          const lastMonth = product.salesByMonth.get(monthKeys[monthKeys.length - 1]);
+          
+          if (firstMonth > 0) {
+            trend = ((lastMonth - firstMonth) / firstMonth) * 100;
+          }
+        }
+      }
+      
+      // Apply a conservative trend (cap at +/- 30%)
+      trend = Math.max(-30, Math.min(30, trend));
+      
+      // Calculate forecasted units for the forecast period
+      const forecastMonths = forecastDays / 30;
+      const trendFactor = 1 + (trend / 100);
+      const forecastedUnits = historicalUnitsPerMonth * forecastMonths * trendFactor;
+      const forecastedRevenue = forecastedUnits * product.unitPrice;
+      
+      productForecasts.push({
+        name: product.name,
+        category: product.category,
+        historicalUnits: historicalUnitsPerMonth,
+        forecastedUnits: forecastedUnits,
+        unitPrice: product.unitPrice,
+        forecastedRevenue: forecastedRevenue,
+        trend: trend
+      });
+    });
+    
+    // Sort product forecasts by forecasted revenue (descending)
+    productForecasts.sort((a, b) => b.forecastedRevenue - a.forecastedRevenue);
+    
+    // Generate category forecasts
+    const categoryForecasts = [];
+    
+    categorySales.forEach(category => {
+      // Calculate historical revenue per month
+      const historicalMonths = Math.max(1, historicalDays / 30);
+      const historicalRevenuePerMonth = category.totalRevenue / historicalMonths;
+      
+      // Apply the same growth rate as overall forecast
+      const forecastMonths = forecastDays / 30;
+      const growthFactor = 1 + (growthRate / 100);
+      const forecastedRevenue = historicalRevenuePerMonth * forecastMonths * growthFactor;
+      
+      categoryForecasts.push({
+        name: category.name,
+        historicalRevenue: category.totalRevenue,
+        forecastedRevenue: forecastedRevenue
+      });
+    });
+    
+    // Sort category forecasts by forecasted revenue (descending)
+    categoryForecasts.sort((a, b) => b.forecastedRevenue - a.forecastedRevenue);
+    
+    // Calculate confidence level based on data quality
+    let confidenceLevel = 70; // Base confidence level
+    
+    // Adjust based on amount of historical data
+    if (historicalDays >= 180) confidenceLevel += 10;
+    if (historicalDays >= 365) confidenceLevel += 5;
+    
+    // Adjust based on consistency of data
+    const dailyValues = Array.from(dailyRevenue.values());
+    if (dailyValues.length > 0) {
+      const avg = dailyValues.reduce((sum, val) => sum + val, 0) / dailyValues.length;
+      const variance = dailyValues.reduce((sum, val) => sum + Math.pow(val - avg, 2), 0) / dailyValues.length;
+      const stdDev = Math.sqrt(variance);
+      const coefficientOfVariation = stdDev / avg;
+      
+      // Lower confidence if data is highly variable
+      if (coefficientOfVariation > 0.5) confidenceLevel -= 10;
+      if (coefficientOfVariation > 1.0) confidenceLevel -= 10;
+    }
+    
+    // Cap confidence level
+    confidenceLevel = Math.max(50, Math.min(95, confidenceLevel));
+    
+    return {
+      success: true,
+      totalHistoricalRevenue: totalHistoricalRevenue,
+      historicalDays: historicalDays,
+      dailyAverageRevenue: dailyAverageRevenue,
+      totalForecastedRevenue: totalForecastedRevenue,
+      growthRate: growthRate,
+      confidenceLevel: confidenceLevel,
+      revenueTrend: revenueTrend,
+      weeklyPattern: weeklyPattern,
+      monthlyForecasts: monthlyForecasts,
+      productForecasts: productForecasts.slice(0, 20), // Top 20 products
+      categoryForecasts: categoryForecasts.slice(0, 5) // Top 5 categories
+    };
+  } catch (e) {
+    console.error('ERROR in generateRevenueForecast:', e);
+    console.error('Stack trace:', e.stack);
+    return { 
+      success: false, 
+      message: 'Error generating revenue forecast: ' + e.message 
+    };
+  }
+}
+
+/**
+ * Exports the revenue forecast to PDF with enhanced HTML styling.
+ * @param {string} startDate - Historical start date in YYYY-MM-DD format.
+ * @param {string} endDate - Historical end date in YYYY-MM-DD format.
+ * @param {string} forecastPeriod - Number of days to forecast.
+ * @return {string} URL to the generated PDF.
+ */
+function exportRevenueForecastToHTMLPDF(startDate, endDate, forecastPeriod) {
+  try {
+    console.log('Starting HTML-styled PDF export for revenue forecast');
+    
+    // Get the report data
+    const reportData = generateRevenueForecast(startDate, endDate, forecastPeriod);
+    
+    if (!reportData.success) {
+      console.error('Failed to generate report data for PDF:', reportData.message);
+      return null;
+    }
+    
+    // Format dates for the filename
+    const formattedStartDate = startDate.replace(/-/g, '');
+    const formattedEndDate = endDate.replace(/-/g, '');
+    const timestamp = new Date().getTime();
+    const fileName = `RevenueForecast_${formattedStartDate}_to_${formattedEndDate}_${timestamp}.pdf`;
+    
+    // Create HTML content
+    let htmlContent = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        body {
+          font-family: Arial, sans-serif;
+          margin: 0;
+          padding: 20px;
+          color: #333;
+        }
+        .header {
+          text-align: center;
+          margin-bottom: 30px;
+        }
+        .logo {
+          max-width: 150px;
+          margin-bottom: 10px;
+        }
+        h1 {
+          margin: 0;
+          color: #000;
+          font-size: 24px;
+        }
+        .subtitle {
+          color: #666;
+          font-size: 16px;
+          margin-top: 5px;
+        }
+        .info-row {
+          display: flex;
+          justify-content: space-between;
+          margin-bottom: 5px;
+          font-size: 14px;
+        }
+        .info-label {
+          font-weight: bold;
+        }
+        .summary-section {
+          margin: 30px 0;
+          padding: 15px;
+          background-color: #f5f5f5;
+          border-radius: 5px;
+        }
+        .summary-title {
+          font-size: 18px;
+          font-weight: bold;
+          margin-bottom: 15px;
+          border-bottom: 1px solid #ddd;
+          padding-bottom: 5px;
+        }
+        .summary-grid {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 15px;
+        }
+        .summary-item {
+          text-align: center;
+        }
+        .summary-value {
+          font-size: 20px;
+          font-weight: bold;
+          color: #000;
+          margin-bottom: 5px;
+        }
+        .summary-label {
+          font-size: 14px;
+          color: #666;
+        }
+        table {
+          width: 100%;
+          border-collapse: collapse;
+          margin-top: 20px;
+        }
+        th, td {
+          padding: 10px;
+          text-align: left;
+          border-bottom: 1px solid #ddd;
+        }
+        th {
+          background-color: #f2f2f2;
+          font-weight: bold;
+        }
+        tr:nth-child(even) {
+          background-color: #f9f9f9;
+        }
+        .footer {
+          margin-top: 30px;
+          text-align: center;
+          font-size: 12px;
+          color: #999;
+        }
+        .positive-growth {
+          color: #28a745;
+        }
+        .negative-growth {
+          color: #dc3545;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="header">
+        <img src="https://i.imgur.com/lfcgQ0s.png" alt="VEND LAS VEGAS Logo" class="logo">
+        <h1>VEND LAS VEGAS</h1>
+        <div class="subtitle">Revenue Forecast Report</div>
+      </div>
+      
+      <div class="info-row">
+        <div><span class="info-label">Historical Period:</span> ${formatDate(new Date(startDate))} to ${formatDate(new Date(endDate))}</div>
+        <div><span class="info-label">Machine ID:</span> ${getMachineID()}</div>
+      </div>
+      <div class="info-row">
+        <div><span class="info-label">Forecast Period:</span> ${forecastPeriod} days</div>
+        <div><span class="info-label">Generated:</span> ${formatDate(new Date())} ${formatTime(new Date())}</div>
+      </div>
+      
+      <div class="summary-section">
+        <div class="summary-title">FORECAST SUMMARY</div>
+        <div class="summary-grid">
+          <div class="summary-item">
+            <div class="summary-value">$${reportData.totalForecastedRevenue.toFixed(2)}</div>
+            <div class="summary-label">Forecasted Revenue</div>
+          </div>
+          <div class="summary-item">
+            <div class="summary-value">$${reportData.dailyAverageRevenue.toFixed(2)}</div>
+            <div class="summary-label">Daily Average</div>
+          </div>
+          <div class="summary-item">
+            <div class="summary-value" style="color: ${reportData.growthRate >= 0 ? '#28a745' : '#dc3545'}">
+              ${reportData.growthRate.toFixed(2)}%
+            </div>
+            <div class="summary-label">Growth Rate</div>
+          </div>
+          <div class="summary-item">
+            <div class="summary-value">${reportData.confidenceLevel.toFixed(0)}%</div>
+            <div class="summary-label">Confidence Level</div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="summary-title">MONTHLY REVENUE FORECAST</div>
+      <table>
+        <thead>
+          <tr>
+            <th>Month</th>
+            <th>Forecasted Revenue</th>
+            <th>Lower Bound</th>
+            <th>Upper Bound</th>
+            <th>Historical Average</th>
+            <th>Growth %</th>
+          </tr>
+        </thead>
+        <tbody>
+    `;
+    
+    // Add monthly forecast rows
+    reportData.monthlyForecasts.forEach(month => {
+      const growthColor = month.growthRate >= 0 ? '#28a745' : '#dc3545';
+      
+      htmlContent += `
+      <tr>
+        <td>${month.month || 'N/A'}</td>
+        <td>$${month.forecastedRevenue.toFixed(2)}</td>
+        <td>$${month.lowerBound.toFixed(2)}</td>
+        <td>$${month.upperBound.toFixed(2)}</td>
+        <td>$${month.historicalAverage.toFixed(2)}</td>
+        <td style="color: ${growthColor}">${month.growthRate.toFixed(2)}%</td>
+      </tr>
+      `;
+    });
+    
+    htmlContent += `
+        </tbody>
+      </table>
+      
+      <div class="summary-title">TOP PRODUCT CATEGORIES</div>
+      <table>
+        <thead>
+          <tr>
+            <th>Category</th>
+            <th>Historical Revenue</th>
+            <th>Forecasted Revenue</th>
+          </tr>
+        </thead>
+        <tbody>
+    `;
+    
+    // Add category forecast rows
+    reportData.categoryForecasts.forEach(category => {
+      htmlContent += `
+      <tr>
+        <td>${category.name || 'Unknown'}</td>
+        <td>$${category.historicalRevenue.toFixed(2)}</td>
+        <td>$${category.forecastedRevenue.toFixed(2)}</td>
+      </tr>
+      `;
+    });
+    
+    htmlContent += `
+        </tbody>
+      </table>
+      
+      <div class="summary-title">TOP PRODUCT FORECASTS</div>
+      <table>
+        <thead>
+          <tr>
+            <th>Product</th>
+            <th>Category</th>
+            <th>Historical Units/Month</th>
+            <th>Forecasted Units</th>
+            <th>Unit Price</th>
+            <th>Forecasted Revenue</th>
+            <th>Trend</th>
+          </tr>
+        </thead>
+        <tbody>
+    `;
+    
+    // Add top 10 product forecast rows
+    const topProducts = reportData.productForecasts.slice(0, 10);
+    topProducts.forEach(product => {
+      const trendColor = product.trend >= 0 ? '#28a745' : '#dc3545';
+      
+      // Determine trend icon
+      let trendIcon = '→';
+      if (product.trend > 10) {
+        trendIcon = '↑↑';
+      } else if (product.trend > 0) {
+        trendIcon = '↑';
+      } else if (product.trend < -10) {
+        trendIcon = '↓↓';
+      } else if (product.trend < 0) {
+        trendIcon = '↓';
+      }
+      
+      htmlContent += `
+      <tr>
+        <td>${product.name || 'N/A'}</td>
+        <td>${product.category || 'N/A'}</td>
+        <td>${product.historicalUnits.toFixed(2)}</td>
+        <td>${product.forecastedUnits.toFixed(2)}</td>
+        <td>$${product.unitPrice.toFixed(2)}</td>
+        <td>$${product.forecastedRevenue.toFixed(2)}</td>
+        <td style="color: ${trendColor}">${trendIcon} ${product.trend.toFixed(2)}%</td>
+      </tr>
+      `;
+    });
+    
+    // Close the HTML
+    htmlContent += `
+        </tbody>
+      </table>
+      
+      <div class="footer">
+        © ${new Date().getFullYear()} VEND LAS VEGAS. All rights reserved.
+      </div>
+    </body>
+    </html>
+    `;
+    
+    // Create a temporary file with the HTML content
+    const htmlFile = DriveApp.createFile('temp_report.html', htmlContent, 'text/html');
+    
+    // Convert to PDF using Google Docs
+    const blob = htmlFile.getAs('application/pdf').setName(fileName);
+    const pdfFile = DriveApp.createFile(blob);
+    
+    // Clean up the temporary HTML file
+    htmlFile.setTrashed(true);
+    
+    // Get the PDF URL
+    const pdfUrl = pdfFile.getUrl();
+    
+    console.log('HTML-styled PDF export completed successfully');
+    return pdfUrl;
+  } catch (e) {
+    console.error('Error exporting revenue forecast to HTML PDF:', e);
+    console.error('Stack trace:', e.stack);
+    return null;
+  }
+}
+
+
+/**
+ * Generates a cost analysis report.
+ * @param {string} startDate - Start date in YYYY-MM-DD format.
+ * @param {string} endDate - End date in YYYY-MM-DD format.
+ * @param {string} category - Category filter (optional).
+ * @return {object} The cost analysis report data.
+ */
+function generateCostAnalysisReport(startDate, endDate, category) {
+  try {
+    console.log(`Starting cost analysis report generation for date range: ${startDate} to ${endDate}, category: ${category}`);
+    
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const transSheet = ss.getSheetByName('Transactions');
+    const masterSheet = ss.getSheetByName(MASTER_LIST_SHEET_NAME);
+    
+    if (!transSheet || !masterSheet) {
+      console.error('Required sheets not found');
+      return { 
+        success: false, 
+        message: 'Required sheets not found. Please check that both "Transactions" and "' + MASTER_LIST_SHEET_NAME + '" sheets exist.' 
+      };
+    }
+    
+    // Convert string dates to Date objects
+    let startDateObj, endDateObj;
+    
+    try {
+      startDateObj = new Date(startDate);
+      endDateObj = new Date(endDate);
+      endDateObj.setHours(23, 59, 59); // Include the entire end date
+      
+      // Verify these are valid dates
+      if (isNaN(startDateObj.getTime()) || isNaN(endDateObj.getTime())) {
+        throw new Error('Invalid date format');
+      }
+    } catch (e) {
+      console.error('Error parsing dates:', e);
+      return {
+        success: false,
+        message: 'Error parsing dates. Please use format YYYY-MM-DD.'
+      };
+    }
+    
+    // Get all transaction data for last sold dates
+    const transData = transSheet.getDataRange().getValues();
+    const transHeaders = transData[0];
+    
+    // Find column indexes by exact header names
+    let dateColIndex = transHeaders.indexOf('Date');
+    
+    // Check for alternative column names if not found
+    if (dateColIndex === -1) {
+      dateColIndex = transHeaders.indexOf('Transaction Date');
+      if (dateColIndex === -1) {
+        dateColIndex = transHeaders.indexOf('Trans Date');
+      }
+    }
+    
+    // Get master sheet data for inventory and cost information
+    const masterData = masterSheet.getDataRange().getValues();
+    const masterHeaders = masterData[0];
+    
+    // Find column indexes in master sheet
+    const masterUpcIndex = masterHeaders.indexOf('UPC');
+    const masterNameIndex = masterHeaders.indexOf('Name');
+    const masterBrandIndex = masterHeaders.indexOf('Brand');
+    const masterCategoryIndex = masterHeaders.indexOf('Category');
+    const masterQtyIndex = masterHeaders.indexOf('QTY');
+    const masterIndvCostIndex = masterHeaders.indexOf('Indv Cost');
+    
+    if (masterUpcIndex === -1 || masterQtyIndex === -1 || masterIndvCostIndex === -1) {
+      return { 
+        success: false, 
+        message: 'Required columns not found in Inv sheet.' 
+      };
+    }
+    
+    // Create a map to track last sold date for each product
+    const lastSoldMap = new Map();
+    
+    // Process transactions to find last sold date
+    for (let i = 1; i < transData.length; i++) {
+      const row = transData[i];
+      
+      // Skip empty rows
+      if (!row[dateColIndex]) {
+        continue;
+      }
+      
+      // Get the date from the sheet
+      let transDate = row[dateColIndex];
+      
+      // Make sure transDate is a Date object
+      if (!(transDate instanceof Date)) {
+        try {
+          // Try to convert to a Date object if it's a string
+          if (typeof transDate === 'string') {
+            transDate = new Date(transDate);
+          } else {
+            // If it's a number or something else, try to convert to string first
+            transDate = new Date(String(transDate));
+          }
+          
+          // Check if conversion was successful
+          if (isNaN(transDate.getTime())) {
+            continue;
+          }
+        } catch (e) {
+          continue;
+        }
+      }
+      
+      // Process each item in the transaction
+      for (let itemNum = 1; itemNum <= 15; itemNum++) {
+        const upcIndex = transHeaders.indexOf(`Item ${itemNum} UPC`);
+        
+        if (upcIndex === -1) {
+          // If we can't find columns for this item number, we've probably reached the end of the item columns
+          break;
+        }
+        
+        const upc = row[upcIndex];
+        if (!upc) continue; // Skip empty items
+        
+        // Update last sold date if newer
+        if (!lastSoldMap.has(upc) || transDate > lastSoldMap.get(upc)) {
+          lastSoldMap.set(upc, transDate);
+        }
+      }
+    }
+    
+    // Process inventory data
+    const items = [];
+    const categories = new Set();
+    const categoryCostMap = new Map();
+    let totalInventoryCost = 0;
+    let highestCostItem = null;
+    let highestCost = 0;
+    let lowestCostItem = null;
+    let lowestCost = Number.MAX_VALUE;
+    
+    const today = new Date();
+    
+    for (let i = 1; i < masterData.length; i++) {
+      const row = masterData[i];
+      const upc = row[masterUpcIndex];
+      const name = row[masterNameIndex] || 'Unknown';
+      const brand = row[masterBrandIndex] || '';
+      const itemCategory = row[masterCategoryIndex] || 'Uncategorized';
+      const quantity = parseInt(row[masterQtyIndex]) || 0;
+      
+      // Skip if quantity is zero
+      if (quantity <= 0) continue;
+      
+      // Skip if category filter is applied and doesn't match
+      if (category && category !== 'all' && itemCategory !== category) {
+        continue;
+      }
+      
+      categories.add(itemCategory);
+      
+      // Get cost information
+      let unitCost = 0;
+      const costValue = row[masterIndvCostIndex];
+      
+      if (typeof costValue === 'number') {
+        unitCost = costValue;
+      } else if (typeof costValue === 'string') {
+        // Remove any currency symbols and commas
+        const cleanedValue = costValue.replace(/[$,]/g, '');
+        unitCost = parseFloat(cleanedValue) || 0;
+      }
+      
+      const totalCost = unitCost * quantity;
+      
+      // Track highest and lowest cost items
+      if (unitCost > highestCost) {
+        highestCost = unitCost;
+        highestCostItem = `${name} (${brand})`;
+      }
+      
+      if (unitCost > 0 && unitCost < lowestCost) {
+        lowestCost = unitCost;
+        lowestCostItem = `${name} (${brand})`;
+      }
+      
+      // Get last sold date
+      let lastSold = lastSoldMap.get(upc);
+      let daysInInventory = 0;
+      let lastSoldFormatted = 'Never';
+      
+      if (lastSold) {
+        // Calculate days since last sold
+        daysInInventory = Math.floor((today - lastSold) / (1000 * 60 * 60 * 24));
+        lastSoldFormatted = Utilities.formatDate(lastSold, Session.getScriptTimeZone(), 'MM/dd/yyyy');
+      } else {
+        // If never sold, assume it's been in inventory since the start date
+        daysInInventory = Math.floor((today - startDateObj) / (1000 * 60 * 60 * 24));
+      }
+      
+      // Update category cost map
+      if (!categoryCostMap.has(itemCategory)) {
+        categoryCostMap.set(itemCategory, {
+          name: itemCategory,
+          itemCount: 0,
+          totalCost: 0,
+          avgCost: 0
+        });
+      }
+      
+      const catCost = categoryCostMap.get(itemCategory);
+      catCost.itemCount += quantity;
+      catCost.totalCost += totalCost;
+      
+      // Add to total inventory cost
+      totalInventoryCost += totalCost;
+      
+      // Add to items array
+      items.push({
+        upc: upc,
+        name: name,
+        brand: brand,
+        category: itemCategory,
+        quantity: quantity,
+        unitCost: unitCost,
+        totalCost: totalCost,
+        lastSold: lastSoldFormatted,
+        daysInInventory: daysInInventory
+      });
+    }
+    
+    // Calculate average item cost
+    const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
+    const averageItemCost = totalItems > 0 ? totalInventoryCost / totalItems : 0;
+    
+    // Calculate category percentages and averages
+    const categoryCosts = [];
+    categoryCostMap.forEach(category => {
+      category.avgCost = category.itemCount > 0 ? category.totalCost / category.itemCount : 0;
+      category.percentOfTotal = totalInventoryCost > 0 ? (category.totalCost / totalInventoryCost) * 100 : 0;
+      categoryCosts.push(category);
+    });
+    
+    // Sort categories by total cost (descending)
+    categoryCosts.sort((a, b) => b.totalCost - a.totalCost);
+    
+    // Sort items by unit cost (descending)
+    items.sort((a, b) => b.unitCost - a.unitCost);
+    
+    // Get top 10 highest cost items
+    const topCostItems = items.slice(0, 10);
+    
+    return {
+      success: true,
+      items: items,
+      categoryCosts: categoryCosts,
+      topCostItems: topCostItems,
+      categories: Array.from(categories).sort(),
+      totalInventoryCost: totalInventoryCost,
+      averageItemCost: averageItemCost,
+      highestCostItem: highestCostItem,
+      lowestCostItem: lowestCostItem
+    };
+  } catch (e) {
+    console.error('ERROR in generateCostAnalysisReport:', e);
+    console.error('Stack trace:', e.stack);
+    return { 
+      success: false, 
+      message: 'Error generating cost analysis report: ' + e.message 
+    };
+  }
+}
+
+/**
+ * Exports the cost analysis report to PDF with enhanced HTML styling.
+ * @param {string} startDate - Start date in YYYY-MM-DD format.
+ * @param {string} endDate - End date in YYYY-MM-DD format.
+ * @param {string} category - Category filter (optional).
+ * @return {string} URL to the generated PDF.
+ */
+function exportCostAnalysisReportToHTMLPDF(startDate, endDate, category) {
+  try {
+    console.log('Starting HTML-styled PDF export for cost analysis report');
+    
+    // Get the report data
+    const reportData = generateCostAnalysisReport(startDate, endDate, category);
+    
+    if (!reportData.success) {
+      console.error('Failed to generate report data for PDF:', reportData.message);
+      return null;
+    }
+    
+    // Format dates for the filename
+    const formattedStartDate = startDate.replace(/-/g, '');
+    const formattedEndDate = endDate.replace(/-/g, '');
+    const timestamp = new Date().getTime();
+    const fileName = `CostAnalysisReport_${formattedStartDate}_to_${formattedEndDate}_${timestamp}.pdf`;
+    
+    // Create HTML content
+    let htmlContent = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        body {
+          font-family: Arial, sans-serif;
+          margin: 0;
+          padding: 20px;
+          color: #333;
+        }
+        .header {
+          text-align: center;
+          margin-bottom: 30px;
+        }
+        .logo {
+          max-width: 150px;
+          margin-bottom: 10px;
+        }
+        h1 {
+          margin: 0;
+          color: #000;
+          font-size: 24px;
+        }
+        .subtitle {
+          color: #666;
+          font-size: 16px;
+          margin-top: 5px;
+        }
+        .info-row {
+          display: flex;
+          justify-content: space-between;
+          margin-bottom: 5px;
+          font-size: 14px;
+        }
+        .info-label {
+          font-weight: bold;
+        }
+        .summary-section {
+          margin: 30px 0;
+          padding: 15px;
+          background-color: #f5f5f5;
+          border-radius: 5px;
+        }
+        .summary-title {
+          font-size: 18px;
+          font-weight: bold;
+          margin-bottom: 15px;
+          border-bottom: 1px solid #ddd;
+          padding-bottom: 5px;
+        }
+        .summary-grid {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 15px;
+        }
+        .summary-item {
+          text-align: center;
+        }
+        .summary-value {
+          font-size: 20px;
+          font-weight: bold;
+          color: #000;
+          margin-bottom: 5px;
+        }
+        .summary-label {
+          font-size: 14px;
+          color: #666;
+        }
+        table {
+          width: 100%;
+          border-collapse: collapse;
+          margin-top: 20px;
+        }
+        th, td {
+          padding: 10px;
+          text-align: left;
+          border-bottom: 1px solid #ddd;
+        }
+        th {
+          background-color: #f2f2f2;
+          font-weight: bold;
+        }
+        tr:nth-child(even) {
+          background-color: #f9f9f9;
+        }
+        .footer {
+          margin-top: 30px;
+          text-align: center;
+          font-size: 12px;
+          color: #999;
+        }
+        .old-inventory {
+          background-color: #f8d7da;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="header">
+        <img src="https://i.imgur.com/lfcgQ0s.png" alt="VEND LAS VEGAS Logo" class="logo">
+        <h1>VEND LAS VEGAS</h1>
+        <div class="subtitle">Cost Analysis Report</div>
+      </div>
+      
+      <div class="info-row">
+        <div><span class="info-label">Date Range:</span> ${formatDate(new Date(startDate))} to ${formatDate(new Date(endDate))}</div>
+        <div><span class="info-label">Machine ID:</span> ${getMachineID()}</div>
+      </div>
+      <div class="info-row">
+        <div><span class="info-label">Category:</span> ${category === 'all' ? 'All Categories' : category}</div>
+        <div><span class="info-label">Generated:</span> ${formatDate(new Date())} ${formatTime(new Date())}</div>
+      </div>
+      
+      <div class="summary-section">
+        <div class="summary-title">SUMMARY</div>
+        <div class="summary-grid">
+          <div class="summary-item">
+            <div class="summary-value">$${reportData.totalInventoryCost.toFixed(2)}</div>
+            <div class="summary-label">Total Inventory Cost</div>
+          </div>
+          <div class="summary-item">
+            <div class="summary-value">$${reportData.averageItemCost.toFixed(2)}</div>
+            <div class="summary-label">Average Item Cost</div>
+          </div>
+          <div class="summary-item">
+            <div class="summary-value">${reportData.highestCostItem || 'N/A'}</div>
+            <div class="summary-label">Highest Cost Item</div>
+          </div>
+          <div class="summary-item">
+            <div class="summary-value">${reportData.lowestCostItem || 'N/A'}</div>
+            <div class="summary-label">Lowest Cost Item</div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="summary-title">COST BREAKDOWN BY CATEGORY</div>
+      <table>
+        <thead>
+          <tr>
+            <th>Category</th>
+            <th>Items</th>
+            <th>Total Cost</th>
+            <th>Avg Cost per Item</th>
+            <th>% of Total Cost</th>
+          </tr>
+        </thead>
+        <tbody>
+    `;
+    
+    // Add category rows
+    reportData.categoryCosts.forEach(category => {
+      htmlContent += `
+      <tr>
+        <td>${category.name || 'Unknown'}</td>
+        <td>${category.itemCount || '0'}</td>
+        <td>$${category.totalCost.toFixed(2)}</td>
+        <td>$${category.avgCost.toFixed(2)}</td>
+        <td>${category.percentOfTotal.toFixed(2)}%</td>
+      </tr>
+      `;
+    });
+    
+    htmlContent += `
+        </tbody>
+      </table>
+      
+      <div class="summary-title">TOP 10 HIGHEST COST ITEMS</div>
+      <table>
+        <thead>
+          <tr>
+            <th>UPC</th>
+            <th>Product</th>
+            <th>Category</th>
+            <th>Quantity</th>
+            <th>Unit Cost</th>
+            <th>Total Cost</th>
+            <th>Last Sold</th>
+            <th>Days in Inventory</th>
+          </tr>
+        </thead>
+        <tbody>
+    `;
+    
+    // Add top cost items
+    reportData.topCostItems.forEach(item => {
+      const rowClass = item.daysInInventory > 90 ? 'old-inventory' : '';
+      
+      htmlContent += `
+      <tr class="${rowClass}">
+        <td>${item.upc || 'N/A'}</td>
+        <td>${item.name || 'N/A'}</td>
+        <td>${item.category || 'N/A'}</td>
+        <td>${item.quantity || '0'}</td>
+        <td>$${item.unitCost.toFixed(2)}</td>
+        <td>$${item.totalCost.toFixed(2)}</td>
+        <td>${item.lastSold || 'Never'}</td>
+        <td>${item.daysInInventory || '0'}</td>
+      </tr>
+      `;
+    });
+    
+    // Close the HTML
+    htmlContent += `
+        </tbody>
+      </table>
+      
+      <div class="footer">
+        © ${new Date().getFullYear()} VEND LAS VEGAS. All rights reserved.
+      </div>
+    </body>
+    </html>
+    `;
+    
+    // Create a temporary file with the HTML content
+    const htmlFile = DriveApp.createFile('temp_report.html', htmlContent, 'text/html');
+    
+    // Convert to PDF using Google Docs
+    const blob = htmlFile.getAs('application/pdf').setName(fileName);
+    const pdfFile = DriveApp.createFile(blob);
+    
+    // Clean up the temporary HTML file
+    htmlFile.setTrashed(true);
+    
+    // Get the PDF URL
+    const pdfUrl = pdfFile.getUrl();
+    
+    console.log('HTML-styled PDF export completed successfully');
+    return pdfUrl;
+  } catch (e) {
+    console.error('Error exporting cost analysis report to HTML PDF:', e);
+    console.error('Stack trace:', e.stack);
+    return null;
+  }
+}
+
+
+
+/**
+ * Exports the profit margin report to PDF with enhanced HTML styling.
+ * @param {string} startDate - Start date in YYYY-MM-DD format.
+ * @param {string} endDate - End date in YYYY-MM-DD format.
+ * @param {string} category - Category filter (optional).
+ * @return {string} URL to the generated PDF.
+ */
+function exportProfitMarginReportToHTMLPDF(startDate, endDate, category) {
+  try {
+    console.log('Starting HTML-styled PDF export for profit margin report');
+    
+    // Get the report data
+    const reportData = generateProfitMarginReport(startDate, endDate, category);
+    
+    if (!reportData.success) {
+      console.error('Failed to generate report data for PDF:', reportData.message);
+      return null;
+    }
+    
+    // Format dates for the filename
+    const formattedStartDate = startDate.replace(/-/g, '');
+    const formattedEndDate = endDate.replace(/-/g, '');
+    const timestamp = new Date().getTime();
+    const fileName = `ProfitMarginReport_${formattedStartDate}_to_${formattedEndDate}_${timestamp}.pdf`;
+    
+    // Create HTML content
+    let htmlContent = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        body {
+          font-family: Arial, sans-serif;
+          margin: 0;
+          padding: 20px;
+          color: #333;
+        }
+        .header {
+          text-align: center;
+          margin-bottom: 30px;
+        }
+        .logo {
+          max-width: 150px;
+          margin-bottom: 10px;
+        }
+        h1 {
+          margin: 0;
+          color: #000;
+          font-size: 24px;
+        }
+        .subtitle {
+          color: #666;
+          font-size: 16px;
+          margin-top: 5px;
+        }
+        .info-row {
+          display: flex;
+          justify-content: space-between;
+          margin-bottom: 5px;
+          font-size: 14px;
+        }
+        .info-label {
+          font-weight: bold;
+        }
+        .summary-section {
+          margin: 30px 0;
+          padding: 15px;
+          background-color: #f5f5f5;
+          border-radius: 5px;
+        }
+        .summary-title {
+          font-size: 18px;
+          font-weight: bold;
+          margin-bottom: 15px;
+          border-bottom: 1px solid #ddd;
+          padding-bottom: 5px;
+        }
+        .summary-grid {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 15px;
+        }
+        .summary-item {
+          text-align: center;
+        }
+        .summary-value {
+          font-size: 20px;
+          font-weight: bold;
+          color: #000;
+          margin-bottom: 5px;
+        }
+        .summary-label {
+          font-size: 14px;
+          color: #666;
+        }
+        table {
+          width: 100%;
+          border-collapse: collapse;
+          margin-top: 20px;
+        }
+        th, td {
+          padding: 10px;
+          text-align: left;
+          border-bottom: 1px solid #ddd;
+        }
+        th {
+          background-color: #f2f2f2;
+          font-weight: bold;
+        }
+        tr:nth-child(even) {
+          background-color: #f9f9f9;
+        }
+        .footer {
+          margin-top: 30px;
+          text-align: center;
+          font-size: 12px;
+          color: #999;
+        }
+        .high-margin {
+          background-color: #d4edda;
+        }
+        .medium-margin {
+          background-color: #fff3cd;
+        }
+        .low-margin {
+          background-color: #f8d7da;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="header">
+        <img src="https://i.imgur.com/lfcgQ0s.png" alt="VEND LAS VEGAS Logo" class="logo">
+        <h1>VEND LAS VEGAS</h1>
+        <div class="subtitle">Profit Margin Report</div>
+      </div>
+      
+      <div class="info-row">
+        <div><span class="info-label">Date Range:</span> ${formatDate(new Date(startDate))} to ${formatDate(new Date(endDate))}</div>
+        <div><span class="info-label">Machine ID:</span> ${getMachineID()}</div>
+      </div>
+      <div class="info-row">
+        <div><span class="info-label">Category:</span> ${category === 'all' ? 'All Categories' : category}</div>
+        <div><span class="info-label">Generated:</span> ${formatDate(new Date())} ${formatTime(new Date())}</div>
+      </div>
+      
+      <div class="summary-section">
+        <div class="summary-title">SUMMARY</div>
+        <div class="summary-grid">
+          <div class="summary-item">
+            <div class="summary-value">${reportData.averageMarginPercent.toFixed(2)}%</div>
+            <div class="summary-label">Average Margin %</div>
+          </div>
+          <div class="summary-item">
+            <div class="summary-value">$${reportData.totalRevenue.toFixed(2)}</div>
+            <div class="summary-label">Total Revenue</div>
+          </div>
+          <div class="summary-item">
+            <div class="summary-value">$${reportData.totalCost.toFixed(2)}</div>
+            <div class="summary-label">Total Cost</div>
+          </div>
+          <div class="summary-item">
+            <div class="summary-value">$${reportData.totalProfit.toFixed(2)}</div>
+            <div class="summary-label">Total Profit</div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="summary-title">CATEGORY MARGINS</div>
+      <table>
+        <thead>
+          <tr>
+            <th>Category</th>
+            <th>Revenue</th>
+            <th>Cost</th>
+            <th>Profit</th>
+            <th>Margin %</th>
+          </tr>
+        </thead>
+        <tbody>
+    `;
+    
+    // Add category rows
+    reportData.categoryMargins.forEach(cat => {
+      let rowClass = '';
+      if (cat.marginPercent >= 50) {
+        rowClass = 'high-margin';
+      } else if (cat.marginPercent >= 30) {
+        rowClass = 'medium-margin';
+      } else {
+        rowClass = 'low-margin';
+      }
+      
+      htmlContent += `
+      <tr class="${rowClass}">
+        <td>${cat.category || 'Unknown'}</td>
+        <td>$${cat.revenue.toFixed(2)}</td>
+        <td>$${cat.cost.toFixed(2)}</td>
+        <td>$${cat.profit.toFixed(2)}</td>
+        <td>${cat.marginPercent.toFixed(2)}%</td>
+      </tr>
+      `;
+    });
+    
+    htmlContent += `
+        </tbody>
+      </table>
+      
+      <div class="summary-title">TOP PRODUCTS BY MARGIN</div>
+      <table>
+        <thead>
+          <tr>
+            <th>UPC</th>
+            <th>Product</th>
+            <th>Category</th>
+            <th>Quantity</th>
+            <th>Unit Price</th>
+            <th>Unit Cost</th>
+            <th>Revenue</th>
+            <th>Cost</th>
+            <th>Profit</th>
+            <th>Margin %</th>
+          </tr>
+        </thead>
+        <tbody>
+    `;
+    
+    // Add product rows (limit to top 20)
+    const topProducts = reportData.products.slice(0, 20);
+    topProducts.forEach(product => {
+      let rowClass = '';
+      if (product.marginPercent >= 50) {
+        rowClass = 'high-margin';
+      } else if (product.marginPercent >= 30) {
+        rowClass = 'medium-margin';
+      } else {
+        rowClass = 'low-margin';
+      }
+      
+      htmlContent += `
+      <tr class="${rowClass}">
+        <td>${product.upc || 'N/A'}</td>
+        <td>${product.name || 'N/A'}</td>
+        <td>${product.category || 'N/A'}</td>
+        <td>${product.quantity || '0'}</td>
+        <td>$${(product.price || 0).toFixed(2)}</td>
+        <td>$${(product.cost || 0).toFixed(2)}</td>
+        <td>$${(product.revenue || 0).toFixed(2)}</td>
+        <td>$${(product.totalCost || 0).toFixed(2)}</td>
+        <td>$${(product.profit || 0).toFixed(2)}</td>
+        <td>${product.marginPercent.toFixed(2)}%</td>
+      </tr>
+      `;
+    });
+    
+    // Close the HTML
+    htmlContent += `
+        </tbody>
+      </table>
+      
+      <div class="footer">
+        © ${new Date().getFullYear()} VEND LAS VEGAS. All rights reserved.
+      </div>
+    </body>
+    </html>
+    `;
+    
+    // Create a temporary file with the HTML content
+    const htmlFile = DriveApp.createFile('temp_report.html', htmlContent, 'text/html');
+    
+    // Convert to PDF using Google Docs
+    const blob = htmlFile.getAs('application/pdf').setName(fileName);
+    const pdfFile = DriveApp.createFile(blob);
+    
+    // Clean up the temporary HTML file
+    htmlFile.setTrashed(true);
+    
+    // Get the PDF URL
+    const pdfUrl = pdfFile.getUrl();
+    
+    console.log('HTML-styled PDF export completed successfully');
+    return pdfUrl;
+  } catch (e) {
+    console.error('Error exporting profit margin report to HTML PDF:', e);
+    console.error('Stack trace:', e.stack);
+    return null;
+  }
+}
+
+
+
 
 /**
  * Exports the sales report to PDF with enhanced HTML styling.
