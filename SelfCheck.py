@@ -14,7 +14,8 @@
 # Transactions synced
 # Email Receipt 
 # Working on Admin Functions
-# 9/4/25 upload to git hub 15:00
+# Toggle input for payment methods and reciept printing
+# 9/12/25 upload to git hub 18:50
 
 import os
 import random
@@ -1656,6 +1657,7 @@ class AdminMode:
         self.label.bind("<Button-1>", self._on_touch)
         self.label.bind("<Motion>", self._on_activity)
 
+    
 
 
     def _on_touch(self, event):
@@ -1677,14 +1679,20 @@ class AdminMode:
                 self.current_menu = "wireless"
                 self._render_wireless_menu()
                 
-            # Exit button
+            # System Settings button
             elif 80 <= x <= 780 and 500 <= y <= 570:
+                self.current_menu = "system_settings"
+                self._render_system_settings_menu()
+                
+            # Exit button (moved down)
+            elif 80 <= x <= 780 and 600 <= y <= 670:
                 if hasattr(self, "on_exit"):
                     self.on_exit()
                     
-            # System Restart button - updated y position to match the button definition
-            elif 80 <= x <= 780 and 600 <= y <= 670:
+            # System Restart button (moved down)
+            elif 80 <= x <= 780 and 700 <= y <= 770:
                 self._system_restart()
+
 
         
         elif self.current_menu == "credentials":
@@ -1720,6 +1728,41 @@ class AdminMode:
             elif 80 <= x <= 380 and 600 <= y <= 670:
                 self.current_menu = "main"
                 self._render_menu()
+                
+        elif self.current_menu == "system_settings":
+            # Check if a setting button was clicked
+            for button in self.settings_buttons:
+                x1, y1, x2, y2 = button["rect"]
+                if x1 <= x <= x2 and y1 <= y <= y2:
+                    # Toggle the button status
+                    if button["status"] == "Enable":
+                        button["status"] = "Disable"
+                        # Update the current_settings dictionary
+                        if button["option"] == "Venmo Payments":
+                            self.current_settings["payment_options"]["venmo_enabled"] = False
+                        elif button["option"] == "CashApp Payments":
+                            self.current_settings["payment_options"]["cashapp_enabled"] = False
+                        elif button["option"] == "Receipt Printer":
+                            self.current_settings["receipt_options"]["print_receipt_enabled"] = False
+                    else:
+                        button["status"] = "Enable"
+                        # Update the current_settings dictionary
+                        if button["option"] == "Venmo Payments":
+                            self.current_settings["payment_options"]["venmo_enabled"] = True
+                        elif button["option"] == "CashApp Payments":
+                            self.current_settings["payment_options"]["cashapp_enabled"] = True
+                        elif button["option"] == "Receipt Printer":
+                            self.current_settings["receipt_options"]["print_receipt_enabled"] = True
+                    # Re-render the menu with updated status
+                    self._render_system_settings_menu()
+                    return
+            
+            # Check if Save & Exit button was clicked
+            if hasattr(self, 'save_button_rect'):
+                x1, y1, x2, y2 = self.save_button_rect
+                if x1 <= x <= x2 and y1 <= y <= y2:
+                    self._save_settings()
+                    return
         
         # Back button (in status screens)
         elif 80 <= x <= 480 and 500 <= y <= 570:
@@ -1734,7 +1777,218 @@ class AdminMode:
 
 
 
+    def _render_system_settings_menu(self):
+        """Render the system settings menu."""
+        if not hasattr(self, 'base_bg') or self.base_bg is None:
+            logging.error("Cannot render system settings menu: base_bg is None")
+            self.base_bg = Image.new("RGB", (WINDOW_W, WINDOW_H), (255, 255, 255))
+        
+        try:
+            frame = self.base_bg.copy()
+            d = ImageDraw.Draw(frame)
             
+            # Add title
+            title_font = load_ttf(48)
+            title_text = "System Settings"
+            tw, th = d.textbbox((0,0), title_text, font=title_font)[2:]
+            d.text(((WINDOW_W - tw)//2, 100), title_text, font=title_font, fill=(0,0,0))
+            
+            # Load current settings
+            settings_path = Path.home() / "SelfCheck" / "Cred" / "Settings.json"
+            try:
+                with open(settings_path, 'r') as f:
+                    settings = json.load(f)
+            except Exception as e:
+                logging.error(f"Error loading settings: {e}")
+                settings = {
+                    "payment_options": {
+                        "venmo_enabled": True,
+                        "cashapp_enabled": True
+                    },
+                    "receipt_options": {
+                        "print_receipt_enabled": True
+                    }
+                }
+            
+            # Store current settings for button rendering
+            if not hasattr(self, 'current_settings'):
+                self.current_settings = settings
+            
+            # Menu options - with touch-friendly buttons
+            option_font = load_ttf(40)
+            
+            # Settings buttons with current status
+            venmo_status = "Enable" if self.current_settings["payment_options"]["venmo_enabled"] else "Disable"
+            cashapp_status = "Enable" if self.current_settings["payment_options"]["cashapp_enabled"] else "Disable"
+            printer_status = "Enable" if self.current_settings["receipt_options"]["print_receipt_enabled"] else "Disable"
+            
+            settings_options = [
+                {"text": "Venmo Payments", "status": venmo_status, "y": 250, "color": (0,120,200)},
+                {"text": "CashApp Payments", "status": cashapp_status, "y": 350, "color": (0,150,100)},
+                {"text": "Receipt Printer", "status": printer_status, "y": 450, "color": (100,100,200)}
+            ]
+            
+            # Store button positions for touch detection
+            self.settings_buttons = []
+            
+            for option in settings_options:
+                option_x, option_y = 100, option["y"]
+                text_w, text_h = d.textbbox((0,0), option["text"], font=option_font)[2:]
+                
+                # Draw option text
+                d.text((option_x, option_y), option["text"], font=option_font, fill=(0,0,0))
+                
+                # Draw status button
+                button_x = option_x + text_w + 100  # Position button to the right of text
+                button_w = 200
+                button_h = text_h + 20
+                
+                # Choose button color based on status
+                if option["status"] == "Enable":
+                    button_color = (0, 150, 0)  # Green for enabled
+                else:
+                    button_color = (150, 0, 0)  # Red for disabled
+                    
+                # Draw button
+                d.rectangle([button_x, option_y-10, button_x+button_w, option_y+button_h], 
+                           fill=button_color, outline=(0,0,0), width=2)
+                d.text((button_x+20, option_y), option["status"], font=option_font, fill=(255,255,255))
+                
+                # Store button position and option info for touch detection
+                self.settings_buttons.append({
+                    "rect": (button_x, option_y-10, button_x+button_w, option_y+button_h),
+                    "option": option["text"],
+                    "status": option["status"]
+                })
+            
+            # Save & Exit button
+            save_btn_y = 600
+            save_btn_text = "Save & Exit"
+            save_text_w, save_text_h = d.textbbox((0,0), save_btn_text, font=option_font)[2:]
+            save_btn_x = (WINDOW_W - save_text_w) // 2 - 50  # Center the button
+            save_btn_w = save_text_w + 100
+            save_btn_h = save_text_h + 20
+            
+            d.rectangle([save_btn_x, save_btn_y-10, save_btn_x+save_btn_w, save_btn_y+save_btn_h], 
+                       fill=(0,120,200), outline=(0,0,0), width=2)
+            d.text((save_btn_x+50, save_btn_y), save_btn_text, font=option_font, fill=(255,255,255))
+            
+            # Store save button position
+            self.save_button_rect = (save_btn_x, save_btn_y-10, save_btn_x+save_btn_w, save_btn_y+save_btn_h)
+            
+            self.tk_img = ImageTk.PhotoImage(frame)
+            self.label.configure(image=self.tk_img)
+            self.label.lift()
+            
+            # Reset the back_to_menu flag
+            if hasattr(self, 'back_to_menu'):
+                delattr(self, 'back_to_menu')
+                
+        except Exception as e:
+            logging.error(f"Error rendering system settings menu: {e}")
+            import traceback
+            logging.error(traceback.format_exc())
+
+    def _save_settings(self):
+        """Save current settings to JSON file and Google Sheets."""
+        if not hasattr(self, 'current_settings'):
+            logging.error("No settings found to save")
+            self._show_error_popup("No settings found to save")
+            return
+        
+        try:
+            # Save to JSON file
+            settings_path = Path.home() / "SelfCheck" / "Cred" / "Settings.json"
+            settings_path.parent.mkdir(parents=True, exist_ok=True)
+            
+            with open(settings_path, 'w') as f:
+                json.dump(self.current_settings, f, indent=4)
+                
+            # Update Google Sheets
+            scopes = [
+                "https://www.googleapis.com/auth/spreadsheets",
+                "https://www.googleapis.com/auth/drive",
+            ]
+            creds = Credentials.from_service_account_file(str(GS_CRED_PATH), scopes=scopes)
+            gc = gspread.authorize(creds)
+            
+            # Open the Settings tab
+            sheet = gc.open(GS_SHEET_NAME).worksheet("Settings")
+            
+            # Update cells - use batch update instead of individual updates
+            venmo_status = "Enable" if self.current_settings["payment_options"]["venmo_enabled"] else "Disable"
+            cashapp_status = "Enable" if self.current_settings["payment_options"]["cashapp_enabled"] else "Disable"
+            printer_status = "Enable" if self.current_settings["receipt_options"]["print_receipt_enabled"] else "Disable"
+            
+            # Use batch update with proper format
+            sheet.update_cell(2, 2, venmo_status)     # B2
+            sheet.update_cell(3, 2, cashapp_status)   # B3
+            sheet.update_cell(4, 2, printer_status)   # B4
+            
+            # Show confirmation popup
+            self._show_settings_saved_popup()
+            
+        except Exception as e:
+            logging.error(f"Error saving settings: {e}")
+            import traceback
+            logging.error(traceback.format_exc())
+            
+            # Show error popup
+            self._show_error_popup("Error saving settings")
+
+    
+
+    def _show_settings_saved_popup(self):
+        """Show confirmation popup for saved settings."""
+        # Create popup frame
+        popup = tk.Frame(self.root, bg="white", bd=3, relief=tk.RAISED)
+        popup.place(relx=0.5, rely=0.5, width=500, height=300, anchor=tk.CENTER)
+        
+        # Title
+        title_label = tk.Label(popup, text="Settings Saved", 
+                             font=("Arial", 24, "bold"), bg="white")
+        title_label.pack(pady=(40, 20))
+        
+        # Message
+        message_label = tk.Label(popup, 
+                               text="System needs to be restarted\nfor changes to take effect", 
+                               font=("Arial", 18), bg="white")
+        message_label.pack(pady=20)
+        
+        # OK button
+        ok_btn = tk.Button(popup, text="OK", font=("Arial", 18), bg="#3498db", fg="white",
+                         width=10, command=lambda: self._close_popup_and_return(popup))
+        ok_btn.pack(pady=20)
+
+    def _show_error_popup(self, message):
+        """Show error popup."""
+        # Create popup frame
+        popup = tk.Frame(self.root, bg="white", bd=3, relief=tk.RAISED)
+        popup.place(relx=0.5, rely=0.5, width=500, height=300, anchor=tk.CENTER)
+        
+        # Title
+        title_label = tk.Label(popup, text="Error", 
+                             font=("Arial", 24, "bold"), bg="white", fg="red")
+        title_label.pack(pady=(40, 20))
+        
+        # Message
+        message_label = tk.Label(popup, text=message, 
+                               font=("Arial", 18), bg="white")
+        message_label.pack(pady=20)
+        
+        # OK button - return to main menu when clicked
+        ok_btn = tk.Button(popup, text="OK", font=("Arial", 18), bg="#3498db", fg="white",
+                         width=10, command=lambda: self._close_popup_and_return(popup))
+        ok_btn.pack(pady=20)
+
+
+    def _close_popup_and_return(self, popup):
+        """Close popup and return to main menu."""
+        popup.destroy()
+        self.current_menu = "main"
+        self._render_menu()
+
+    
     def _system_restart(self):
         """Handle system restart button click."""
         # Show confirmation dialog
@@ -1893,8 +2147,9 @@ class AdminMode:
             buttons = [
                 {"text": "Credentials", "y": 300, "color": (0,120,200)},
                 {"text": "Wireless", "y": 400, "color": (0,150,100)},
-                {"text": "Exit Admin Mode", "y": 500, "color": (200,60,60)},
-                {"text": "System Restart", "y": 600, "color": (150,30,30)}  # Added System Restart button
+                {"text": "System Settings", "y": 500, "color": (100,150,0)},  # Add this line
+                {"text": "Exit Admin Mode", "y": 600, "color": (200,60,60)},  # Move down
+                {"text": "System Restart", "y": 700, "color": (150,30,30)}    # Move down
             ]
 
             # Add logging to check buttons
@@ -1923,6 +2178,7 @@ class AdminMode:
             logging.error(f"Error rendering admin menu: {e}")
             import traceback
             logging.error(traceback.format_exc())
+
 
 
     def _render_credentials_menu(self):
@@ -3955,7 +4211,24 @@ class CartMode:
         # Load payment method images
         payment_images_dir = Path.home() / "SelfCheck" / "SysPics"
     
-        # Stripe button
+        # Load settings
+        settings_path = Path.home() / "SelfCheck" / "Cred" / "Settings.json"
+        try:
+            with open(settings_path, 'r') as f:
+                settings = json.load(f)
+        except Exception as e:
+            logging.error(f"Error loading settings: {e}")
+            settings = {
+                "payment_options": {
+                    "venmo_enabled": True,
+                    "cashapp_enabled": True
+                },
+                "receipt_options": {
+                    "print_receipt_enabled": True
+                }
+            }
+    
+        # Stripe button (always shown)
         stripe_path = payment_images_dir / "stripe.png"
         if stripe_path.exists():
             try:
@@ -3982,65 +4255,67 @@ class CartMode:
                                      height=2, width=20)
                 stripe_btn.pack(pady=10)
     
-        # Frame for Venmo and Cash App buttons (side by side)
-        mobile_frame = tk.Frame(self.payment_popup, bg="white")
-        mobile_frame.pack(pady=10)
+        # Only create mobile payment frame if at least one mobile option is enabled
+        if settings["payment_options"]["venmo_enabled"] or settings["payment_options"]["cashapp_enabled"]:
+            # Frame for Venmo and Cash App buttons (side by side)
+            mobile_frame = tk.Frame(self.payment_popup, bg="white")
+            mobile_frame.pack(pady=10)
     
-        # Venmo button
-        venmo_path = payment_images_dir / "Venmo.png"
-        if venmo_path.exists():
-            try:
-                with Image.open(venmo_path) as img:
-                    # Resize to appropriate size
-                    img = img.resize((200, 80), Image.LANCZOS)
-                    venmo_img = ImageTk.PhotoImage(img)
-                
-                    # Create button with image
-                    venmo_btn = tk.Button(mobile_frame, 
-                                        image=venmo_img, 
-                                        command=lambda: self._process_payment("Venmo"),
-                                        bd=0)
-                    venmo_btn.image = venmo_img  # Keep reference
-                    venmo_btn.pack(side=tk.LEFT, padx=10)
-            except Exception as e:
-                logging.error(f"Error loading Venmo image: {e}")
-                # Fallback to text button
-                venmo_btn = tk.Button(mobile_frame, 
-                                    text="Venmo", 
-                                    font=("Arial", 16), 
-                                    command=lambda: self._process_payment("Venmo"),
-                                    bg="#3D95CE", fg="white",
-                                    height=2, width=10)
-                venmo_btn.pack(side=tk.LEFT, padx=10)
+            # Venmo button
+            if settings["payment_options"]["venmo_enabled"]:
+                venmo_path = payment_images_dir / "Venmo.png"
+                if venmo_path.exists():
+                    try:
+                        with Image.open(venmo_path) as img:
+                            # Resize to appropriate size
+                            img = img.resize((200, 80), Image.LANCZOS)
+                            venmo_img = ImageTk.PhotoImage(img)
+                        
+                            # Create button with image
+                            venmo_btn = tk.Button(mobile_frame, 
+                                                image=venmo_img, 
+                                                command=lambda: self._process_payment("Venmo"),
+                                                bd=0)
+                            venmo_btn.image = venmo_img  # Keep reference
+                            venmo_btn.pack(side=tk.LEFT, padx=10)
+                    except Exception as e:
+                        logging.error(f"Error loading Venmo image: {e}")
+                        # Fallback to text button
+                        venmo_btn = tk.Button(mobile_frame, 
+                                            text="Venmo", 
+                                            font=("Arial", 16), 
+                                            command=lambda: self._process_payment("Venmo"),
+                                            bg="#3D95CE", fg="white",
+                                            height=2, width=10)
+                        venmo_btn.pack(side=tk.LEFT, padx=10)
     
-
-        # Cash App button
-        cashapp_path = payment_images_dir / "cashapp.png"
-        if cashapp_path.exists():
-            try:
-                with Image.open(cashapp_path) as img:
-                    # Resize to same size as Venmo button
-                    img = img.resize((200, 80), Image.LANCZOS)
-                    cashapp_img = ImageTk.PhotoImage(img)
-                
-                    # Create button with image - call the dedicated Cash App method directly
-                    cashapp_btn = tk.Button(mobile_frame, 
-                                          image=cashapp_img, 
-                                          command=lambda: self._process_cashapp_payment(total),
-                                          bd=0)
-                    cashapp_btn.image = cashapp_img  # Keep reference
-                    cashapp_btn.pack(side=tk.LEFT, padx=10)
-            except Exception as e:
-                logging.error(f"Error loading Cash App image: {e}")
-                # Fallback to text button
-                cashapp_btn = tk.Button(mobile_frame, 
-                                      text="Cash App", 
-                                      font=("Arial", 16), 
-                                      command=lambda: self._process_cashapp_payment(total),
-                                      bg="#00D632", fg="white",
-                                      height=2, width=10)
-                cashapp_btn.pack(side=tk.LEFT, padx=10)
-
+            # Cash App button
+            if settings["payment_options"]["cashapp_enabled"]:
+                cashapp_path = payment_images_dir / "cashapp.png"
+                if cashapp_path.exists():
+                    try:
+                        with Image.open(cashapp_path) as img:
+                            # Resize to same size as Venmo button
+                            img = img.resize((200, 80), Image.LANCZOS)
+                            cashapp_img = ImageTk.PhotoImage(img)
+                        
+                            # Create button with image - call the dedicated Cash App method directly
+                            cashapp_btn = tk.Button(mobile_frame, 
+                                                  image=cashapp_img, 
+                                                  command=lambda: self._process_cashapp_payment(total),
+                                                  bd=0)
+                            cashapp_btn.image = cashapp_img  # Keep reference
+                            cashapp_btn.pack(side=tk.LEFT, padx=10)
+                    except Exception as e:
+                        logging.error(f"Error loading Cash App image: {e}")
+                        # Fallback to text button
+                        cashapp_btn = tk.Button(mobile_frame, 
+                                              text="Cash App", 
+                                              font=("Arial", 16), 
+                                              command=lambda: self._process_cashapp_payment(total),
+                                              bg="#00D632", fg="white",
+                                              height=2, width=10)
+                        cashapp_btn.pack(side=tk.LEFT, padx=10)
     
         # Button frame for Return and Cancel buttons
         button_frame = tk.Frame(self.payment_popup, bg="white")
@@ -4066,6 +4341,7 @@ class CartMode:
     
         # Start timeout for payment popup
         self._start_payment_timeout()
+
 
     def _close_payment_popup(self):
         """Close the payment popup."""
@@ -5349,6 +5625,23 @@ class CartMode:
                                bg="white")
         receipt_label.pack(pady=(0, 30))
         
+        # Load settings
+        settings_path = Path.home() / "SelfCheck" / "Cred" / "Settings.json"
+        try:
+            with open(settings_path, 'r') as f:
+                settings = json.load(f)
+        except Exception as e:
+            logging.error(f"Error loading settings: {e}")
+            settings = {
+                "payment_options": {
+                    "venmo_enabled": True,
+                    "cashapp_enabled": True
+                },
+                "receipt_options": {
+                    "print_receipt_enabled": True
+                }
+            }
+        
         # Button frame
         button_frame = tk.Frame(self.thank_you_popup, bg="white")
         button_frame.pack(pady=20, fill=tk.X, padx=40)
@@ -5361,16 +5654,17 @@ class CartMode:
         bottom_row = tk.Frame(button_frame, bg="white")
         bottom_row.pack(fill=tk.X)
         
-        # Print button - make it more prominent (top left)
-        print_btn = tk.Button(top_row, 
-                            text="Print", 
-                            font=("Arial", 18, "bold"), 
-                            bg="#3498db", fg="white",
-                            command=lambda: self._receipt_option_selected("print"),
-                            width=8, height=2)
-        print_btn.pack(side=tk.LEFT, padx=10, expand=True)
+        # Print button - only if enabled in settings
+        if settings["receipt_options"]["print_receipt_enabled"]:
+            print_btn = tk.Button(top_row, 
+                                text="Print", 
+                                font=("Arial", 18, "bold"), 
+                                bg="#3498db", fg="white",
+                                command=lambda: self._receipt_option_selected("print"),
+                                width=8, height=2)
+            print_btn.pack(side=tk.LEFT, padx=10, expand=True)
         
-        # Email button (top right)
+        # Email button (top right or center if print is disabled)
         email_btn = tk.Button(top_row, 
                             text="Email", 
                             font=("Arial", 18), 
@@ -5396,10 +5690,10 @@ class CartMode:
                            command=self._thank_you_complete,
                            width=8, height=2)
         none_btn.pack(side=tk.LEFT, padx=10, expand=True)
-
         
         # Start timeout - 20 seconds
         self.thank_you_timeout = self.root.after(20000, self._thank_you_timeout)
+
 
 
     def _thank_you_timeout(self):
@@ -7226,14 +7520,15 @@ class App:
         self.root.config(cursor="arrow")  # Show cursor during development
         self.root.configure(bg="black")
         self.root.bind("<Escape>", lambda e: self.shutdown())
-
-  
-
+ 
         # Initialize Google Drive service
         self.drive_service = None
         self.sheets_service = None
         self.init_google_services()
-        
+
+        # Load settings from Google Sheets
+        self.settings = self.load_settings_from_sheet()
+              
         # Attach services to root for access by all modes
         self.root.drive_service = self.drive_service
         self.root.sheets_service = self.sheets_service
@@ -7388,6 +7683,77 @@ class App:
             self.sheets_service = None
             return False
 
+    def load_settings_from_sheet(self):
+        """Load settings from Google Sheets Settings tab and save to JSON file."""
+        logging.info("Loading settings from Google Sheets")
+        
+        try:
+            # Connect to Google Sheet
+            scopes = [
+                "https://www.googleapis.com/auth/spreadsheets.readonly",
+                "https://www.googleapis.com/auth/drive.readonly",
+            ]
+            creds = Credentials.from_service_account_file(str(GS_CRED_PATH), scopes=scopes)
+            gc = gspread.authorize(creds)
+            
+            # Open the Settings tab
+            sheet = gc.open(GS_SHEET_NAME).worksheet("Settings")
+            
+            # Get settings values
+            venmo_status = sheet.acell('B2').value
+            cashapp_status = sheet.acell('B3').value
+            receipt_printer_status = sheet.acell('B4').value
+            
+            # Create settings dictionary
+            settings = {
+                "payment_options": {
+                    "venmo_enabled": venmo_status == "Enable",
+                    "cashapp_enabled": cashapp_status == "Enable"
+                },
+                "receipt_options": {
+                    "print_receipt_enabled": receipt_printer_status == "Enable"
+                }
+            }
+            
+            # Save to JSON file
+            settings_path = Path.home() / "SelfCheck" / "Cred" / "Settings.json"
+            settings_path.parent.mkdir(parents=True, exist_ok=True)
+            
+            with open(settings_path, 'w') as f:
+                json.dump(settings, f, indent=4)
+                
+            logging.info(f"Settings saved to {settings_path}")
+            return settings
+            
+        except Exception as e:
+            logging.error(f"Error loading settings from sheet: {e}")
+            
+            # Create default settings if loading fails
+            default_settings = {
+                "payment_options": {
+                    "venmo_enabled": True,
+                    "cashapp_enabled": True
+                },
+                "receipt_options": {
+                    "print_receipt_enabled": True
+                }
+            }
+            
+            # Try to save default settings
+            try:
+                settings_path = Path.home() / "SelfCheck" / "Cred" / "Settings.json"
+                settings_path.parent.mkdir(parents=True, exist_ok=True)
+                
+                with open(settings_path, 'w') as f:
+                    json.dump(default_settings, f, indent=4)
+                    
+                logging.info(f"Default settings saved to {settings_path}")
+            except Exception as save_error:
+                logging.error(f"Error saving default settings: {save_error}")
+                
+            return default_settings
+        
+
     # Add global touch event handler for debugging
         def global_touch_handler(event):
             logging.info(f"Global touch event at ({event.x}, {event.y})")
@@ -7541,6 +7907,27 @@ class App:
         # Optional: Add system restart command if needed
         # import os
         # os.system("sudo reboot")
+
+    def get_settings(self):
+        """Get current settings, loading from file if necessary."""
+        if not hasattr(self, 'settings') or self.settings is None:
+            # Try to load from file first
+            settings_path = Path.home() / "SelfCheck" / "Cred" / "Settings.json"
+            if settings_path.exists():
+                try:
+                    with open(settings_path, 'r') as f:
+                        self.settings = json.load(f)
+                    logging.info("Settings loaded from file")
+                except Exception as e:
+                    logging.error(f"Error loading settings from file: {e}")
+                    # Fall back to loading from sheet
+                    self.settings = self.load_settings_from_sheet()
+            else:
+                # If file doesn't exist, load from sheet
+                self.settings = self.load_settings_from_sheet()
+        
+        return self.settings
+    
     
 
     def shutdown(self):
