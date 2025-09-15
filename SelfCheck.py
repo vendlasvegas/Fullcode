@@ -15,7 +15,8 @@
 # Email Receipt 
 # Working on Admin Functions
 # Toggle input for payment methods and reciept printing
-# 9/12/25 upload to git hub 18:50
+# Discount Logic working, need to still fix the spreadsheet logging for redemptions
+# 9/14/25 upload to git hub 21:00
 
 import os
 import random
@@ -39,6 +40,8 @@ import re  # For regex in _format_receipt_for_sms
 import tkinter as tk
 from tkinter import messagebox
 from PIL import Image, ImageTk, ImageFont, ImageDraw
+from tkinter import ttk
+
 
 import RPi.GPIO as GPIO
 
@@ -3428,6 +3431,13 @@ class CartMode:
                                       bg="#3498db", fg="white", bd=2, relief=tk.RAISED,
                                       command=self._show_manual_entry)
         manual_entry_button.place(x=WINDOW_W//2 + 100, y=WINDOW_H-646, width=200, height=50)
+
+        # Add Coupons/Promos button above Manual Entry
+        discount_button = tk.Button(self.root, text="Coupons/Promos", font=("Arial", 16, "bold"),
+                                  bg="#9b59b6", fg="white", bd=2, relief=tk.RAISED,
+                                  command=self._show_discount_entry)
+        discount_button.place(x=WINDOW_W//2 + 100, y=WINDOW_H-696, width=200, height=50)
+        
     
         # Add Pay Now button at the bottom
         pay_now_button = tk.Button(self.root, text="Pay Now", font=("Arial", 24, "bold"),
@@ -3481,99 +3491,699 @@ class CartMode:
         self.receipt_items_frame.update_idletasks()
         self.receipt_canvas.configure(scrollregion=self.receipt_canvas.bbox("all"))
 
-    def _update_totals(self):
-        """Update the totals display with current cart values."""
-        if not hasattr(self, 'totals_frame') or not self.totals_frame:
-            return
+    def _show_discount_entry(self):
+        """Show discount code entry popup with numeric keypad."""
+        # Reset activity timestamp to prevent timeout during entry
+        self._on_activity()
         
-        # Clear existing totals display
-        for widget in self.totals_frame.winfo_children():
+        # Create popup frame
+        self.discount_entry_frame = tk.Frame(self.root, bg="white", bd=3, relief=tk.RAISED)
+        self.discount_entry_frame.place(relx=0.5, rely=0.5, width=800, height=700, anchor=tk.CENTER)
+
+        
+        # Title
+        title_label = tk.Label(self.discount_entry_frame, 
+                             text="Enter Coupon or Promo Code", 
+                             font=("Arial", 24, "bold"), 
+                             bg="white")
+        title_label.pack(pady=(20, 10))
+        
+        # Entry field
+        self.discount_code_var = tk.StringVar()
+        entry_frame = tk.Frame(self.discount_entry_frame, bg="white")
+        entry_frame.pack(pady=20)
+        
+        entry_field = tk.Entry(entry_frame, 
+                             textvariable=self.discount_code_var, 
+                             font=("Arial", 24), 
+                             width=20, 
+                             justify=tk.CENTER)
+        entry_field.pack(side=tk.LEFT, padx=10)
+        entry_field.focus_set()  # Set focus to the entry field
+        
+        # Keyboard toggle button
+        self.keyboard_mode = "numeric"  # Start with numeric keyboard
+        self.keyboard_toggle_btn = tk.Button(entry_frame, 
+                                           text="ABC", 
+                                           font=("Arial", 18), 
+                                           bg="#3498db", fg="white",
+                                           command=self._toggle_keyboard_mode)
+        self.keyboard_toggle_btn.pack(side=tk.LEFT, padx=10)
+        
+        # Create container for keyboard
+        self.keyboard_container = tk.Frame(self.discount_entry_frame, bg="white")
+        self.keyboard_container.pack(pady=20, fill=tk.BOTH, expand=True)
+        
+        # Show numeric keyboard initially
+        self._show_numeric_keyboard()
+        
+        # Button frame
+        button_frame = tk.Frame(self.discount_entry_frame, bg="white")
+        button_frame.pack(pady=(20, 20), fill=tk.X, padx=20)
+        
+        # Cancel button
+        cancel_btn = tk.Button(button_frame, 
+                             text="Cancel", 
+                             font=("Arial", 18), 
+                             command=self._close_discount_entry,
+                             bg="#e74c3c", fg="white",
+                             height=2)
+        cancel_btn.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
+        
+        # Submit button
+        submit_btn = tk.Button(button_frame, 
+                             text="Apply Discount", 
+                             font=("Arial", 18, "bold"), 
+                             command=self._process_discount_code,
+                             bg="#27ae60", fg="white",
+                             height=2)
+        submit_btn.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
+        
+        # Bind keyboard events
+        self.root.bind("<Key>", self._discount_key_press)
+
+    def _toggle_keyboard_mode(self):
+        """Toggle between numeric and QWERTY keyboard."""
+        if self.keyboard_mode == "numeric":
+            self.keyboard_mode = "qwerty"
+            self.keyboard_toggle_btn.config(text="123")
+            self._show_qwerty_keyboard()
+        else:
+            self.keyboard_mode = "numeric"
+            self.keyboard_toggle_btn.config(text="ABC")
+            self._show_numeric_keyboard()
+
+    def _show_numeric_keyboard(self):
+        """Show numeric keyboard in the container."""
+        # Clear existing keyboard
+        for widget in self.keyboard_container.winfo_children():
             widget.destroy()
         
-        # Calculate totals
+        # Create number buttons
+        buttons = [
+            ['1', '2', '3'],
+            ['4', '5', '6'],
+            ['7', '8', '9'],
+            ['0', 'Backspace']
+        ]
+        
+        for row_idx, row in enumerate(buttons):
+            row_frame = tk.Frame(self.keyboard_container, bg="white")
+            row_frame.pack(fill=tk.X, pady=5)
+            
+            for col_idx, btn_text in enumerate(row):
+                if btn_text == 'Backspace':
+                    # Backspace button
+                    btn = tk.Button(row_frame, 
+                                  text=btn_text, 
+                                  font=("Arial", 18), 
+                                  bg="#e74c3c", fg="white",
+                                  width=10, height=2,
+                                  command=self._discount_backspace)
+                    btn.pack(side=tk.LEFT, padx=5, pady=5, expand=True)
+                else:
+                    # Number button
+                    btn = tk.Button(row_frame, 
+                                  text=btn_text, 
+                                  font=("Arial", 24), 
+                                  bg="#3498db", fg="white",
+                                  width=4, height=2,
+                                  command=lambda b=btn_text: self._discount_add_char(b))
+                    btn.pack(side=tk.LEFT, padx=5, pady=5, expand=True)
+
+    def _show_qwerty_keyboard(self):
+        """Show QWERTY keyboard in the container."""
+        # Clear existing keyboard
+        for widget in self.keyboard_container.winfo_children():
+            widget.destroy()
+        
+        # Create QWERTY keyboard layout
+        rows = [
+            ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'],
+            ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'],
+            ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L'],
+            ['Z', 'X', 'C', 'V', 'B', 'N', 'M', 'Backspace']
+        ]
+        
+        for row_idx, row in enumerate(rows):
+            row_frame = tk.Frame(self.keyboard_container, bg="white")
+            row_frame.pack(fill=tk.X, pady=5)
+            
+            # Add padding for keyboard layout alignment
+            if row_idx == 2:  # A-L row
+                tk.Label(row_frame, text="", width=1, bg="white").pack(side=tk.LEFT)
+            elif row_idx == 3:  # Z-M row
+                tk.Label(row_frame, text="", width=2, bg="white").pack(side=tk.LEFT)
+            
+            for btn_text in row:
+                if btn_text == 'Backspace':
+                    # Backspace button
+                    btn = tk.Button(row_frame, 
+                                  text=btn_text, 
+                                  font=("Arial", 18), 
+                                  bg="#e74c3c", fg="white",
+                                  width=10, height=2,
+                                  command=self._discount_backspace)
+                    btn.pack(side=tk.LEFT, padx=5, pady=5, expand=True)
+                else:
+                    # Letter/number button
+                    btn = tk.Button(row_frame, 
+                                  text=btn_text, 
+                                  font=("Arial", 20), 
+                                  bg="#3498db", fg="white",
+                                  width=3, height=2,
+                                  command=lambda b=btn_text: self._discount_add_char(b))
+                    btn.pack(side=tk.LEFT, padx=5, pady=5)
+
+    def _discount_add_char(self, char):
+        """Add a character to the discount code entry."""
+        current = self.discount_code_var.get()
+        self.discount_code_var.set(current + char)
+
+    def _discount_backspace(self):
+        """Remove the last character from the discount code entry."""
+        current = self.discount_code_var.get()
+        self.discount_code_var.set(current[:-1])
+
+    def _discount_key_press(self, event):
+        """Handle keyboard input for discount code entry."""
+        if not hasattr(self, 'discount_entry_frame') or not self.discount_entry_frame:
+            return
+            
+        if event.char.isalnum():
+            # Add alphanumeric character (convert to uppercase)
+            self._discount_add_char(event.char.upper())
+        elif event.keysym == 'BackSpace':
+            # Backspace
+            self._discount_backspace()
+        elif event.keysym == 'Return':
+            # Enter
+            self._process_discount_code()
+
+    def _close_discount_entry(self):
+        """Close the discount entry popup."""
+        if hasattr(self, 'discount_entry_frame') and self.discount_entry_frame:
+            self.discount_entry_frame.destroy()
+            self.discount_entry_frame = None
+            
+        # Unbind keyboard events
+        self.root.unbind("<Key>")
+        self.root.bind("<Key>", self._on_key)  # Restore original key binding
+        
+        # Reset activity timestamp
+        self._on_activity()
+
+    def _process_discount_code(self):
+        """Process the entered discount code."""
+        # Get the entered code
+        code = self.discount_code_var.get().strip()
+        
+        if not code:
+            self._show_discount_error("Please enter a discount code")
+            return
+        
+        logging.info(f"Processing discount code: {code}")
+        
+        # Close the entry popup
+        self._close_discount_entry()
+        
+        # Look up the discount in the spreadsheet
+        try:
+            discount_info = self._get_discount_info(code)
+            
+            if not discount_info:
+                self._show_discount_error("Invalid discount code")
+                return
+            
+            # Check if the discount is expired
+            if not self._check_discount_expiration(discount_info):
+                self._show_discount_error("This discount has expired")
+                return
+            
+            # Check if one-time use and already used
+            if not self._check_discount_usage(discount_info):
+                last_used = discount_info.get('last_used', 'Unknown date')
+                self._show_discount_error(f"This discount was already used on {last_used}")
+                return
+            
+            # Apply the discount
+            self._apply_discount(discount_info)
+            
+        except Exception as e:
+            logging.error(f"Error processing discount: {e}")
+            import traceback
+            logging.error(traceback.format_exc())
+            self._show_discount_error("Error processing discount")
+
+    def _get_discount_info(self, code):
+        """Look up discount information from the Discounts tab."""
+        try:
+            # Connect to Google Sheet
+            scopes = [
+                "https://www.googleapis.com/auth/spreadsheets",
+                "https://www.googleapis.com/auth/drive",
+            ]
+            creds = Credentials.from_service_account_file(str(GS_CRED_PATH), scopes=scopes)
+            gc = gspread.authorize(creds)
+            
+            # Open the Discounts tab
+            sheet = gc.open(GS_SHEET_NAME).worksheet("Discounts")
+            
+            # Get all discount data
+            all_data = sheet.get_all_values()
+            
+            # Find the header row to map column indices
+            headers = all_data[0] if all_data else []
+            
+            # Map column indices
+            col_indices = {
+                'code': headers.index('Code') if 'Code' in headers else 0,
+                'type': headers.index('Discount Type') if 'Discount Type' in headers else 1,
+                'once': headers.index('Once') if 'Once' in headers else 2,
+                'expiration': headers.index('Expiration') if 'Expiration' in headers else 3,
+                'dollars': headers.index('Dollars') if 'Dollars' in headers else 4,
+                'percent': headers.index('Percent%') if 'Percent%' in headers else 5,
+                'total': headers.index('Total') if 'Total' in headers else 6,
+                'category': headers.index('Category') if 'Category' in headers else 7,
+                'item1': headers.index('Item 1') if 'Item 1' in headers else 8,
+                'item2': headers.index('Item 2') if 'Item 2' in headers else 9,
+                'item3': headers.index('Item 3') if 'Item 3' in headers else 10,
+                'item4': headers.index('Item 4') if 'Item 4' in headers else 11,
+                'item5': headers.index('Item 5') if 'Item 5' in headers else 12,
+                'last_used': headers.index('Last Used') if 'Last Used' in headers else 13
+            }
+            
+            # Search for the code
+            for row in all_data[1:]:  # Skip header row
+                if not row:
+                    continue
+                    
+                if row[col_indices['code']].strip().upper() == code.upper():
+                    # Found the discount code, create a dictionary with the information
+                    discount_info = {
+                        'row_index': all_data.index(row) + 1,  # 1-based index for gspread
+                        'code': row[col_indices['code']],
+                        'type': row[col_indices['type']],
+                        'once': row[col_indices['once']].upper() == 'TRUE',
+                        'expiration': row[col_indices['expiration']],
+                        'dollars': row[col_indices['dollars']],
+                        'percent': row[col_indices['percent']],
+                        'total': row[col_indices['total']].upper() == 'TRUE',
+                        'category': row[col_indices['category']],
+                        'items': [
+                            row[col_indices['item1']],
+                            row[col_indices['item2']],
+                            row[col_indices['item3']],
+                            row[col_indices['item4']],
+                            row[col_indices['item5']]
+                        ],
+                        'last_used': row[col_indices['last_used']]
+                    }
+                    
+                    # Store the column indices for later updates
+                    self.discount_col_indices = col_indices
+                    
+                    return discount_info
+            
+            # Code not found
+            return None
+            
+        except Exception as e:
+            logging.error(f"Error getting discount info: {e}")
+            import traceback
+            logging.error(traceback.format_exc())
+            return None
+
+    def _check_discount_expiration(self, discount_info):
+        """Check if the discount has expired."""
+        expiration_str = discount_info.get('expiration', '')
+        if not expiration_str:
+            return True  # No expiration date, so it's valid
+        
+        try:
+            # Parse the expiration date
+            # Try different formats
+            for fmt in ['%m/%d/%Y %H:%M:%S', '%m/%d/%Y']:
+                try:
+                    expiration_date = datetime.strptime(expiration_str, fmt)
+                    break
+                except ValueError:
+                    continue
+            else:
+                # If no format worked
+                logging.warning(f"Could not parse expiration date: {expiration_str}")
+                return True  # Allow it if we can't parse the date
+            
+            # Compare with current date
+            current_date = datetime.now()
+            return current_date <= expiration_date
+            
+        except Exception as e:
+            logging.error(f"Error checking discount expiration: {e}")
+            return True  # Allow it if there's an error
+
+    def _check_discount_usage(self, discount_info):
+        """Check if a one-time use discount has already been used."""
+        if not discount_info.get('once', False):
+            return True  # Not a one-time use discount, so it's valid
+        
+        last_used = discount_info.get('last_used', '')
+        return not bool(last_used.strip())  # Valid if last_used is empty
+
+    def _show_discount_error(self, message):
+        """Show an error message for discount processing."""
+        messagebox.showerror("Discount Error", message)
+
+    def _apply_discount(self, discount_info):
+        """Apply the discount to the cart."""
+        # Store the discount info for receipt printing and final processing
+        self.current_discount = discount_info
+        
+        # Check if it's a dollar amount or percentage discount
+        dollar_str = discount_info.get('dollars', '').strip()
+        percent_str = discount_info.get('percent', '').strip()
+        
+        if dollar_str and percent_str:
+            self._show_discount_error("Invalid discount: both dollar and percentage values are set")
+            self.current_discount = None
+            return
+        
+        try:
+            # Apply to total or specific items
+            if discount_info.get('total', False):
+                # Apply to subtotal
+                if dollar_str:
+                    # Dollar amount discount
+                    dollar_amount = float(dollar_str)
+                    self._apply_dollar_discount_to_total(dollar_amount)
+                elif percent_str:
+                    # Percentage discount
+                    percent = float(percent_str)
+                    self._apply_percent_discount_to_total(percent)
+            else:
+                # Apply to specific items
+                items = [item for item in discount_info.get('items', []) if item.strip()]
+                if not items:
+                    self._show_discount_error("No items specified for item-specific discount")
+                    self.current_discount = None
+                    return
+                    
+                if dollar_str:
+                    # Dollar amount discount per item
+                    dollar_amount = float(dollar_str)
+                    self._apply_dollar_discount_to_items(dollar_amount, items)
+                elif percent_str:
+                    # Percentage discount per item
+                    percent = float(percent_str)
+                    self._apply_percent_discount_to_items(percent, items)
+            
+            # Update the UI
+            self._update_totals()
+            
+            # Show success message
+            messagebox.showinfo("Discount Applied", 
+                              f"{discount_info.get('type', 'Discount')} has been applied to your order")
+            
+        except ValueError as e:
+            logging.error(f"Error parsing discount values: {e}")
+            self._show_discount_error("Invalid discount value")
+            self.current_discount = None
+        except Exception as e:
+            logging.error(f"Error applying discount: {e}")
+            self._show_discount_error("Error applying discount")
+            self.current_discount = None
+    def _apply_dollar_discount_to_total(self, amount):
+        """Apply a fixed dollar amount discount to the subtotal."""
+        # Calculate current subtotal
         subtotal = sum(item["price"] * item["qty"] for item in self.cart_items.values())
+        
+        # Limit discount to subtotal amount
+        self.discount_amount = min(amount, subtotal)
+        self.discount_type = "dollar_total"
+        
+        logging.info(f"Applied ${self.discount_amount:.2f} discount to subtotal")
+
+    def _apply_percent_discount_to_total(self, percent):
+        """Apply a percentage discount to the subtotal."""
+        # Calculate current subtotal
+        subtotal = sum(item["price"] * item["qty"] for item in self.cart_items.values())
+        
+        # Calculate discount amount
+        self.discount_amount = subtotal * (percent / 100)
+        self.discount_type = "percent_total"
+        
+        logging.info(f"Applied {percent}% discount (${self.discount_amount:.2f}) to subtotal")
+
+    def _apply_dollar_discount_to_items(self, amount, item_upcs):
+        """Apply a fixed dollar amount discount to specific items."""
+        total_discount = 0
+        discount_count = 0
+        
+        # Convert all UPCs to strings for comparison
+        item_upcs = [str(upc).strip() for upc in item_upcs if str(upc).strip()]
+        
+        for upc, item in self.cart_items.items():
+            # Check if this item's UPC matches any in the discount list
+            if any(self._match_upc(upc, discount_upc) for discount_upc in item_upcs):
+                # Apply discount for each quantity of this item
+                item_discount = min(amount, item["price"]) * item["qty"]
+                total_discount += item_discount
+                discount_count += item["qty"]
+        
+        self.discount_amount = total_discount
+        self.discount_type = "dollar_items"
+        self.discount_items = item_upcs
+        self.discount_item_count = discount_count
+        
+        logging.info(f"Applied ${amount:.2f} discount to {discount_count} items, total discount: ${total_discount:.2f}")
+
+    def _apply_percent_discount_to_items(self, percent, item_upcs):
+        """Apply a percentage discount to specific items."""
+        total_discount = 0
+        discount_count = 0
+        
+        # Convert all UPCs to strings for comparison
+        item_upcs = [str(upc).strip() for upc in item_upcs if str(upc).strip()]
+        
+        for upc, item in self.cart_items.items():
+            # Check if this item's UPC matches any in the discount list
+            if any(self._match_upc(upc, discount_upc) for discount_upc in item_upcs):
+                # Apply discount for each quantity of this item
+                item_discount = item["price"] * (percent / 100) * item["qty"]
+                total_discount += item_discount
+                discount_count += item["qty"]
+        
+        self.discount_amount = total_discount
+        self.discount_type = "percent_items"
+        self.discount_items = item_upcs
+        self.discount_item_count = discount_count
+        
+        logging.info(f"Applied {percent}% discount to {discount_count} items, total discount: ${total_discount:.2f}")
+
+    def _match_upc(self, cart_upc, discount_upc):
+        """Check if cart UPC matches discount UPC, handling variants."""
+        if not cart_upc or not discount_upc:
+            return False
+            
+        # Direct match
+        if str(cart_upc).strip() == str(discount_upc).strip():
+            return True
+            
+        # Try variants
+        cart_variants = upc_variants_from_scan(cart_upc)
+        discount_variants = upc_variants_from_sheet(discount_upc)
+        
+        # Check for any overlap
+        return any(cv == dv for cv in cart_variants for dv in discount_variants)
+
+    def _update_discount_usage(self):
+        """Update the spreadsheet with discount usage timestamp."""
+        if not hasattr(self, 'current_discount') or not self.current_discount:
+            logging.info("No discount to update usage for")
+            return
+            
+        # Only update if it's a one-time use discount
+        if not self.current_discount.get('once', False):
+            logging.info("Not a one-time use discount, skipping usage update")
+            return
+            
+        try:
+            # Connect to Google Sheet
+            scopes = [
+                "https://www.googleapis.com/auth/spreadsheets",
+                "https://www.googleapis.com/auth/drive",
+            ]
+            creds = Credentials.from_service_account_file(str(GS_CRED_PATH), scopes=scopes)
+            gc = gspread.authorize(creds)
+            
+            # Open the Discounts tab
+            sheet = gc.open(GS_SHEET_NAME).worksheet("Discounts")
+            
+            # Get row index and last_used column index
+            row_index = self.current_discount.get('row_index')
+            
+            if not hasattr(self, 'discount_col_indices') or not self.discount_col_indices:
+                logging.error("Missing column indices for discount update")
+                # Try to get column indices directly
+                all_data = sheet.get_all_values()
+                headers = all_data[0] if all_data else []
+                last_used_col = headers.index('Last Used') + 1 if 'Last Used' in headers else 14  # Default to column N
+            else:
+                last_used_col = self.discount_col_indices.get('last_used') + 1  # Convert to 1-based index
+            
+            if not row_index:
+                logging.error(f"Missing row index ({row_index}) for discount update")
+                return
+                
+            # Current timestamp
+            timestamp = datetime.now().strftime("%m/%d/%Y %H:%M:%S")
+            
+            # Log what we're about to do
+            logging.info(f"Updating discount usage: Sheet={GS_SHEET_NAME}, Tab=Discounts, Row={row_index}, Col={last_used_col}, Value={timestamp}")
+            
+            # Update the cell
+            sheet.update_cell(row_index, last_used_col, timestamp)
+            logging.info(f"Updated discount usage timestamp for code {self.current_discount.get('code')} to {timestamp}")
+            
+        except Exception as e:
+            logging.error(f"Error updating discount usage: {e}")
+            import traceback
+            logging.error(traceback.format_exc())
+
+
+    def _clear_discount_info(self):
+        """Clear all discount-related information."""
+        if hasattr(self, 'discount_amount'):
+            delattr(self, 'discount_amount')
+        if hasattr(self, 'discount_type'):
+            delattr(self, 'discount_type')
+        if hasattr(self, 'current_discount'):
+            delattr(self, 'current_discount')
+        if hasattr(self, 'discount_items'):
+            delattr(self, 'discount_items')
+        if hasattr(self, 'discount_item_count'):
+            delattr(self, 'discount_item_count')
+        logging.info("Cleared all discount information")
+
+
+
+#     *******************************End of Dicount Logic ***********************************************
+
+
+    def _update_totals(self):
+        """Update the totals display."""
+        if not hasattr(self, 'totals_frame'):
+            return
+            
+        # Calculate subtotal
+        subtotal = sum(item["price"] * item["qty"] for item in self.cart_items.values())
+        
+        # Apply discount if any
+        discount_amount = getattr(self, 'discount_amount', 0)
+        
+        # Adjust subtotal after discount
+        adjusted_subtotal = subtotal - discount_amount
+        
+        # Ensure adjusted subtotal is not negative
+        adjusted_subtotal = max(0, adjusted_subtotal)
+        
+        # Calculate tax
         taxable_subtotal = sum(
             item["price"] * item["qty"] 
             for item in self.cart_items.values() if item["taxable"]
         )
+        
+        # If we have a discount, adjust taxable subtotal proportionally
+        if discount_amount > 0 and subtotal > 0:
+            # For total discounts, reduce taxable amount proportionally
+            if hasattr(self, 'discount_type') and self.discount_type in ['dollar_total', 'percent_total']:
+                taxable_subtotal = max(0, taxable_subtotal * (adjusted_subtotal / subtotal))
+            # For item-specific discounts, we need to check which items were discounted
+            elif hasattr(self, 'discount_type') and self.discount_type in ['dollar_items', 'percent_items'] and hasattr(self, 'discount_items'):
+                # Calculate tax reduction for discounted taxable items
+                tax_reduction = 0
+                for upc, item in self.cart_items.items():
+                    if item["taxable"] and any(self._match_upc(upc, discount_upc) for discount_upc in self.discount_items):
+                        if self.discount_type == 'dollar_items':
+                            # Reduce by dollar amount per item, limited by item price
+                            item_discount = min(float(getattr(self, 'current_discount', {}).get('dollars', 0)), item["price"]) * item["qty"]
+                            tax_reduction += item_discount
+                        else:  # percent_items
+                            # Reduce by percentage of item price
+                            percent = float(getattr(self, 'current_discount', {}).get('percent', 0))
+                            item_discount = item["price"] * (percent / 100) * item["qty"]
+                            tax_reduction += item_discount
+                
+                # Adjust taxable subtotal
+                taxable_subtotal = max(0, taxable_subtotal - tax_reduction)
+        
         tax_amount = taxable_subtotal * (self.tax_rate / 100)
-        total = subtotal + tax_amount
+        total = adjusted_subtotal + tax_amount
+        
+        # Store the calculated total as an instance variable
+        self.final_total = total
+        
+        # Update the display
         total_items = sum(item["qty"] for item in self.cart_items.values())
         
-        # Load business name from file
-        business_name = "Vend Las Vegas"  # Default value
-        try:
-            business_name_path = Path.home() / "SelfCheck" / "Cred" / "BusinessName.txt"
-            if business_name_path.exists():
-                with open(business_name_path, 'r') as f:
-                    business_name = f.read().strip() or business_name
-        except Exception as e:
-            logging.error(f"Error reading business name: {e}")
+        # Clear existing widgets
+        for widget in self.totals_frame.winfo_children():
+            widget.destroy()
         
-        # Load machine ID from file
-        machine_id = "Unknown"  # Default value
-        try:
-            machine_id_path = Path.home() / "SelfCheck" / "Cred" / "MachineID.txt"
-            if machine_id_path.exists():
-                with open(machine_id_path, 'r') as f:
-                    machine_id = f.read().strip() or machine_id
-        except Exception as e:
-            logging.error(f"Error reading machine ID: {e}")
-        
-        # Get current timestamp
-        current_time = datetime.now().strftime("%m/%d/%Y %H:%M:%S")
-        
-        # Create a frame for header information
-        header_frame = tk.Frame(self.totals_frame, bg="white")
-        header_frame.pack(fill=tk.X, pady=(10, 20), anchor=tk.W)
-        
-        # Business name (bold)
-        business_label = tk.Label(header_frame, text=business_name, 
-                                font=("Arial", 18, "bold"), bg="white", anchor=tk.W)
-        business_label.pack(fill=tk.X, anchor=tk.W)
+        # Business name
+        business_label = tk.Label(self.totals_frame, text=self.business_name, 
+                                font=("Arial", 16, "bold"), bg="white")
+        business_label.pack(anchor=tk.W, pady=(0, 5))
         
         # Machine ID
-        machine_label = tk.Label(header_frame, text=f"Machine: {machine_id}", 
-                               font=("Arial", 14), bg="white", anchor=tk.W)
-        machine_label.pack(fill=tk.X, anchor=tk.W)
+        machine_label = tk.Label(self.totals_frame, text=f"Machine: {self.machine_id}", 
+                               font=("Arial", 12), bg="white")
+        machine_label.pack(anchor=tk.W)
         
         # Transaction ID
-        transaction_label = tk.Label(header_frame, text=f"Transaction #: {self.transaction_id}", 
-                                   font=("Arial", 14), bg="white", anchor=tk.W)
-        transaction_label.pack(fill=tk.X, anchor=tk.W)
+        txn_label = tk.Label(self.totals_frame, text=f"Transaction #: {self.transaction_id}", 
+                           font=("Arial", 12), bg="white")
+        txn_label.pack(anchor=tk.W)
         
-        # Timestamp
-        time_label = tk.Label(header_frame, text=current_time, 
-                            font=("Arial", 14), bg="white", anchor=tk.W)
-        time_label.pack(fill=tk.X, anchor=tk.W)
+        # Date and time
+        now = datetime.now()
+        date_label = tk.Label(self.totals_frame, text=now.strftime("%m/%d/%Y %H:%M:%S"), 
+                            font=("Arial", 12), bg="white")
+        date_label.pack(anchor=tk.W, pady=(0, 10))
         
-        # Separator
-        separator = tk.Frame(self.totals_frame, height=2, bg="#cccccc")
-        separator.pack(fill=tk.X, pady=10)
+        # Horizontal line
+        separator = ttk.Separator(self.totals_frame, orient='horizontal')
+        separator.pack(fill=tk.X, pady=5)
         
         # Items count
-        items_label = tk.Label(self.totals_frame, 
-                              text=f"Items: {total_items}", 
-                              font=("Arial", 16), bg="white", anchor=tk.W)
-        items_label.pack(fill=tk.X, pady=5)
+        items_label = tk.Label(self.totals_frame, text=f"Items: {total_items}", 
+                             font=("Arial", 14), bg="white")
+        items_label.pack(anchor=tk.W, pady=(5, 0))
         
         # Subtotal
-        subtotal_label = tk.Label(self.totals_frame, 
-                                 text=f"Subtotal: ${subtotal:.2f}", 
-                                 font=("Arial", 16), bg="white", anchor=tk.W)
-        subtotal_label.pack(fill=tk.X, pady=5)
+        subtotal_label = tk.Label(self.totals_frame, text=f"Subtotal: ${subtotal:.2f}", 
+                                font=("Arial", 14), bg="white")
+        subtotal_label.pack(anchor=tk.W)
+        
+        # Discount if applicable
+        if discount_amount > 0:
+            discount_type_name = "Coupon"
+            if hasattr(self, 'current_discount') and self.current_discount:
+                discount_type_name = self.current_discount.get('type', 'Coupon')
+                
+            discount_label = tk.Label(self.totals_frame, text=f"Discount ({discount_type_name}): -${discount_amount:.2f}", 
+                                    font=("Arial", 14), bg="white", fg="red")
+            discount_label.pack(anchor=tk.W)
         
         # Tax
-        tax_label = tk.Label(self.totals_frame, 
-                            text=f"Tax ({self.tax_rate}%): ${tax_amount:.2f}", 
-                            font=("Arial", 16), bg="white", anchor=tk.W)
-        tax_label.pack(fill=tk.X, pady=5)
+        tax_label = tk.Label(self.totals_frame, text=f"Tax ({self.tax_rate}%): ${tax_amount:.2f}", 
+                           font=("Arial", 14), bg="white")
+        tax_label.pack(anchor=tk.W)
         
-        # Total (bold and larger)
-        total_label = tk.Label(self.totals_frame, 
-                              text=f"Total: ${total:.2f}", 
-                              font=("Arial", 20, "bold"), bg="white", anchor=tk.W)
-        total_label.pack(fill=tk.X, pady=(10, 5))
+        # Total
+        total_label = tk.Label(self.totals_frame, text=f"Total: ${total:.2f}", 
+                             font=("Arial", 16, "bold"), bg="white")
+        total_label.pack(anchor=tk.W, pady=(0, 10))
 
 
     def scan_item(self, upc):
@@ -4142,15 +4752,56 @@ class CartMode:
         
         # Calculate the total for display
         subtotal = sum(item["price"] * item["qty"] for item in self.cart_items.values())
+        
+        # Apply discount if any
+        discount_amount = getattr(self, 'discount_amount', 0)
+        
+        # Adjust subtotal after discount
+        adjusted_subtotal = max(0, subtotal - discount_amount)
+        
+        # Calculate tax on adjusted subtotal
         taxable_subtotal = sum(
             item["price"] * item["qty"] 
             for item in self.cart_items.values() if item["taxable"]
         )
-        tax_amount = taxable_subtotal * (self.tax_rate / 100)
-        total = subtotal + tax_amount
         
-        # Create payment popup
-        self._show_payment_popup(total)
+        # If we have a discount, adjust taxable subtotal proportionally
+        if discount_amount > 0 and subtotal > 0:
+            # For total discounts, reduce taxable amount proportionally
+            if hasattr(self, 'discount_type') and self.discount_type in ['dollar_total', 'percent_total']:
+                taxable_subtotal = max(0, taxable_subtotal * (adjusted_subtotal / subtotal))
+            # For item-specific discounts, we need to check which items were discounted
+            elif hasattr(self, 'discount_type') and self.discount_type in ['dollar_items', 'percent_items'] and hasattr(self, 'discount_items'):
+                # Calculate tax reduction for discounted taxable items
+                tax_reduction = 0
+                for upc, item in self.cart_items.items():
+                    if item["taxable"] and any(self._match_upc(upc, discount_upc) for discount_upc in self.discount_items):
+                        if self.discount_type == 'dollar_items':
+                            # Reduce by dollar amount per item, limited by item price
+                            item_discount = min(float(getattr(self, 'current_discount', {}).get('dollars', 0)), item["price"]) * item["qty"]
+                            tax_reduction += item_discount
+                        else:  # percent_items
+                            # Reduce by percentage of item price
+                            percent = float(getattr(self, 'current_discount', {}).get('percent', 0))
+                            item_discount = item["price"] * (percent / 100) * item["qty"]
+                            tax_reduction += item_discount
+                
+                # Adjust taxable subtotal
+                taxable_subtotal = max(0, taxable_subtotal - tax_reduction)
+        
+        tax_amount = taxable_subtotal * (self.tax_rate / 100)
+        total = adjusted_subtotal + tax_amount
+        
+        # Store the calculated total as an instance variable
+        self.final_total = total
+        
+        # Log the calculated total
+        logging.info(f"Calculated final total: ${self.final_total:.2f}")
+        
+        # Create payment popup with the correct total
+        self._show_payment_popup(self.final_total)
+
+
 
     def _close_all_payment_popups(self):
         """Close all payment-related popups."""
@@ -4365,54 +5016,43 @@ class CartMode:
         """Process payment with selected method."""
         # Debug logging
         logging.info(f"_process_payment called with method: {method}")
-        logging.info(f"Method type: {type(method)}, Method repr: {repr(method)}")
         
-        # Calculate the total
-        subtotal = sum(item["price"] * item["qty"] for item in self.cart_items.values())
-        taxable_subtotal = sum(
-            item["price"] * item["qty"] 
-            for item in self.cart_items.values() if item["taxable"]
-        )
-        tax_amount = taxable_subtotal * (self.tax_rate / 100)
-        total = subtotal + tax_amount
+        # Use the pre-calculated total from _pay_now()
+        if not hasattr(self, 'final_total'):
+            logging.error("final_total not set, cannot process payment.")
+            return
+
+        # Get the final total
+        total = self.final_total
         
-        # Log the payment attempt
+        # Log the payment attempt with the correct total
         logging.info(f"Processing payment of ${total:.2f} with {method}")
 
         # Store the payment method for receipt printing
-        if method.lower() == "stripe":
+        if method == "Stripe":
             self.current_payment_method = "Credit Card"
         else:
             self.current_payment_method = method
         
-        # Debug each condition
-        logging.info(f"Checking method == 'Venmo': {method == 'Venmo'}")
-        logging.info(f"Checking method == 'Cash App': {method == 'Cash App'}")
-        logging.info(f"Checking method == 'Stripe': {method == 'Stripe'}")
-        
-        # Use exact string comparison for method to ensure correct matching
+        # Route to the correct QR code generation method
         if method == "Venmo":
-            logging.info("Venmo condition matched")
-            # Show QR code for Venmo payment
+            # Show QR code for Venmo payment with the calculated total
             self._show_venmo_qr_code(total)
-        elif method == "Cash App":
-            logging.info("Cash App condition matched")
-            # Show QR code for Cash App payment
-            self._show_cashapp_qr_code(total)
         elif method == "Stripe":
-            logging.info("Stripe condition matched")
-            # Show QR code for Stripe payment
+            # Show QR code for Stripe payment with the calculated total
             self._show_stripe_qr_code(total)
+        elif method == "Cash App":
+            # This is usually called directly, but handle it here for consistency
+            self._process_cashapp_payment(total)
         else:
-            logging.info(f"No condition matched for method: {method}")
-            # For other payment methods (temporary)
+            # Fallback for other/unknown payment methods
+            logging.warning(f"Unknown payment method '{method}' called in _process_payment.")
             self._close_payment_popup()
-            
-            # Log the transaction
             self._log_successful_transaction(self.current_payment_method, total)
-            
-            # Show thank you popup
             self._show_thank_you_popup()
+
+
+
 
 
 #***CashApp***
@@ -4623,7 +5263,7 @@ class CartMode:
         title_label.pack(pady=(20, 10))
         
         try:
-            # Generate QR code and get session ID
+            # Generate QR code and get session ID - pass the exact total
             qr_img, session_id = self._generate_stripe_qr_code(total)
             
             # Store session ID for reference
@@ -4714,6 +5354,9 @@ class CartMode:
         
         # Start timeout for payment popup - 60 seconds
         self._start_stripe_payment_timeout()
+
+
+
     def _start_payment_status_polling(self):
         """Start polling for payment status with a 90-second timeout."""
         self.payment_polling_active = True
@@ -4839,6 +5482,9 @@ class CartMode:
         import json
         import uuid
         
+        # Log the total being used
+        logging.info(f"Generating Stripe QR code with total: ${total:.2f}")
+        
         # Load Stripe credentials
         try:
             stripe_secret_key_path = Path.home() / "SelfCheck" / "Cred" / "Stripe_Secret_Key.txt"
@@ -4933,7 +5579,7 @@ class CartMode:
             raise
 
 
-
+# Check 
     def _start_stripe_webhook_listener(self):
         """Start listening for Stripe webhook events."""
         import threading
@@ -5230,46 +5876,6 @@ class CartMode:
 
     
 
-    def _process_payment(self, method):
-        """Process payment with selected method."""
-        # Debug logging
-        logging.info(f"_process_payment called with method: {method}")
-        
-        # Calculate the total
-        subtotal = sum(item["price"] * item["qty"] for item in self.cart_items.values())
-        taxable_subtotal = sum(
-            item["price"] * item["qty"] 
-            for item in self.cart_items.values() if item["taxable"]
-        )
-        tax_amount = taxable_subtotal * (self.tax_rate / 100)
-        total = subtotal + tax_amount
-        
-        # Log the payment attempt
-        logging.info(f"Processing payment of ${total:.2f} with {method}")
-
-        # Store the payment method for receipt printing
-        if method.lower() == "stripe":
-            self.current_payment_method = "Credit Card"
-        else:
-            self.current_payment_method = method
-        
-        if method.lower() == "venmo":
-            # Show QR code for Venmo payment
-            self._show_venmo_qr_code(total)
-        elif method.lower() == "stripe":
-            # Show QR code for Stripe payment
-            self._show_stripe_qr_code(total)
-        else:
-            # For other payment methods (temporary)
-            self._close_payment_popup()
-            
-            # Log the transaction
-            self._log_successful_transaction(self.current_payment_method, total)
-            
-            # Show thank you popup
-            self._show_thank_you_popup()
-
-
     def _show_venmo_qr_code(self, total):
         """Show QR code for Venmo payment."""
         # Close the current payment popup
@@ -5288,7 +5894,7 @@ class CartMode:
         title_label.pack(pady=(20, 10))
         
         try:
-            # Generate QR code and get transaction ID
+            # Generate QR code and get transaction ID - pass the exact total
             qr_img, transaction_id = self._generate_venmo_qr_code(total)
             
             # Store transaction ID for reference
@@ -5379,10 +5985,14 @@ class CartMode:
         # Start timeout for payment popup - 60 seconds
         self._start_payment_timeout(timeout_seconds=60)
 
+
     def _generate_venmo_qr_code(self, total):
         """Generate a Venmo QR code for payment."""
         import qrcode
         import urllib.parse
+        
+        # Log the total being used
+        logging.info(f"Generating Venmo QR code with total: ${total:.2f}")
         
         # Generate a unique transaction ID
         if not hasattr(self, 'current_transaction_id'):
@@ -5423,6 +6033,8 @@ class CartMode:
         
         # Return the PIL Image and transaction ID
         return img, self.current_transaction_id
+
+
 
     def get_venmo_username(self):
         """Get Venmo username from VenmoUser.txt."""
@@ -5760,12 +6372,50 @@ class CartMode:
             
             # Calculate totals
             subtotal = sum(item["price"] * item["qty"] for item in self.cart_items.values())
+            
+            # Apply discount if any
+            discount_amount = getattr(self, 'discount_amount', 0)
+            discount_type = getattr(self, 'discount_type', None)
+            discount_info = getattr(self, 'current_discount', None)
+            
+            # Adjust subtotal after discount
+            adjusted_subtotal = subtotal - discount_amount
+            
+            # Ensure adjusted subtotal is not negative
+            adjusted_subtotal = max(0, adjusted_subtotal)
+            
+            # Calculate tax
             taxable_subtotal = sum(
                 item["price"] * item["qty"] 
                 for item in self.cart_items.values() if item["taxable"]
             )
+            
+            # If we have a discount, adjust taxable subtotal proportionally
+            if discount_amount > 0 and subtotal > 0:
+                # For total discounts, reduce taxable amount proportionally
+                if discount_type in ['dollar_total', 'percent_total']:
+                    taxable_subtotal = max(0, taxable_subtotal * (adjusted_subtotal / subtotal))
+                # For item-specific discounts, we need to check which items were discounted
+                elif discount_type in ['dollar_items', 'percent_items'] and hasattr(self, 'discount_items'):
+                    # Calculate tax reduction for discounted taxable items
+                    tax_reduction = 0
+                    for upc, item in self.cart_items.items():
+                        if item["taxable"] and any(self._match_upc(upc, discount_upc) for discount_upc in self.discount_items):
+                            if discount_type == 'dollar_items':
+                                # Reduce by dollar amount per item, limited by item price
+                                item_discount = min(float(discount_info.get('dollars', 0)), item["price"]) * item["qty"]
+                                tax_reduction += item_discount
+                            else:  # percent_items
+                                # Reduce by percentage of item price
+                                percent = float(discount_info.get('percent', 0))
+                                item_discount = item["price"] * (percent / 100) * item["qty"]
+                                tax_reduction += item_discount
+                    
+                    # Adjust taxable subtotal
+                    taxable_subtotal = max(0, taxable_subtotal - tax_reduction)
+            
             tax_amount = taxable_subtotal * (self.tax_rate / 100)
-            total = subtotal + tax_amount
+            total = adjusted_subtotal + tax_amount
             total_items = sum(item["qty"] for item in self.cart_items.values())
             
             # Get current date and time
@@ -5773,14 +6423,14 @@ class CartMode:
             date_str = now.strftime("%m/%d/%Y")
             time_str = now.strftime("%H:%M:%S")
             
-            # Prepare row data
+            # Prepare row data - KEEP ORIGINAL FORMAT
             row_data = [
                 f"TXN-{self.transaction_id}",  # Transaction ID
                 date_str,                      # Date
                 time_str,                      # Time
                 str(total_items),              # Items
                 self.current_payment_method,   # Payment Method
-                f"${subtotal:.2f}",            # Subtotal
+                f"${adjusted_subtotal:.2f}",   # Subtotal (already adjusted for discount)
                 f"${tax_amount:.2f}",          # Tax
                 f"${total:.2f}",               # Total
                 self.machine_id,               # Machine ID
@@ -5815,8 +6465,54 @@ class CartMode:
             sheet.append_row(row_data)
             logging.info(f"Successfully logged transaction {self.transaction_id} to Transactions tab")
             
+            # If there was a discount, log it to the Redeemed tab
+            if discount_amount > 0 and discount_info:
+                self._log_discount_to_redeemed_tab(discount_info, discount_amount)
+            
         except Exception as e:
             logging.error(f"Failed to log transaction details: {e}")
+            import traceback
+            logging.error(traceback.format_exc())
+
+    def _log_discount_to_redeemed_tab(self, discount_info, discount_amount):
+        """Log discount information to the Redeemed tab."""
+        try:
+            # Connect to Google Sheet
+            scopes = [
+                "https://www.googleapis.com/auth/spreadsheets",
+                "https://www.googleapis.com/auth/drive",
+            ]
+            creds = Credentials.from_service_account_file(str(GS_CRED_PATH), scopes=scopes)
+            gc = gspread.authorize(creds)
+            
+            # Open the Redeemed sheet
+            sheet = gc.open(GS_SHEET_NAME).worksheet("Redeemed")
+            
+            # Get current date and time
+            now = datetime.now()
+            date_str = now.strftime("%m/%d/%Y")
+            time_str = now.strftime("%H:%M:%S")
+            
+            # Prepare row data for Redeemed tab
+            row_data = [
+                f"TXN-{self.transaction_id}",                # Transaction ID
+                date_str,                                     # Date
+                time_str,                                     # Time
+                discount_info.get('type', 'Discount'),        # Discount Type
+                f"${discount_amount:.2f}",                    # Amount
+                self.machine_id,                              # Machine ID
+                self.current_payment_method,                  # Payment Method
+                f"${sum(item['price'] * item['qty'] for item in self.cart_items.values()):.2f}",  # Subtotal (original)
+                f"${sum(item['price'] * item['qty'] for item in self.cart_items.values() if item['taxable']) * (self.tax_rate / 100):.2f}",  # Tax
+                f"${sum(item['price'] * item['qty'] for item in self.cart_items.values()) - discount_amount + (sum(item['price'] * item['qty'] for item in self.cart_items.values() if item['taxable']) * (self.tax_rate / 100)):.2f}"  # Total
+            ]
+            
+            # Append the row to the sheet
+            sheet.append_row(row_data)
+            logging.info(f"Successfully logged discount for transaction {self.transaction_id} to Redeemed tab")
+            
+        except Exception as e:
+            logging.error(f"Failed to log discount to Redeemed tab: {e}")
             import traceback
             logging.error(traceback.format_exc())
     
@@ -5838,6 +6534,8 @@ class CartMode:
             self.thank_you_popup.destroy()
             self.thank_you_popup = None
 
+        # Update discount usage in spreadsheet
+        self._update_discount_usage()        
 
         # Clean up QR frame if it exists
         if hasattr(self, 'qr_frame') and self.qr_frame:
@@ -5959,8 +6657,13 @@ class CartMode:
         # Reset payment method
         self.current_payment_method = None
         
+        # Clear discount information
+        self._clear_discount_info()
+        
         logging.info("Cart reset")
 
+        
+        
     def _show_text_receipt(self, payment_method, total):
         """Show a text-based receipt on screen."""
         # Calculate values needed for receipt
@@ -6113,10 +6816,48 @@ class CartMode:
         """Format receipt content for display or printing."""
         # Calculate values needed for receipt
         subtotal = sum(item["price"] * item["qty"] for item in self.cart_items.values())
+        
+        # Apply discount if any
+        discount_amount = getattr(self, 'discount_amount', 0)
+        discount_type = getattr(self, 'discount_type', None)
+        discount_info = getattr(self, 'current_discount', None)
+        
+        # Adjust subtotal after discount
+        adjusted_subtotal = subtotal - discount_amount
+        
+        # Ensure adjusted subtotal is not negative
+        adjusted_subtotal = max(0, adjusted_subtotal)
+        
+        # Calculate tax
         taxable_subtotal = sum(
             item["price"] * item["qty"] 
             for item in self.cart_items.values() if item["taxable"]
         )
+        
+        # If we have a discount, adjust taxable subtotal proportionally
+        if discount_amount > 0 and subtotal > 0:
+            # For total discounts, reduce taxable amount proportionally
+            if discount_type in ['dollar_total', 'percent_total']:
+                taxable_subtotal = max(0, taxable_subtotal * (adjusted_subtotal / subtotal))
+            # For item-specific discounts, we need to check which items were discounted
+            elif discount_type in ['dollar_items', 'percent_items'] and hasattr(self, 'discount_items'):
+                # Calculate tax reduction for discounted taxable items
+                tax_reduction = 0
+                for upc, item in self.cart_items.items():
+                    if item["taxable"] and any(self._match_upc(upc, discount_upc) for discount_upc in self.discount_items):
+                        if discount_type == 'dollar_items':
+                            # Reduce by dollar amount per item, limited by item price
+                            item_discount = min(float(discount_info.get('dollars', 0)), item["price"]) * item["qty"]
+                            tax_reduction += item_discount
+                        else:  # percent_items
+                            # Reduce by percentage of item price
+                            percent = float(discount_info.get('percent', 0))
+                            item_discount = item["price"] * (percent / 100) * item["qty"]
+                            tax_reduction += item_discount
+                
+                # Adjust taxable subtotal
+                taxable_subtotal = max(0, taxable_subtotal - tax_reduction)
+        
         tax_amount = taxable_subtotal * (self.tax_rate / 100)
         total_items = sum(item["qty"] for item in self.cart_items.values())
         
@@ -6145,6 +6886,13 @@ class CartMode:
         receipt_text += "-" * 40 + "\n"
         receipt_text += f"Items: {total_items}\n"
         receipt_text += f"Subtotal: ${subtotal:.2f}\n"
+        
+        # Add discount if applicable
+        if discount_amount > 0 and discount_info:
+            discount_text = f"Discount ({discount_info.get('type', 'Discount')}): -${discount_amount:.2f}"
+            receipt_text += f"{discount_text}\n"
+            receipt_text += f"Adjusted Subtotal: ${adjusted_subtotal:.2f}\n"
+        
         receipt_text += f"Tax ({self.tax_rate}%): ${tax_amount:.2f}\n"
         receipt_text += f"Total: ${total:.2f}\n"
         receipt_text += f"Paid: {getattr(self, 'current_payment_method', 'Unknown')}\n"
@@ -6219,11 +6967,50 @@ class CartMode:
         try:
             # Calculate values needed for receipt
             subtotal = sum(item["price"] * item["qty"] for item in self.cart_items.values())
+            
+            # Apply discount if any
+            discount_amount = getattr(self, 'discount_amount', 0)
+            discount_type = getattr(self, 'discount_type', None)
+            discount_info = getattr(self, 'current_discount', None)
+            
+            # Adjust subtotal after discount
+            adjusted_subtotal = subtotal - discount_amount
+            
+            # Ensure adjusted subtotal is not negative
+            adjusted_subtotal = max(0, adjusted_subtotal)
+            
+            # Calculate tax on adjusted subtotal
             taxable_subtotal = sum(
                 item["price"] * item["qty"] 
                 for item in self.cart_items.values() if item["taxable"]
             )
+            
+            # If we have a discount, adjust taxable subtotal proportionally
+            if discount_amount > 0 and subtotal > 0:
+                # For total discounts, reduce taxable amount proportionally
+                if discount_type in ['dollar_total', 'percent_total']:
+                    taxable_subtotal = max(0, taxable_subtotal * (adjusted_subtotal / subtotal))
+                # For item-specific discounts, we need to check which items were discounted
+                elif discount_type in ['dollar_items', 'percent_items'] and hasattr(self, 'discount_items'):
+                    # Calculate tax reduction for discounted taxable items
+                    tax_reduction = 0
+                    for upc, item in self.cart_items.items():
+                        if item["taxable"] and any(self._match_upc(upc, discount_upc) for discount_upc in self.discount_items):
+                            if discount_type == 'dollar_items':
+                                # Reduce by dollar amount per item, limited by item price
+                                item_discount = min(float(discount_info.get('dollars', 0)), item["price"]) * item["qty"]
+                                tax_reduction += item_discount
+                            else:  # percent_items
+                                # Reduce by percentage of item price
+                                percent = float(discount_info.get('percent', 0))
+                                item_discount = item["price"] * (percent / 100) * item["qty"]
+                                tax_reduction += item_discount
+                    
+                    # Adjust taxable subtotal
+                    taxable_subtotal = max(0, taxable_subtotal - tax_reduction)
+            
             tax_amount = taxable_subtotal * (self.tax_rate / 100)
+            calculated_total = adjusted_subtotal + tax_amount
             total_items = sum(item["qty"] for item in self.cart_items.values())
             
             # Format the receipt content
@@ -6281,11 +7068,20 @@ class CartMode:
             # Totals
             receipt.append(f"Items: {total_items}\n".encode('ascii', 'replace'))
             receipt.append(f"Subtotal: ${subtotal:.2f}\n".encode('ascii', 'replace'))
+            
+            # Add discount if applicable
+            if discount_amount > 0 and discount_info:
+                discount_text = f"Discount ({discount_info.get('type', 'Discount')}): -${discount_amount:.2f}"
+                receipt.append(b'\x1B\x45\x01')  # Bold on
+                receipt.append(discount_text.encode('ascii', 'replace') + b'\n')
+                receipt.append(b'\x1B\x45\x00')  # Bold off
+                receipt.append(f"Adjusted Subtotal: ${adjusted_subtotal:.2f}\n".encode('ascii', 'replace'))
+            
             receipt.append(f"Tax ({self.tax_rate}%): ${tax_amount:.2f}\n".encode('ascii', 'replace'))
             
-            # Bold for total
+            # Bold for total - use calculated_total instead of parameter total
             receipt.append(b'\x1B\x45\x01')  # Bold on
-            receipt.append(f"Total: ${total:.2f}\n".encode('ascii', 'replace'))
+            receipt.append(f"Total: ${calculated_total:.2f}\n".encode('ascii', 'replace'))
             receipt.append(b'\x1B\x45\x00')  # Bold off
             
             receipt.append(f"Paid: {payment_method}\n".encode('ascii', 'replace'))
@@ -6366,6 +7162,7 @@ class CartMode:
             import traceback
             logging.error(traceback.format_exc())
             return False
+
 
     def _show_email_entry_popup(self):
         """Show popup for email entry with virtual keyboard."""
@@ -6710,10 +7507,48 @@ class CartMode:
         """Format receipt content for email."""
         # Calculate values needed for receipt
         subtotal = sum(item["price"] * item["qty"] for item in self.cart_items.values())
+        
+        # Apply discount if any
+        discount_amount = getattr(self, 'discount_amount', 0)
+        discount_type = getattr(self, 'discount_type', None)
+        discount_info = getattr(self, 'current_discount', None)
+        
+        # Adjust subtotal after discount
+        adjusted_subtotal = subtotal - discount_amount
+        
+        # Ensure adjusted subtotal is not negative
+        adjusted_subtotal = max(0, adjusted_subtotal)
+        
+        # Calculate tax
         taxable_subtotal = sum(
             item["price"] * item["qty"] 
             for item in self.cart_items.values() if item["taxable"]
         )
+        
+        # If we have a discount, adjust taxable subtotal proportionally
+        if discount_amount > 0 and subtotal > 0:
+            # For total discounts, reduce taxable amount proportionally
+            if discount_type in ['dollar_total', 'percent_total']:
+                taxable_subtotal = max(0, taxable_subtotal * (adjusted_subtotal / subtotal))
+            # For item-specific discounts, we need to check which items were discounted
+            elif discount_type in ['dollar_items', 'percent_items'] and hasattr(self, 'discount_items'):
+                # Calculate tax reduction for discounted taxable items
+                tax_reduction = 0
+                for upc, item in self.cart_items.items():
+                    if item["taxable"] and any(self._match_upc(upc, discount_upc) for discount_upc in self.discount_items):
+                        if discount_type == 'dollar_items':
+                            # Reduce by dollar amount per item, limited by item price
+                            item_discount = min(float(discount_info.get('dollars', 0)), item["price"]) * item["qty"]
+                            tax_reduction += item_discount
+                        else:  # percent_items
+                            # Reduce by percentage of item price
+                            percent = float(discount_info.get('percent', 0))
+                            item_discount = item["price"] * (percent / 100) * item["qty"]
+                            tax_reduction += item_discount
+                
+                # Adjust taxable subtotal
+                taxable_subtotal = max(0, taxable_subtotal - tax_reduction)
+        
         tax_amount = taxable_subtotal * (self.tax_rate / 100)
         total_items = sum(item["qty"] for item in self.cart_items.values())
         
@@ -6740,6 +7575,13 @@ class CartMode:
         receipt.append("-" * 40)
         receipt.append(f"Items: {total_items}")
         receipt.append(f"Subtotal: ${subtotal:.2f}")
+        
+        # Add discount if applicable
+        if discount_amount > 0 and discount_info:
+            discount_text = f"Discount ({discount_info.get('type', 'Discount')}): -${discount_amount:.2f}"
+            receipt.append(discount_text)
+            receipt.append(f"Adjusted Subtotal: ${adjusted_subtotal:.2f}")
+        
         receipt.append(f"Tax ({self.tax_rate}%): ${tax_amount:.2f}")
         receipt.append(f"Total: ${total:.2f}")
         receipt.append(f"Paid: {self.current_payment_method}")
@@ -6976,12 +7818,16 @@ class CartMode:
         # Close the dialog
         close_callback()
         
+        # Clear discount information
+        self._clear_discount_info()
+        
         # Log the cancelled cart
         self._log_cancelled_cart("Customer")
         
         # Exit to main menu
         if hasattr(self, "on_exit"):
             self.on_exit()
+
 
 
     def _log_cancelled_cart(self, reason):
