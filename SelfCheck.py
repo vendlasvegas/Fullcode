@@ -16,7 +16,8 @@
 # Working on Admin Functions
 # Toggle input for payment methods and reciept printing
 # Discount Logic working, need to still fix the spreadsheet logging for redemptions
-# 9/14/25 upload to git hub 21:00
+# Security Camera integratin into cart mode
+# 9/17/25 upload to git hub 16:00
 
 import os
 import random
@@ -35,12 +36,14 @@ import uuid
 import http.server
 import stripe
 import re  # For regex in _format_receipt_for_sms
+import cv2
 
 
 import tkinter as tk
 from tkinter import messagebox
 from PIL import Image, ImageTk, ImageFont, ImageDraw
 from tkinter import ttk
+from googleapiclient.http import MediaFileUpload
 
 
 import RPi.GPIO as GPIO
@@ -235,6 +238,123 @@ class IdleMode:
         self.weather_api_key = None
 
 
+    def _check_and_upload_videos(self):
+        """Check for videos to upload after 10 minutes in idle mode."""
+        if not self.is_active:
+            return
+            
+        # Check if we've been in idle mode for at least 10 minutes
+        current_time = time.time()
+        if not hasattr(self, 'idle_start_time'):
+            self.idle_start_time = current_time
+            
+        elapsed_minutes = (current_time - self.idle_start_time) / 60
+        
+        if elapsed_minutes >= 10:
+            logging.info("Idle for 10+ minutes, checking for videos to upload")
+            
+            # Reset timer so we don't check again for another 10 minutes
+            self.idle_start_time = current_time
+            
+            # Start upload in a separate thread
+            threading.Thread(target=self._upload_videos_to_drive, daemon=True).start()
+        
+        # Check again in 60 seconds
+        self.video_check_timer = self.root.after(60000, self._check_and_upload_videos)
+
+    def _upload_videos_to_drive(self):
+        """Upload videos to Google Drive and delete local copies."""
+        videos_dir = Path.home() / "SelfCheck" / "TransactionVideos"
+        if not videos_dir.exists():
+            logging.info("No TransactionVideos directory found")
+            return
+            
+        # Get list of video files
+        video_files = list(videos_dir.glob("*.avi"))
+        if not video_files:
+            logging.info("No videos found to upload")
+            return
+            
+        logging.info(f"Found {len(video_files)} videos to upload")
+        
+        # Initialize Google Drive API
+        try:
+            scopes = [
+                "https://www.googleapis.com/auth/drive",
+                "https://www.googleapis.com/auth/drive.file",
+            ]
+            creds = Credentials.from_service_account_file(str(GS_CRED_PATH), scopes=scopes)
+            drive_service = build('drive', 'v3', credentials=creds)
+            
+            # Find or create TransactionVideos folder in Google Drive
+            folder_id = self._find_or_create_drive_folder(drive_service, "TransactionVideos")
+            if not folder_id:
+                logging.error("Failed to find or create TransactionVideos folder in Google Drive")
+                return
+                
+            # Upload each video
+            for video_path in video_files:
+                try:
+                    logging.info(f"Uploading {video_path.name} to Google Drive")
+                    self._upload_file_to_drive(drive_service, video_path, folder_id)
+                    
+                    # Delete local file after successful upload
+                    video_path.unlink()
+                    logging.info(f"Deleted local file: {video_path}")
+                except Exception as e:
+                    logging.error(f"Error uploading {video_path.name}: {e}")
+        except Exception as e:
+            logging.error(f"Error initializing Google Drive API: {e}")
+
+    def _find_or_create_drive_folder(self, drive_service, folder_name):
+        """Find or create a folder in Google Drive."""
+        try:
+            # Check if folder exists
+            query = f"name='{folder_name}' and mimeType='application/vnd.google-apps.folder' and trashed=false"
+            results = drive_service.files().list(q=query, spaces='drive', fields='files(id, name)').execute()
+            items = results.get('files', [])
+            
+            if items:
+                # Folder exists, return its ID
+                return items[0]['id']
+            else:
+                # Create folder
+                file_metadata = {
+                    'name': folder_name,
+                    'mimeType': 'application/vnd.google-apps.folder'
+                }
+                folder = drive_service.files().create(body=file_metadata, fields='id').execute()
+                return folder.get('id')
+        except Exception as e:
+            logging.error(f"Error finding/creating Drive folder: {e}")
+            return None
+
+    def _upload_file_to_drive(self, drive_service, file_path, folder_id):
+        """Upload a file to Google Drive folder."""
+        try:
+            file_metadata = {
+                'name': file_path.name,
+                'parents': [folder_id]
+            }
+            
+            media = MediaFileUpload(
+                str(file_path),
+                mimetype='video/x-msvideo',
+                resumable=True
+            )
+            
+            file = drive_service.files().create(
+                body=file_metadata,
+                media_body=media,
+                fields='id'
+            ).execute()
+            
+            logging.info(f"Uploaded {file_path.name} to Google Drive with ID: {file.get('id')}")
+            return True
+        except Exception as e:
+            logging.error(f"Error uploading to Drive: {e}")
+            return False
+    
     
 
 
@@ -630,6 +750,11 @@ class IdleMode:
         
         # Start command checker
         self.start_command_checker()
+        
+        # Start video upload checker
+        self.idle_start_time = time.time()
+        self._check_and_upload_videos()
+
 
 
 
@@ -650,15 +775,16 @@ class IdleMode:
             self.root.after_cancel(self.selection_timeout)
             self.selection_timeout = None
         
-        # Hide all overlays and main label
-        self._hide_all_overlays()
-        self._hide_selection_screen()
-
         # Cancel command checker timer
         if hasattr(self, 'command_check_timer') and self.command_check_timer:
             self.root.after_cancel(self.command_check_timer)
             self.command_check_timer = None
 
+        # Cancel video check timer
+        if hasattr(self, 'video_check_timer') and self.video_check_timer:
+            self.root.after_cancel(self.video_check_timer)
+            self.video_check_timer = None
+        
         # Cancel restart countdown timer if active
         if hasattr(self, 'restart_countdown_timer') and self.restart_countdown_timer:
             self.root.after_cancel(self.restart_countdown_timer)
@@ -668,6 +794,12 @@ class IdleMode:
         if hasattr(self, 'restart_popup') and self.restart_popup:
             self.restart_popup.destroy()
             self.restart_popup = None
+    
+        
+        # Hide all overlays
+        self._hide_all_overlays()
+        self._hide_selection_screen()
+
     
         
     def _hide_all_overlays(self):
@@ -1747,6 +1879,8 @@ class AdminMode:
                             self.current_settings["payment_options"]["cashapp_enabled"] = False
                         elif button["option"] == "Receipt Printer":
                             self.current_settings["receipt_options"]["print_receipt_enabled"] = False
+                        elif button["option"] == "Security Camera":
+                            self.current_settings["camera_options"]["security_camera_enabled"] = False
                     else:
                         button["status"] = "Enable"
                         # Update the current_settings dictionary
@@ -1756,6 +1890,8 @@ class AdminMode:
                             self.current_settings["payment_options"]["cashapp_enabled"] = True
                         elif button["option"] == "Receipt Printer":
                             self.current_settings["receipt_options"]["print_receipt_enabled"] = True
+                        elif button["option"] == "Security Camera":
+                            self.current_settings["camera_options"]["security_camera_enabled"] = True
                     # Re-render the menu with updated status
                     self._render_system_settings_menu()
                     return
@@ -1810,6 +1946,9 @@ class AdminMode:
                     },
                     "receipt_options": {
                         "print_receipt_enabled": True
+                    },
+                    "camera_options": {
+                        "security_camera_enabled": True
                     }
                 }
             
@@ -1825,10 +1964,16 @@ class AdminMode:
             cashapp_status = "Enable" if self.current_settings["payment_options"]["cashapp_enabled"] else "Disable"
             printer_status = "Enable" if self.current_settings["receipt_options"]["print_receipt_enabled"] else "Disable"
             
+            # Add camera status
+            if "camera_options" not in self.current_settings:
+                self.current_settings["camera_options"] = {"security_camera_enabled": True}
+            camera_status = "Enable" if self.current_settings["camera_options"]["security_camera_enabled"] else "Disable"
+            
             settings_options = [
                 {"text": "Venmo Payments", "status": venmo_status, "y": 250, "color": (0,120,200)},
                 {"text": "CashApp Payments", "status": cashapp_status, "y": 350, "color": (0,150,100)},
-                {"text": "Receipt Printer", "status": printer_status, "y": 450, "color": (100,100,200)}
+                {"text": "Receipt Printer", "status": printer_status, "y": 450, "color": (100,100,200)},
+                {"text": "Security Camera", "status": camera_status, "y": 550, "color": (150,50,150)}
             ]
             
             # Store button positions for touch detection
@@ -1865,7 +2010,7 @@ class AdminMode:
                 })
             
             # Save & Exit button
-            save_btn_y = 600
+            save_btn_y = 650  # Move down to accommodate new button
             save_btn_text = "Save & Exit"
             save_text_w, save_text_h = d.textbbox((0,0), save_btn_text, font=option_font)[2:]
             save_btn_x = (WINDOW_W - save_text_w) // 2 - 50  # Center the button
@@ -1891,6 +2036,7 @@ class AdminMode:
             logging.error(f"Error rendering system settings menu: {e}")
             import traceback
             logging.error(traceback.format_exc())
+
 
     def _save_settings(self):
         """Save current settings to JSON file and Google Sheets."""
@@ -1922,11 +2068,13 @@ class AdminMode:
             venmo_status = "Enable" if self.current_settings["payment_options"]["venmo_enabled"] else "Disable"
             cashapp_status = "Enable" if self.current_settings["payment_options"]["cashapp_enabled"] else "Disable"
             printer_status = "Enable" if self.current_settings["receipt_options"]["print_receipt_enabled"] else "Disable"
+            camera_status = "Enable" if self.current_settings["camera_options"]["security_camera_enabled"] else "Disable"
             
             # Use batch update with proper format
             sheet.update_cell(2, 2, venmo_status)     # B2
             sheet.update_cell(3, 2, cashapp_status)   # B3
             sheet.update_cell(4, 2, printer_status)   # B4
+            sheet.update_cell(5, 2, camera_status)    # B5
             
             # Show confirmation popup
             self._show_settings_saved_popup()
@@ -1938,6 +2086,7 @@ class AdminMode:
             
             # Show error popup
             self._show_error_popup("Error saving settings")
+
 
     
 
@@ -3161,6 +3310,146 @@ class CartMode:
             # Check permissions to help diagnose the issue
             self.check_spreadsheet_permissions()
 
+    def _init_security_camera(self):
+        """Initialize the security camera if enabled in settings."""
+        # Check if OpenCV is available
+        if not SecurityCamera.is_available():
+            logging.error("OpenCV not available, security camera disabled")
+            self.camera_enabled = False
+            return
+            
+        # Check if camera is enabled in settings
+        settings_path = Path.home() / "SelfCheck" / "Cred" / "Settings.json"
+        try:
+            with open(settings_path, 'r') as f:
+                settings = json.load(f)
+                camera_enabled = settings.get("camera_options", {}).get("security_camera_enabled", True)
+        except Exception as e:
+            logging.error(f"Error loading camera settings: {e}")
+            camera_enabled = True  # Default to enabled if settings can't be loaded
+        
+        self.camera_enabled = camera_enabled
+        
+        if not self.camera_enabled:
+            logging.info("Security camera disabled in settings")
+            return
+        
+        # Initialize camera
+        self.security_camera = SecurityCamera()
+        self.camera_display_active = False
+        self.camera_update_after = None
+        self.recording_end_timer = None
+        
+        # Create videos directory
+        self.videos_dir = Path.home() / "SelfCheck" / "TransactionVideos"
+        self.videos_dir.mkdir(parents=True, exist_ok=True)
+
+
+    def _create_camera_display(self):
+        """Create the security camera display area."""
+        if not hasattr(self, 'security_camera') or not self.camera_enabled:
+            return
+        
+        # Create a frame for the camera display
+        camera_width = 200  # Width of the camera display
+        
+        self.camera_frame = tk.LabelFrame(self.root, text="Security Camera", 
+                                        font=("Arial", 14, "bold"), fg="white", bg="#34495e",
+                                        bd=2, relief=tk.RAISED)
+        
+        # Position to the right of the buttons - adjust as needed for your layout
+        # This positions it above the "Pay Now" button
+        self.camera_frame.place(x=WINDOW_W//2 + 100, y=WINDOW_H-300, 
+                              width=camera_width, height=150)
+        
+        # Camera display label
+        self.camera_label = tk.Label(self.camera_frame, text="Initializing Camera...", 
+                                   bg="black", fg="white", font=("Arial", 10))
+        self.camera_label.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        # Start the camera
+        if self.security_camera.start():
+            self.camera_display_active = True
+            self._update_camera_display()
+            
+            # Start recording
+            self._start_transaction_recording()
+        else:
+            self.camera_label.config(text="Camera not available")
+
+    def _update_camera_display(self):
+        """Update the security camera display."""
+        if not hasattr(self, 'camera_display_active') or not self.camera_display_active:
+            return
+        
+        if not hasattr(self, 'security_camera'):
+            return
+            
+        pil_image = self.security_camera.get_current_frame()
+        
+        if pil_image:
+            try:
+                # Scale up the image to fit the display area
+                display_width = 180  # Adjust for padding
+                display_height = 130
+                
+                # Resize with NEAREST filter for speed
+                pil_image = pil_image.resize((display_width, display_height), Image.NEAREST)
+                
+                # Convert to PhotoImage
+                photo = ImageTk.PhotoImage(pil_image)
+                
+                # Update label
+                self.camera_label.config(image=photo, text="")
+                self.camera_label.image = photo  # Keep a reference
+                
+            except Exception as e:
+                logging.error(f"Camera display update error: {e}")
+                self.camera_label.config(text=f"Camera Error")
+        
+        # Schedule next update
+        if hasattr(self, 'camera_display_active') and self.camera_display_active:
+            self.camera_update_after = self.root.after(100, self._update_camera_display)  # ~10 FPS
+
+    def _start_transaction_recording(self):
+        """Start recording video for this transaction."""
+        if not hasattr(self, 'security_camera') or not self.camera_enabled:
+            return
+        
+        # Create filename with transaction ID and timestamp
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = str(self.videos_dir / f"transaction_{self.transaction_id}_{timestamp}.avi")
+        
+        # Start recording
+        if self.security_camera.start_recording(filename):
+            logging.info(f"Started transaction recording: {filename}")
+        else:
+            logging.error("Failed to start transaction recording")
+
+    def _schedule_recording_end(self):
+        """Schedule the recording to end 10 seconds after thank you screen."""
+        if not hasattr(self, 'security_camera') or not self.camera_enabled:
+            return
+            
+        # Cancel any existing timer
+        if hasattr(self, 'recording_end_timer') and self.recording_end_timer:
+            self.root.after_cancel(self.recording_end_timer)
+            
+        # Schedule recording to end in 10 seconds
+        self.recording_end_timer = self.root.after(10000, self._stop_transaction_recording)
+        logging.info("Scheduled recording to end in 10 seconds")
+
+    def _stop_transaction_recording(self):
+        """Stop recording video."""
+        if not hasattr(self, 'security_camera') or not self.camera_enabled:
+            return
+            
+        if self.security_camera.stop_recording():
+            logging.info("Stopped transaction recording")
+        else:
+            logging.warning("No active recording to stop")
+    
+
     def start(self):
         """Start the Cart mode."""
         logging.info("CartMode: Starting")
@@ -3180,12 +3469,29 @@ class CartMode:
         # Create fresh UI
         self._create_ui()
         
+        # Initialize and start security camera
+        self._init_security_camera()
+        if hasattr(self, 'camera_enabled') and self.camera_enabled:
+            self._create_camera_display()
+        
         # Start timeout timer
         self._arm_timeout()
+
 
     def stop(self):
         """Stop the Cart mode and clean up resources."""
         logging.info("CartMode: Stopping")
+        
+        # Stop camera
+        if hasattr(self, 'security_camera'):
+            self.camera_display_active = False
+            if hasattr(self, 'camera_update_after') and self.camera_update_after:
+                self.root.after_cancel(self.camera_update_after)
+                self.camera_update_after = None
+            if hasattr(self, 'recording_end_timer') and self.recording_end_timer:
+                self.root.after_cancel(self.recording_end_timer)
+                self.recording_end_timer = None
+            self.security_camera.stop()
         
         # Cancel timers
         if self.timeout_after:
@@ -3211,6 +3517,10 @@ class CartMode:
         if hasattr(self, 'totals_frame'):
             self.totals_frame.place_forget()
             
+        # Hide camera frame
+        if hasattr(self, 'camera_frame'):
+            self.camera_frame.place_forget()
+            
         # Close popups
         for popup_attr in ['popup_frame', 'manual_entry_frame', 'timeout_popup', 
                           'payment_popup', 'transaction_id_popup', 'thank_you_popup',
@@ -3221,7 +3531,6 @@ class CartMode:
                     setattr(self, popup_attr, None)
                 except:
                     pass
-
 
 
 
@@ -6534,6 +6843,10 @@ class CartMode:
             self.thank_you_popup.destroy()
             self.thank_you_popup = None
 
+        # Schedule recording to end in 10 seconds
+        if hasattr(self, 'security_camera') and hasattr(self, 'camera_enabled') and self.camera_enabled:
+            self._schedule_recording_end()
+
         # Update discount usage in spreadsheet
         self._update_discount_usage()        
 
@@ -6562,6 +6875,10 @@ class CartMode:
         
         if hasattr(self, 'totals_frame'):
             self.totals_frame.place_forget()
+            
+        # Hide camera frame
+        if hasattr(self, 'camera_frame'):
+            self.camera_frame.place_forget()
         
         # Call the exit callback to return to idle mode
         if hasattr(self, 'on_exit') and callable(self.on_exit):
@@ -8347,6 +8664,188 @@ class CartMode:
 
 
 
+# ==============================
+#        SECURITY CAMERA
+# ==============================
+
+class SecurityCamera:
+    """Handles camera capture for security monitoring."""
+    def __init__(self):
+        self.camera = None
+        self.camera_running = False
+        self.current_frame = None
+        self.camera_thread = None
+        self.recording = False
+        self.video_writer = None
+        self.recording_filename = None
+
+    @staticmethod
+    def is_available():
+        """Check if OpenCV is available."""
+        try:
+            import cv2
+            return True
+        except ImportError:
+            return False
+    
+        
+    def initialize(self):
+        """Initialize camera with V4L2 settings."""
+        try:
+            logging.info("Initializing security camera...")
+            self.camera = cv2.VideoCapture("/dev/video0", cv2.CAP_V4L2)
+            
+            if not self.camera.isOpened():
+                logging.error("Failed to open camera")
+                self.camera = None
+                return False
+            
+            logging.info("Camera opened successfully")
+            
+            # Set to the supported resolution
+            self.camera.set(cv2.CAP_PROP_FRAME_WIDTH, 160)
+            self.camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 120)
+            
+            # Try both formats - use MJPG first as it's typically faster
+            formats = [
+                ("MJPG", cv2.VideoWriter_fourcc('M','J','P','G')),
+                ("YUYV", cv2.VideoWriter_fourcc('Y','U','Y','V'))
+            ]
+            
+            format_set = False
+            for fmt_name, fmt_code in formats:
+                logging.info(f"Trying camera format: {fmt_name}")
+                self.camera.set(cv2.CAP_PROP_FOURCC, fmt_code)
+                
+                # Try to read a test frame
+                ret, frame = self.camera.read()
+                if ret:
+                    logging.info(f"SUCCESS! Camera format {fmt_name} works")
+                    format_set = True
+                    break
+            
+            if not format_set:
+                logging.error("Could not set a working camera format")
+                self.camera.release()
+                self.camera = None
+                return False
+                
+            logging.info("Security camera initialized successfully")
+            return True
+            
+        except Exception as e:
+            logging.error(f"Error initializing camera: {e}")
+            if self.camera is not None:
+                self.camera.release()
+            self.camera = None
+            return False
+    
+    def start(self):
+        """Start camera capture in separate thread."""
+        if self.camera is None and not self.initialize():
+            logging.error("Cannot start camera - initialization failed")
+            return False
+            
+        self.camera_running = True
+        self.camera_thread = threading.Thread(target=self._camera_loop, daemon=True)
+        self.camera_thread.start()
+        logging.info("Security camera started")
+        return True
+    
+    def stop(self):
+        """Stop camera capture."""
+        self.camera_running = False
+        
+        # Stop recording if active
+        if self.recording:
+            self.stop_recording()
+        
+        if self.camera_thread:
+            # Wait for thread to finish
+            if self.camera_thread.is_alive():
+                self.camera_thread.join(timeout=1.0)
+            self.camera_thread = None
+            
+        if self.camera:
+            self.camera.release()
+            self.camera = None
+        logging.info("Security camera stopped")
+    
+    def _camera_loop(self):
+        """Camera capture loop running in separate thread."""
+        while self.camera_running and self.camera is not None:
+            try:
+                ret, frame = self.camera.read()
+                if ret:
+                    # Convert BGR to RGB for PIL
+                    self.current_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                    
+                    # Write frame to video if recording
+                    if self.recording and self.video_writer:
+                        self.video_writer.write(frame)  # Write the original BGR frame
+                else:
+                    logging.warning("Failed to read from camera")
+                    time.sleep(0.5)  # Wait before trying again
+            except Exception as e:
+                logging.error(f"Camera error: {e}")
+                time.sleep(1)  # Wait longer after an error
+            
+            time.sleep(0.1)  # ~10 FPS to reduce CPU usage
+    
+    def get_current_frame(self):
+        """Get the current camera frame as a PIL Image."""
+        if self.current_frame is None:
+            return None
+            
+        try:
+            # Convert to PIL Image
+            pil_image = Image.fromarray(self.current_frame)
+            return pil_image
+        except Exception as e:
+            logging.error(f"Error converting camera frame: {e}")
+            return None
+            
+    def start_recording(self, filename):
+        """Start recording video to a file."""
+        if self.camera is None:
+            logging.error("Cannot start recording - camera not initialized")
+            return False
+            
+        try:
+            # Create directory if it doesn't exist
+            os.makedirs(os.path.dirname(filename), exist_ok=True)
+            
+            # Define the codec and create VideoWriter object
+            fourcc = cv2.VideoWriter_fourcc(*'XVID')
+            self.video_writer = cv2.VideoWriter(filename, fourcc, 10.0, (160, 120))
+            
+            if not self.video_writer.isOpened():
+                logging.error(f"Failed to open video writer for {filename}")
+                return False
+                
+            self.recording = True
+            self.recording_filename = filename
+            logging.info(f"Started recording to {filename}")
+            return True
+        except Exception as e:
+            logging.error(f"Error starting recording: {e}")
+            return False
+
+    def stop_recording(self):
+        """Stop recording video."""
+        if not self.recording:
+            return False
+            
+        try:
+            self.recording = False
+            if self.video_writer:
+                self.video_writer.release()
+                self.video_writer = None
+            logging.info(f"Stopped recording to {self.recording_filename}")
+            return True
+        except Exception as e:
+            logging.error(f"Error stopping recording: {e}")
+            return False
 
 
 
@@ -8367,6 +8866,9 @@ class App:
         self.root.configure(bg="black")
         self.root.bind("<Escape>", lambda e: self.shutdown())
  
+        # Check for OpenCV installation
+        self.opencv_available = self.check_opencv_installation()
+
         # Initialize Google Drive service
         self.drive_service = None
         self.sheets_service = None
@@ -8429,6 +8931,7 @@ class App:
         self.idle.on_cart_action = lambda: self.set_mode("Cart")
         self.price.on_cart_action = lambda: self.set_mode("Cart")
         self.cart.on_exit = lambda: self.set_mode("Idle")
+
 
     # Button handlers
     def _on_red(self, ch):
@@ -8549,6 +9052,7 @@ class App:
             venmo_status = sheet.acell('B2').value
             cashapp_status = sheet.acell('B3').value
             receipt_printer_status = sheet.acell('B4').value
+            camera_status = sheet.acell('B5').value  # Add this line
             
             # Create settings dictionary
             settings = {
@@ -8558,6 +9062,9 @@ class App:
                 },
                 "receipt_options": {
                     "print_receipt_enabled": receipt_printer_status == "Enable"
+                },
+                "camera_options": {
+                    "security_camera_enabled": camera_status == "Enable"
                 }
             }
             
@@ -8582,6 +9089,9 @@ class App:
                 },
                 "receipt_options": {
                     "print_receipt_enabled": True
+                },
+                "camera_options": {
+                    "security_camera_enabled": True
                 }
             }
             
@@ -8598,6 +9108,7 @@ class App:
                 logging.error(f"Error saving default settings: {save_error}")
                 
             return default_settings
+
         
 
     # Add global touch event handler for debugging
@@ -8673,6 +9184,18 @@ class App:
         # Also apply to all child widgets for consistency
         for widget in self.root.winfo_children():
             widget.config(cursor=blank_cursor)
+
+    def check_opencv_installation(self):
+        """Check if OpenCV is installed and provide a warning if not."""
+        try:
+            import cv2
+            logging.info(f"OpenCV version {cv2.__version__} is installed")
+            return True
+        except ImportError:
+            logging.error("OpenCV (cv2) is not installed. Camera functionality will be disabled.")
+            logging.error("To install OpenCV, run: sudo apt install python3-opencv")
+            return False
+    
 
     def update_upc_catalog_and_tax_rate(self):
         """Update UPC catalog and tax rate from Google Sheet."""
