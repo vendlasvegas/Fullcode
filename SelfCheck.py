@@ -1,24 +1,15 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 # SelfCheck.py
-# Idle slideshow on HDMI + PriceCheck mode
 # Target display: 1280x1024 (square format)
-# Price Checker is Good
-# Admin Login Screen Good / Secret button Top Left Passwords good long press
-# Starting to test cart functions
-# Manual Entry Added and working with image pull up
-# Setting up Pay Now options, Venmo and Stripe good
-# reciept working
-# CashApp Working
 # Inventory Synced to Inv tab
 # Transactions synced
 # Email Receipt 
 # Working on Admin Functions
-# Toggle input for payment methods and reciept printing
 # Discount Logic working, need to still fix the spreadsheet logging for redemptions
 # Security Camera integratin into cart mode no recording features
-# Need to fix venmo/cash app timeout transaction logging
-# 9/18/25 upload to git hub 18:30
+
+
+# 9/22/25 upload to git hub 10:00
 
 import os
 import random
@@ -5723,131 +5714,6 @@ class CartMode:
             raise
 
 
-# Check 
-    def _start_stripe_webhook_listener(self):
-        """Start listening for Stripe webhook events."""
-        import threading
-        import http.server
-        import socketserver
-        import json
-        import stripe
-        import time
-        from datetime import datetime, timedelta
-        
-        # Load webhook secret
-        try:
-            webhook_secret_path = Path.home() / "SelfCheck" / "Cred" / "Stripe_Webhook_Secret.txt"
-            
-            if not webhook_secret_path.exists():
-                logging.warning(f"Stripe webhook secret file not found: {webhook_secret_path}")
-                logging.warning("Webhook verification will be disabled")
-                webhook_secret = None
-            else:
-                with open(webhook_secret_path, 'r') as f:
-                    webhook_secret = f.read().strip()
-            
-            # Store the start time for timeout checking
-            self.stripe_webhook_start_time = time.time()
-            
-            # Flag to track if payment was received
-            self.stripe_payment_received = False
-            
-            # Define webhook handler
-            class StripeWebhookHandler(http.server.BaseHTTPRequestHandler):
-                def do_POST(self):
-                    content_length = int(self.headers['Content-Length'])
-                    post_data = self.rfile.read(content_length)
-                    
-                    try:
-                        # Parse the JSON payload
-                        event_json = json.loads(post_data)
-                        
-                        # Verify webhook signature if secret is available
-                        if webhook_secret:
-                            try:
-                                event = stripe.Webhook.construct_event(
-                                    post_data, self.headers['Stripe-Signature'], webhook_secret
-                                )
-                            except Exception as e:
-                                logging.error(f"Webhook signature verification failed: {e}")
-                                self.send_response(400)
-                                self.end_headers()
-                                self.wfile.write(b'Webhook signature verification failed')
-                                return
-                        else:
-                            # If no webhook secret, just use the parsed JSON
-                            event = event_json
-                        
-                        # Log the event
-                        logging.info(f"Received Stripe webhook event: {event.get('type')}")
-                        
-                        # Check if it's a payment success event
-                        if event.get('type') == 'checkout.session.completed':
-                            session = event.get('data', {}).get('object', {})
-                            
-                            # Get metadata
-                            metadata = session.get('metadata', {})
-                            machine_id = metadata.get('machine_id')
-                            
-                            # Check if this webhook is for this machine
-                            if machine_id == self.server.machine_id:
-                                logging.info(f"Valid payment confirmation received for machine {machine_id}")
-                                
-                                # Set payment received flag
-                                self.server.payment_received = True
-                                
-                                # Schedule UI update in main thread
-                                self.server.root.after(0, self.server.payment_callback)
-                            else:
-                                logging.info(f"Webhook for different machine: {machine_id}")
-                        
-                        # Send response
-                        self.send_response(200)
-                        self.end_headers()
-                        self.wfile.write(b'Event received')
-                        
-                    except Exception as e:
-                        logging.error(f"Error processing webhook: {e}")
-                        self.send_response(400)
-                        self.end_headers()
-                        self.wfile.write(b'Webhook error')
-            
-            # Create server
-            class StripeWebhookServer(socketserver.TCPServer):
-                def __init__(self, server_address, RequestHandlerClass, machine_id, root, payment_callback):
-                    self.machine_id = machine_id
-                    self.root = root
-                    self.payment_callback = payment_callback
-                    self.payment_received = False
-                    socketserver.TCPServer.__init__(self, server_address, RequestHandlerClass)
-            
-            # Start server in a separate thread
-            def run_server():
-                try:
-                    # Use a random available port
-                    with StripeWebhookServer(('localhost', 0), StripeWebhookHandler, 
-                                            self.machine_id, 
-                                            self.root, self._on_stripe_payment_received) as httpd:
-                        
-                        # Store the server port
-                        self.stripe_webhook_port = httpd.server_address[1]
-                        logging.info(f"Stripe webhook server started on port {self.stripe_webhook_port}")
-                        
-                        # Serve until shutdown
-                        httpd.serve_forever()
-                except Exception as e:
-                    logging.error(f"Error in webhook server: {e}")
-            
-            # Start server thread
-            self.stripe_webhook_thread = threading.Thread(target=run_server)
-            self.stripe_webhook_thread.daemon = True
-            self.stripe_webhook_thread.start()
-            
-        except Exception as e:
-            logging.error(f"Error starting Stripe webhook listener: {e}")
-            import traceback
-            logging.error(traceback.format_exc())
-
 
     def _on_stripe_payment_received(self):
         """Handle successful Stripe payment."""
@@ -6313,6 +6179,9 @@ class CartMode:
         # Unbind keyboard events
         self.root.unbind("<Key>")
         self.root.bind("<Key>", self._on_key)  # Restore original key binding
+
+        # Log the unconfirmed transaction
+        self._log_unconfirmed_mobile_payment()        
         
         # Return to payment popup
         messagebox.showinfo("Timeout", "Transaction ID entry timed out.")
@@ -6326,6 +6195,9 @@ class CartMode:
         
         # Get entered ID
         entered_id = self.transaction_id_var.get().strip()
+        
+        # Store the entered verification code for transaction logging
+        self.entered_verification_code = entered_id
         
         # Log the entered ID
         logging.info(f"Transaction ID entered: {entered_id}")
@@ -6356,6 +6228,34 @@ class CartMode:
         
         # Show thank you popup
         self._show_thank_you_popup()
+
+    def _log_unconfirmed_mobile_payment(self):
+        """Log an unconfirmed mobile payment when timeout occurs."""
+        # Calculate the total
+        subtotal = sum(item["price"] * item["qty"] for item in self.cart_items.values())
+        taxable_subtotal = sum(
+            item["price"] * item["qty"] 
+            for item in self.cart_items.values() if item["taxable"]
+        )
+        tax_amount = taxable_subtotal * (self.tax_rate / 100)
+        total = subtotal + tax_amount
+        
+        # Set status to unconfirmed for transaction logging
+        self.entered_verification_code = None
+        
+        # Log the transaction
+        self._log_successful_transaction(self.current_payment_method, total)
+        
+        # Log transaction details to ensure it's recorded in the Transactions tab
+        self._log_transaction_details()
+        
+        # Close all popups
+        self._close_all_payment_popups()
+        
+        # Clear cart and return to idle mode
+        self.cart_items = {}
+        if hasattr(self, "on_exit"):
+            self.on_exit()
 
 
     def _show_thank_you_popup(self):
@@ -6567,6 +6467,19 @@ class CartMode:
             date_str = now.strftime("%m/%d/%Y")
             time_str = now.strftime("%H:%M:%S")
             
+            # Determine status based on payment method and verification code
+            payment_method = getattr(self, 'current_payment_method', "Unknown")
+            verification_code = getattr(self, 'entered_verification_code', None)
+            
+            # Set status based on payment method and verification code
+            if payment_method in ["Venmo", "CashApp"]:
+                if verification_code:
+                    status = f"Completed {verification_code}"
+                else:
+                    status = "Unconfirmed"
+            else:
+                status = "Completed"
+            
             # Prepare row data - KEEP ORIGINAL FORMAT
             row_data = [
                 f"TXN-{self.transaction_id}",  # Transaction ID
@@ -6578,7 +6491,7 @@ class CartMode:
                 f"${tax_amount:.2f}",          # Tax
                 f"${total:.2f}",               # Total
                 self.machine_id,               # Machine ID
-                "Completed"                    # Status
+                status                         # Status with verification code if available
             ]
             
             # Add item details (up to 15 items)
@@ -6617,6 +6530,7 @@ class CartMode:
             logging.error(f"Failed to log transaction details: {e}")
             import traceback
             logging.error(traceback.format_exc())
+
 
     def _log_discount_to_redeemed_tab(self, discount_info, discount_amount):
         """Log discount information to the Redeemed tab."""
@@ -7894,10 +7808,15 @@ class CartMode:
 
     def _payment_timeout_expired(self):
         """Handle payment timeout expiration."""
-        self._close_all_payment_popups()
-        self._log_cancelled_cart("Customer")
-        if hasattr(self, "on_exit"):
-            self.on_exit()
+        # If this is a mobile payment (Venmo/CashApp), log as unconfirmed
+        if hasattr(self, 'current_payment_method') and self.current_payment_method in ["Venmo", "CashApp"]:
+            self._log_unconfirmed_mobile_payment()
+        else:
+            # For other payment methods, just log as cancelled
+            self._log_cancelled_cart("Timeout")
+            if hasattr(self, "on_exit"):
+                self.on_exit()
+
 
     def _show_error(self, message):
         """Show an error message."""
