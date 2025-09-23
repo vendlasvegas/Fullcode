@@ -7,6 +7,7 @@
 # Working on Admin Functions
 # Discount Logic working, need to still fix the spreadsheet logging for redemptions
 # Security Camera integratin into cart mode no recording features
+# ssh tcanutt@192.168.0.131
 
 
 # 9/22/25 upload to git hub 10:00
@@ -2770,36 +2771,7 @@ class AdminMode:
         bt_frame.destroy()
         self._render_wireless_menu()
 
-def _system_restart(self):
-    """Handle system restart button click."""
-    # Show confirmation dialog
-    from tkinter import messagebox
-    if messagebox.askyesno("System Restart", "Are you sure you want to restart the system?"):
-        logging.info("System restart initiated by admin")
-        
-        # Clean up resources
-        if hasattr(self, 'timeout_after') and self.timeout_after:
-            self.root.after_cancel(self.timeout_after)
-            self.timeout_after = None
-        
-        # Notify parent app to shut down
-        if hasattr(self, "on_system_restart"):
-            self.on_system_restart()
-        else:
-            # Fallback if callback not set
-            try:
-                # Clean up GPIO
-                import RPi.GPIO as GPIO
-                GPIO.cleanup()
-                
-                # Destroy root window
-                self.root.destroy()
-                
-                # Exit program
-                import sys
-                sys.exit(0)
-            except Exception as e:
-                logging.error(f"Error during system restart: {e}")
+#def _system_restart(self):
 
     
 
